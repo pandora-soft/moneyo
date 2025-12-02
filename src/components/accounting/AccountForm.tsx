@@ -12,7 +12,7 @@ const formSchema = z.object({
   type: z.enum(['cash', 'bank', 'credit_card']),
   currency: z.enum(['USD', 'EUR', 'ARS']),
   balance: z.preprocess(
-    (val) => (val === '' || val === undefined ? 0 : Number(val)),
+    (val: unknown) => (val === '' || val === undefined ? 0 : Number(val)),
     z.number().min(0, "El saldo no puede ser negativo.").default(0)
   ),
 });
@@ -25,7 +25,7 @@ interface AccountFormProps {
 }
 export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = false }: AccountFormProps) {
   const form = useForm<AccountFormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       currency: 'USD',
       balance: 0,
@@ -34,7 +34,11 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
   });
   const { isSubmitting } = form.formState;
   const handleSubmit: SubmitHandler<AccountFormValues> = async (values) => {
-    await onSubmit(values);
+    const payload: Omit<Account, 'id' | 'createdAt'> = {
+      ...values,
+      balance: values.balance ?? 0,
+    };
+    await onSubmit(payload);
     onFinished();
   };
   return (

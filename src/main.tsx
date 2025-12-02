@@ -24,7 +24,7 @@ const navItems = [
   { href: '/reports', label: 'Reportes', icon: BarChart },
   { href: '/settings', label: 'Ajustes', icon: Settings },
 ];
-const AppRoot = () => (
+export const AppRoot = () => (
   <div className="min-h-screen bg-background font-sans antialiased">
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">

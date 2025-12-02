@@ -16,7 +16,7 @@ const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta."),
   category: z.string().min(2, "La categoría es requerida.").max(50),
   limit: z.preprocess(
-    (val) => (val === '' ? 0 : Number(val)),
+    (val: unknown) => (val === '' ? 0 : Number(val)),
     z.number().positive("El límite debe ser positivo.")
   ),
   month: z.date(),
@@ -31,7 +31,7 @@ interface BudgetFormProps {
 }
 export function BudgetForm({ onSubmit, onFinished, accounts, categories, defaultValues }: BudgetFormProps) {
   const form = useForm<BudgetFormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       month: new Date(),
       limit: 0,
@@ -43,6 +43,7 @@ export function BudgetForm({ onSubmit, onFinished, accounts, categories, default
     const startOfMonth = new Date(values.month.getFullYear(), values.month.getMonth(), 1);
     await onSubmit({
       ...values,
+      limit: values.limit ?? 0,
       month: startOfMonth.getTime(),
     });
     onFinished();

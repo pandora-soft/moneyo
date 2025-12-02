@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -16,7 +16,7 @@ import { Loader2 } from 'lucide-react';
 const settingsSchema = z.object({
   currency: z.enum(['USD', 'EUR', 'ARS']),
   fiscalMonthStart: z.preprocess(
-    (val) => Number(val),
+    (val: unknown) => Number(val),
     z.number().int().min(1, "Mínimo 1").max(28, "Máximo 28")
   ),
 });
@@ -24,17 +24,21 @@ type SettingsFormValues = z.infer<typeof settingsSchema>;
 export function SettingsPage() {
   const { isDark } = useTheme();
   const form = useForm<SettingsFormValues>({
-    resolver: zodResolver(settingsSchema),
+    resolver: zodResolver(settingsSchema) as any,
   });
   const { isSubmitting, isDirty } = form.formState;
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     async function fetchSettings() {
+      setLoading(true);
       try {
         const settings = await api<Settings>('/api/finance/settings');
         form.reset(settings);
       } catch (error) {
         toast.error('No se pudieron cargar los ajustes.');
         console.error(error);
+      } finally {
+        setLoading(false);
       }
     }
     fetchSettings();
@@ -82,7 +86,7 @@ export function SettingsPage() {
                   <CardDescription>Ajustes relacionados con la moneda y fechas.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {form.formState.isLoading ? (
+                  {loading ? (
                     <>
                       <Skeleton className="h-10 w-full" />
                       <Skeleton className="h-10 w-full" />
@@ -120,7 +124,7 @@ export function SettingsPage() {
                           <FormItem>
                             <div className="flex items-center justify-between">
                               <FormLabel>Inicio del Mes Fiscal</FormLabel>
-                              <Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value)}>
+                              <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value ? String(field.value) : undefined}>
                                 <FormControl>
                                   <SelectTrigger className="w-[180px]">
                                     <SelectValue placeholder="Día del mes" />

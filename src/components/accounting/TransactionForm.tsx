@@ -19,7 +19,14 @@ const formSchema = z.object({
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
   amount: z.preprocess(
-    (val) => Number(val),
+    (val: unknown) => {
+      if (val === null || val === undefined) return 0;
+      if (typeof val === 'string') {
+        if (val.trim() === '') return 0;
+        return Number(val);
+      }
+      return Number(val as any);
+    },
     z.number().positive("El monto debe ser positivo.")
   ),
   category: z.string().min(2, "La categoría es requerida.").max(50),
@@ -43,7 +50,7 @@ interface TransactionFormProps {
 }
 export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues }: TransactionFormProps) {
   const form = useForm<TransactionFormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       type: 'expense',
       ts: new Date(),
