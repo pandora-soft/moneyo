@@ -6,6 +6,8 @@ import { api } from '@/lib/api-client';
 import type { Transaction } from '@shared/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 const COLORS = ['#0F172A', '#F97316', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
 export function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -33,7 +35,7 @@ export function ReportsPage() {
       if (tx.type === 'income') {
         acc[month].income += tx.amount;
       } else if (tx.type === 'expense') {
-        acc[month].expense += tx.amount;
+        acc[month].expense += Math.abs(tx.amount);
       }
       return acc;
     }, {} as Record<string, { income: number; expense: number }>);
@@ -46,7 +48,7 @@ export function ReportsPage() {
         if (!acc[tx.category]) {
           acc[tx.category] = 0;
         }
-        acc[tx.category] += tx.amount;
+        acc[tx.category] += Math.abs(tx.amount);
         return acc;
       }, {} as Record<string, number>);
     const categoryChartData = Object.entries(spending)
@@ -54,12 +56,34 @@ export function ReportsPage() {
       .sort((a, b) => b.value - a.value);
     return { monthlySummary: monthlyChartData, categorySpending: categoryChartData };
   }, [transactions]);
+  const handleExport = () => {
+    const headers = "Fecha,Cuenta ID,Tipo,Monto,Moneda,Categoría,Nota\n";
+    const csvContent = transactions
+      .map(tx => `${new Date(tx.ts).toISOString()},${tx.accountId},${tx.type},${tx.amount},${tx.currency},${tx.category},"${tx.note || ''}"`)
+      .join("\n");
+    const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `casaconta_reporte_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
-        <header className="mb-10">
-          <h1 className="text-4xl font-display font-bold">Reportes</h1>
-          <p className="text-muted-foreground mt-1">Visualiza tus patrones de ingresos y gastos.</p>
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
+          <div>
+            <h1 className="text-4xl font-display font-bold">Reportes</h1>
+            <p className="text-muted-foreground mt-1">Visualiza tus patrones de ingresos y gastos.</p>
+          </div>
+          <Button onClick={handleExport} disabled={loading || transactions.length === 0}>
+            <Download className="mr-2 size-4" /> Exportar a CSV
+          </Button>
         </header>
         <div className="grid gap-8 lg:grid-cols-2">
           <Card>

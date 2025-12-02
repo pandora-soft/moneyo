@@ -1,24 +1,32 @@
-import { useState, useEffect } from 'react';
-import { PlusCircle, MoreHorizontal, ArrowUpDown, Banknote, Landmark, CreditCard } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { TransactionForm } from '@/components/accounting/TransactionForm';
+import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
 import { api } from '@/lib/api-client';
 import type { Account, Transaction } from '@shared/types';
-import { format } from 'date-fns';
+import { format, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 export function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setSheetOpen] = useState(false);
-  const accountsById = new Map(accounts.map(a => [a.id, a]));
-  const fetchData = async () => {
+  const [filters, setFilters] = useState<Filters>({
+    query: '',
+    accountId: 'all',
+    type: 'all',
+    dateRange: undefined,
+  });
+  const accountsById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [txs, accs] = await Promise.all([
@@ -29,22 +37,40 @@ export function TransactionsPage() {
       setAccounts(accs);
     } catch (error) {
       console.error("Failed to fetch data", error);
+      toast.error('Error al cargar los datos.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
   useEffect(() => {
     fetchData();
-  }, []);
-  const handleAddTransaction = async (values: Omit<Transaction, 'id' | 'currency'>) => {
-    const amount = values.type === 'income' ? Math.abs(values.amount) : -Math.abs(values.amount);
-    const finalValues = { ...values, amount };
-    const newTx = await api<Transaction>('/api/finance/transactions', {
-      method: 'POST',
-      body: JSON.stringify(finalValues),
+  }, [fetchData]);
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(tx => {
+      const queryMatch = filters.query.length > 1 ?
+        tx.category.toLowerCase().includes(filters.query.toLowerCase()) ||
+        tx.note?.toLowerCase().includes(filters.query.toLowerCase()) : true;
+      const accountMatch = filters.accountId === 'all' || tx.accountId === filters.accountId;
+      const typeMatch = filters.type === 'all' || tx.type === filters.type;
+      const dateMatch = filters.dateRange?.from ?
+        isWithinInterval(new Date(tx.ts), {
+          start: filters.dateRange.from,
+          end: filters.dateRange.to || new Date(),
+        }) : true;
+      return queryMatch && accountMatch && typeMatch && dateMatch;
     });
-    // Optimistic update would be better, but for now we refetch
-    fetchData();
+  }, [transactions, filters]);
+  const handleAddTransaction = async (values: Omit<Transaction, 'id' | 'currency'>) => {
+    try {
+      await api<Transaction>('/api/finance/transactions', {
+        method: 'POST',
+        body: JSON.stringify(values),
+      });
+      toast.success('Transacción guardada.');
+      fetchData();
+    } catch (error) {
+      toast.error('Error al guardar la transacción.');
+    }
   };
   const formatCurrency = (value: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
   const accountIcons = {
@@ -74,6 +100,7 @@ export function TransactionsPage() {
             </SheetContent>
           </Sheet>
         </header>
+        <TransactionFilters filters={filters} setFilters={setFilters} accounts={accounts} />
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -99,8 +126,8 @@ export function TransactionsPage() {
                       <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
                     </TableRow>
                   ))
-                ) : transactions.length > 0 ? (
-                  transactions.map((tx) => {
+                ) : filteredTransactions.length > 0 ? (
+                  filteredTransactions.map((tx) => {
                     const account = accountsById.get(tx.accountId);
                     return (
                       <TableRow key={tx.id}>
@@ -111,7 +138,7 @@ export function TransactionsPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{tx.category}</Badge>
+                          <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
                         </TableCell>
                         <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>
                         <TableCell className={cn("text-right font-mono", tx.type === 'income' ? 'text-emerald-500' : 'text-foreground')}>
@@ -123,7 +150,7 @@ export function TransactionsPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
-                      No hay transacciones.
+                      No hay transacciones que coincidan con los filtros.
                     </TableCell>
                   </TableRow>
                 )}

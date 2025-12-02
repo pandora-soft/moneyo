@@ -1,29 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import type { Account, Currency } from '@shared/types';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api-client';
-import t from '@/lib/i18n';
+import type { Account, AccountType } from '@shared/types';
 const formSchema = z.object({
-  name: z.string().min(2, t('form.minChars', 2)).max(50),
-  type: z.enum(['cash', 'bank', 'credit_card']),
-  currency: z.string().min(1, t('form.required')),
-  balance: z.preprocess(
-    (val: unknown) => (val === '' || val === undefined ? 0 : Number(val)),
-    z.number().default(0)
-  ),
-}).refine((data) => {
-  if (data.type === 'credit_card') return true;
-  return data.balance >= 0;
-}, {
-  path: ['balance'],
-  message: t('form.account.negativeBalanceError'),
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres.").max(50),
+  type: z.enum(['cash', 'bank', 'credit_card'], { required_error: "Debe seleccionar un tipo de cuenta." }),
+  currency: z.enum(['USD', 'EUR', 'ARS'], { required_error: "Debe seleccionar una moneda." }),
+  balance: z.coerce.number().default(0),
 });
 type AccountFormValues = z.infer<typeof formSchema>;
 interface AccountFormProps {
@@ -33,43 +21,27 @@ interface AccountFormProps {
   isEditing?: boolean;
 }
 export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = false }: AccountFormProps) {
-  const [currencies, setCurrencies] = useState<Currency[]>([]);
-  useEffect(() => {
-    api<Currency[]>('/api/finance/currencies')
-      .then(setCurrencies)
-      .catch(() => setCurrencies([
-        { id: 'eur', code: 'EUR', symbol: '€', suffix: true },
-        { id: 'usd', code: 'USD', symbol: '$', suffix: false },
-        { id: 'ars', code: 'ARS', symbol: '$', suffix: false },
-      ]));
-  }, []);
   const form = useForm<AccountFormValues>({
-    resolver: zodResolver(formSchema) as any,
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      currency: 'EUR',
-      balance: 0,
+      currency: 'USD',
       ...defaultValues,
     },
   });
   const { isSubmitting } = form.formState;
-  const handleSubmit: SubmitHandler<AccountFormValues> = async (values) => {
-    const payload: Omit<Account, 'id' | 'createdAt'> = {
-      ...values,
-      balance: values.balance ?? 0,
-      currency: values.currency || 'EUR',
-    };
-    await onSubmit(payload);
+  async function handleSubmit(values: AccountFormValues) {
+    await onSubmit(values);
     onFinished();
-  };
+  }
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 px-4 py-2">
         <FormField
           control={form.control}
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('form.account.name')}</FormLabel>
+              <FormLabel>Nombre de la Cuenta</FormLabel>
               <FormControl>
                 <Input placeholder="Ej: Ahorros" {...field} />
               </FormControl>
@@ -82,7 +54,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
           name="type"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('form.account.type')}</FormLabel>
+              <FormLabel>Tipo</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -90,9 +62,9 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="bank">{t('form.account.bank')}</SelectItem>
-                  <SelectItem value="cash">{t('form.account.cash')}</SelectItem>
-                  <SelectItem value="credit_card">{t('form.account.credit_card')}</SelectItem>
+                  <SelectItem value="bank">Cuenta Bancaria</SelectItem>
+                  <SelectItem value="cash">Efectivo</SelectItem>
+                  <SelectItem value="credit_card">Tarjeta de Crédito</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -104,7 +76,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
           name="currency"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('form.account.currency')}</FormLabel>
+              <FormLabel>Moneda</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -112,7 +84,9 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}
+                  <SelectItem value="USD">USD - Dólar Americano</SelectItem>
+                  <SelectItem value="EUR">EUR - Euro</SelectItem>
+                  <SelectItem value="ARS">ARS - Peso Argentino</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -124,7 +98,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
           name="balance"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('form.account.initialBalance')}</FormLabel>
+              <FormLabel>Saldo Inicial</FormLabel>
               <FormControl>
                 <Input type="number" placeholder="0.00" {...field} disabled={isEditing} />
               </FormControl>
@@ -135,7 +109,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? t('common.save') : t('common.createAccount')}
+            {isEditing ? 'Guardar Cambios' : 'Crear Cuenta'}
           </Button>
         </div>
       </form>

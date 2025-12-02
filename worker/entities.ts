@@ -1,5 +1,5 @@
-import { IndexedEntity } from "./core-utils";
-import type { Account, Transaction } from "@shared/types";
+import { IndexedEntity, Entity } from "./core-utils";
+import type { Account, Transaction, Budget, Settings, Currency } from "@shared/types";
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@shared/mock-data";
 // ACCOUNT ENTITY
 export class AccountEntity extends IndexedEntity<Account> {
@@ -21,7 +21,6 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
   async addTransaction(tx: Omit<Transaction, 'id'>): Promise<Transaction> {
     const newTx: Transaction = { ...tx, id: crypto.randomUUID() };
     await this.mutate(s => {
-      // Keep transactions sorted by date descending
       const updatedTransactions = [...s.transactions, newTx].sort((a, b) => b.ts - a.ts);
       return { ...s, transactions: updatedTransactions };
     });
@@ -32,5 +31,20 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const paginated = transactions.slice(cursor, cursor + limit);
     const nextCursor = (cursor + limit < transactions.length) ? cursor + limit : null;
     return { items: paginated, next: nextCursor };
+  }
+}
+// BUDGET ENTITY
+export class BudgetEntity extends IndexedEntity<Budget> {
+  static readonly entityName = "budget";
+  static readonly indexName = "budgets";
+  static readonly initialState: Budget = { id: "", accountId: "", month: 0, category: "", limit: 0 };
+  static seedData = [];
+}
+// SETTINGS ENTITY (Singleton)
+export class SettingsEntity extends Entity<Settings> {
+  static readonly entityName = "settings";
+  static readonly initialState: Settings = { currency: 'USD', fiscalMonthStart: 1 };
+  constructor(env: Env) {
+    super(env, "global"); // Singleton ID
   }
 }
