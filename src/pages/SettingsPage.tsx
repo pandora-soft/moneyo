@@ -15,7 +15,10 @@ import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 const settingsSchema = z.object({
   currency: z.enum(['USD', 'EUR', 'ARS']),
-  fiscalMonthStart: z.coerce.number().int().min(1).max(28),
+  fiscalMonthStart: z.preprocess(
+    (val) => Number(val),
+    z.number().int().min(1, "Mínimo 1").max(28, "Máximo 28")
+  ),
 });
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 export function SettingsPage() {

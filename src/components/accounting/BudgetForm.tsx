@@ -15,7 +15,10 @@ import type { Account, Budget } from '@shared/types';
 const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta."),
   category: z.string().min(2, "La categoría es requerida.").max(50),
-  limit: z.coerce.number().positive("El límite debe ser un número positivo."),
+  limit: z.preprocess(
+    (val) => (val === '' ? 0 : Number(val)),
+    z.number().positive("El límite debe ser positivo.")
+  ),
   month: z.date(),
 });
 type BudgetFormValues = z.infer<typeof formSchema>;
@@ -31,6 +34,7 @@ export function BudgetForm({ onSubmit, onFinished, accounts, categories, default
     resolver: zodResolver(formSchema),
     defaultValues: {
       month: new Date(),
+      limit: 0,
       ...defaultValues,
     },
   });

@@ -11,7 +11,10 @@ const formSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres.").max(50),
   type: z.enum(['cash', 'bank', 'credit_card']),
   currency: z.enum(['USD', 'EUR', 'ARS']),
-  balance: z.coerce.number().default(0),
+  balance: z.preprocess(
+    (val) => (val === '' || val === undefined ? 0 : Number(val)),
+    z.number().min(0, "El saldo no puede ser negativo.").default(0)
+  ),
 });
 type AccountFormValues = z.infer<typeof formSchema>;
 interface AccountFormProps {

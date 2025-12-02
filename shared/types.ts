@@ -38,7 +38,7 @@ export interface Settings {
   currency: Currency;
   fiscalMonthStart: number; // Day of the month (1-28)
 }
-export interface SettingsUpdate extends Partial<Settings> {}
+export type SettingsUpdate = Partial<Settings>;
 // Demo types from template (can be removed later)
 export interface User {
   id: string;

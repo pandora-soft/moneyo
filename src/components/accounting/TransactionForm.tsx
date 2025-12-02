@@ -18,7 +18,10 @@ const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
-  amount: z.coerce.number().positive("El monto debe ser positivo."),
+  amount: z.preprocess(
+    (val) => Number(val),
+    z.number().positive("El monto debe ser positivo.")
+  ),
   category: z.string().min(2, "La categoría es requerida.").max(50),
   ts: z.date(),
   note: z.string().max(100).optional()
