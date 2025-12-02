@@ -12,7 +12,7 @@ import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { Account, Transaction } from '@shared/types';
-import { useEffect } from 'react';
+import { useEffect } from 'react';interface es {id?: string | number;[key: string]: unknown;}
 const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
   accountToId: z.string().optional(),
@@ -20,15 +20,15 @@ const formSchema = z.object({
   amount: z.coerce.number().positive("El monto debe ser positivo."),
   category: z.string().min(2, "La categoría es requerida.").max(50),
   ts: z.date(),
-  note: z.string().max(100).optional(),
-}).refine(data => {
+  note: z.string().max(100).optional()
+}).refine((data) => {
   if (data.type === 'transfer') {
     return !!data.accountToId && data.accountToId !== data.accountId;
   }
   return true;
 }, {
   message: "Debe seleccionar una cuenta de destino diferente a la de origen.",
-  path: ["accountToId"],
+  path: ["accountToId"]
 });
 type TransactionFormValues = z.infer<typeof formSchema>;
 interface TransactionFormProps {
@@ -43,8 +43,8 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
     defaultValues: {
       type: 'expense',
       ts: new Date(),
-      ...defaultValues,
-    },
+      ...defaultValues
+    }
   });
   const { isSubmitting } = form.formState;
   const transactionType = form.watch('type');
@@ -63,7 +63,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       category: values.category,
       ts: values.ts.getTime(),
       note: values.note,
-      accountTo: values.accountToId,
+      accountTo: values.accountToId
     };
     await onSubmit(finalValues);
     onFinished();
@@ -74,8 +74,8 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         <FormField
           control={form.control}
           name="type"
-          render={({ field }) => (
-            <FormItem>
+          render={({ field }) =>
+          <FormItem>
               <FormLabel>Tipo</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
@@ -89,69 +89,69 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
               </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
+          } />
+
         <FormField
           control={form.control}
           name="accountId"
-          render={({ field }) => (
-            <FormItem>
+          render={({ field }) =>
+          <FormItem>
               <FormLabel>{transactionType === 'transfer' ? 'Cuenta de Origen' : 'Cuenta'}</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
                 <SelectContent>
-                  {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
+                  {accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
                 </SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
-        {transactionType === 'transfer' && (
-          <FormField
-            control={form.control}
-            name="accountToId"
-            render={({ field }) => (
-              <FormItem>
+          } />
+
+        {transactionType === 'transfer' &&
+        <FormField
+          control={form.control}
+          name="accountToId"
+          render={({ field }) =>
+          <FormItem>
                 <FormLabel>Cuenta de Destino</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
                   <SelectContent>
-                    {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
+                    {accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        )}
+          } />
+
+        }
         <FormField
           control={form.control}
           name="amount"
-          render={({ field }) => (
-            <FormItem>
+          render={({ field }) =>
+          <FormItem>
               <FormLabel>Monto</FormLabel>
               <FormControl><Input type="number" placeholder="0.00" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
+          } />
+
         <FormField
           control={form.control}
           name="category"
-          render={({ field }) => (
-            <FormItem>
+          render={({ field }) =>
+          <FormItem>
               <FormLabel>Categoría</FormLabel>
               <FormControl><Input placeholder="Ej: Supermercado" {...field} disabled={transactionType === 'transfer'} /></FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
+          } />
+
         <FormField
           control={form.control}
           name="ts"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
+          render={({ field }) =>
+          <FormItem className="flex flex-col">
               <FormLabel>Fecha</FormLabel>
               <Popover>
                 <PopoverTrigger asChild>
@@ -168,19 +168,19 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
               </Popover>
               <FormMessage />
             </FormItem>
-          )}
-        />
+          } />
+
         <FormField
           control={form.control}
           name="note"
-          render={({ field }) => (
-            <FormItem>
+          render={({ field }) =>
+          <FormItem>
               <FormLabel>Nota (Opcional)</FormLabel>
               <FormControl><Textarea placeholder="Detalles adicionales..." {...field} /></FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
+          } />
+
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -188,6 +188,6 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
           </Button>
         </div>
       </form>
-    </Form>
-  );
+    </Form>);
+
 }
