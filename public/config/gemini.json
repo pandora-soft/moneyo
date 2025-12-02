@@ -1,0 +1,5 @@
+{
+  "claveApi": "11111111111111111111111111111",
+  "modeloIa": "Geminis-2.5.flash",
+  "instruccionesIa": "extre los datos del ticket"
+}
