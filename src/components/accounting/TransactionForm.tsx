@@ -25,7 +25,7 @@ const formSchema = z.object({
       if (val === null || val === undefined) return 0;
       const strVal = String(val).trim();
       if (strVal === '') return 0;
-      return Math.abs(Number(strVal));
+      return Number(strVal);
     },
     z.number().positive("El monto debe ser positivo.")
   ),
@@ -54,7 +54,7 @@ const formSchema = z.object({
 type TransactionFormValues = z.infer<typeof formSchema>;
 interface TransactionFormProps {
   accounts: Account[];
-  onSubmit: (values: Omit<Transaction, 'currency'> & { id?: string }) => Promise<void>;
+  onSubmit: (values: Partial<Transaction> & { id?: string }) => Promise<void>;
   onFinished: () => void;
   defaultValues?: Partial<TransactionFormValues>;
 }
@@ -62,11 +62,16 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
-      type: 'expense',
-      ts: new Date(),
-      amount: 0,
-      recurrent: false,
-      ...defaultValues,
+      id: defaultValues?.id ?? undefined,
+      type: defaultValues?.type ?? 'expense',
+      accountId: defaultValues?.accountId ?? '',
+      accountToId: defaultValues?.accountToId ?? '',
+      amount: defaultValues?.amount ?? 0,
+      category: defaultValues?.category ?? '',
+      ts: defaultValues?.ts ?? new Date(),
+      note: defaultValues?.note ?? '',
+      recurrent: defaultValues?.recurrent ?? false,
+      frequency: defaultValues?.frequency ?? undefined,
     }
   });
   const { isSubmitting } = form.formState;
@@ -81,7 +86,8 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
     }
   }, [transactionType, form]);
   const handleSubmit: SubmitHandler<TransactionFormValues> = async (values) => {
-    const finalValues: Omit<Transaction, 'currency'> & { id?: string } = {
+    const accountFound = accounts.find(a => a.id === values.accountId);
+    const finalValues: Partial<Transaction> & { id?: string } = {
       id: values.id,
       accountId: values.accountId,
       type: values.type,
@@ -92,6 +98,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       accountTo: values.accountToId,
       recurrent: values.recurrent,
       frequency: values.recurrent ? values.frequency : undefined,
+      currency: accountFound?.currency,
     };
     await onSubmit(finalValues);
     onFinished();
@@ -105,7 +112,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Tipo</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select value={field.value ?? ''} onValueChange={field.onChange}>
                 <FormControl>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                 </FormControl>
@@ -125,7 +132,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
           render={({ field }) => (
             <FormItem>
               <FormLabel>{transactionType === 'transfer' ? 'Cuenta de Origen' : 'Cuenta'}</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select value={field.value ?? ''} onValueChange={field.onChange}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
                 <SelectContent>
                   {accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
@@ -142,7 +149,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Cuenta de Destino</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select value={field.value ?? ''} onValueChange={field.onChange}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
                   <SelectContent>
                     {accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
@@ -232,7 +239,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Frecuencia</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select value={field.value ?? ''} onValueChange={field.onChange}>
                                     <FormControl>
                                         <SelectTrigger><SelectValue placeholder="Seleccione una frecuencia" /></SelectTrigger>
                                     </FormControl>
@@ -248,7 +255,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
                 )}
             </>
         )}
-        <div className="flex justify-end pt-4">
+        <div className="flex justify-end pt-4 sticky bottom-0 z-10">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {defaultValues?.id ? 'Actualizar Transacción' : 'Guardar Transacción'}

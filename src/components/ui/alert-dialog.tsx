@@ -28,7 +28,7 @@ AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
+>(({ className, 'aria-describedby': ariaDescribedBy, ...props }, ref) => (
   <AlertDialogPortal>
     <AlertDialogOverlay />
     <AlertDialogPrimitive.Content
@@ -38,6 +38,7 @@ const AlertDialogContent = React.forwardRef<
         className
       )}
       {...props}
+      {...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {})}
     />
   </AlertDialogPortal>
 ))

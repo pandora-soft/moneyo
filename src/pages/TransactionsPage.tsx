@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TransactionForm } from '@/components/accounting/TransactionForm';
@@ -214,6 +214,7 @@ export function TransactionsPage() {
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingTxn(null); setSheetOpen(open); }}>
         <SheetContent className="sm:max-w-lg w-full p-0">
           <SheetHeader className="p-6 border-b"><SheetTitle>{editingTxn?.id ? 'Editar Transacción' : 'Nueva Transacción'}</SheetTitle></SheetHeader>
+          <SheetDescription id="transaction-sheet-desc">Aquí puedes crear o editar una transacción. Completa los campos y guarda los cambios.</SheetDescription>
           {editingTxn && (
             <TransactionForm accounts={accounts} onSubmit={handleFormSubmit} onFinished={() => { setSheetOpen(false); setEditingTxn(null); }} defaultValues={{ ...editingTxn, ts: new Date(editingTxn.ts || Date.now()), accountToId: editingTxn.accountTo }} />
           )}
@@ -222,6 +223,7 @@ export function TransactionsPage() {
       <Sheet open={isImportSheetOpen} onOpenChange={setImportSheetOpen}>
         <SheetContent className="sm:max-w-2xl w-full">
             <SheetHeader><SheetTitle>Importar Transacciones</SheetTitle></SheetHeader>
+            <SheetDescription id="import-sheet-desc">Sube un archivo CSV para previsualizar y confirmar la importación de transacciones.</SheetDescription>
             <div className="py-4">
                 <p className="text-sm text-muted-foreground mb-4">Previsualización de las transacciones a importar. Columnas requeridas: date, accountName, type, amount, category, note.</p>
                 <div className="max-h-96 overflow-auto border rounded-md">
