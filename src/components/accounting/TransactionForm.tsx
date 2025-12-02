@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -11,8 +11,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import type { Account, Transaction } from '@shared/types';
-import { useEffect } from 'react';interface es {id?: string | number;[key: string]: unknown;}
+import { useEffect } from 'react';
 const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
   accountToId: z.string().optional(),
@@ -43,6 +44,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
     defaultValues: {
       type: 'expense',
       ts: new Date(),
+      amount: 0,
       ...defaultValues
     }
   });
@@ -55,7 +57,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       form.setValue('category', '');
     }
   }, [transactionType, form]);
-  async function handleSubmit(values: TransactionFormValues) {
+  const handleSubmit: SubmitHandler<TransactionFormValues> = async (values) => {
     const finalValues: Omit<Transaction, 'id' | 'currency'> = {
       accountId: values.accountId,
       type: values.type,
@@ -67,15 +69,15 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
     };
     await onSubmit(finalValues);
     onFinished();
-  }
+  };
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 px-4 py-2">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6">
         <FormField
           control={form.control}
           name="type"
-          render={({ field }) =>
-          <FormItem>
+          render={({ field }) => (
+            <FormItem>
               <FormLabel>Tipo</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
@@ -89,13 +91,13 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
               </Select>
               <FormMessage />
             </FormItem>
-          } />
-
+          )}
+        />
         <FormField
           control={form.control}
           name="accountId"
-          render={({ field }) =>
-          <FormItem>
+          render={({ field }) => (
+            <FormItem>
               <FormLabel>{transactionType === 'transfer' ? 'Cuenta de Origen' : 'Cuenta'}</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
@@ -105,14 +107,14 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
               </Select>
               <FormMessage />
             </FormItem>
-          } />
-
-        {transactionType === 'transfer' &&
-        <FormField
-          control={form.control}
-          name="accountToId"
-          render={({ field }) =>
-          <FormItem>
+          )}
+        />
+        {transactionType === 'transfer' && (
+          <FormField
+            control={form.control}
+            name="accountToId"
+            render={({ field }) => (
+              <FormItem>
                 <FormLabel>Cuenta de Destino</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
@@ -122,36 +124,36 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
                 </Select>
                 <FormMessage />
               </FormItem>
-          } />
-
-        }
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name="amount"
-          render={({ field }) =>
-          <FormItem>
+          render={({ field }) => (
+            <FormItem>
               <FormLabel>Monto</FormLabel>
               <FormControl><Input type="number" placeholder="0.00" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
-          } />
-
+          )}
+        />
         <FormField
           control={form.control}
           name="category"
-          render={({ field }) =>
-          <FormItem>
+          render={({ field }) => (
+            <FormItem>
               <FormLabel>Categoría</FormLabel>
               <FormControl><Input placeholder="Ej: Supermercado" {...field} disabled={transactionType === 'transfer'} /></FormControl>
               <FormMessage />
             </FormItem>
-          } />
-
+          )}
+        />
         <FormField
           control={form.control}
           name="ts"
-          render={({ field }) =>
-          <FormItem className="flex flex-col">
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
               <FormLabel>Fecha</FormLabel>
               <Popover>
                 <PopoverTrigger asChild>
@@ -168,19 +170,19 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
               </Popover>
               <FormMessage />
             </FormItem>
-          } />
-
+          )}
+        />
         <FormField
           control={form.control}
           name="note"
-          render={({ field }) =>
-          <FormItem>
+          render={({ field }) => (
+            <FormItem>
               <FormLabel>Nota (Opcional)</FormLabel>
               <FormControl><Textarea placeholder="Detalles adicionales..." {...field} /></FormControl>
               <FormMessage />
             </FormItem>
-          } />
-
+          )}
+        />
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -188,6 +190,6 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
           </Button>
         </div>
       </form>
-    </Form>);
-
+    </Form>
+  );
 }

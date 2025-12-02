@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Env } from './core-utils';
 import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity } from "./entities";
 import { ok, bad, notFound, isStr } from './core-utils';
-import type { Account, Transaction, AccountType, Budget, Settings } from "@shared/types";
+import type { Account, Transaction, Budget, Settings, Currency } from "@shared/types";
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
   const finance = new Hono<{ Bindings: Env }>();
   finance.use('*', async (c, next) => {
@@ -32,6 +32,14 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     await AccountEntity.create(c.env, newAccount);
     return ok(c, newAccount);
   });
+  finance.put('/accounts/:id', async (c) => {
+    const id = c.req.param('id');
+    const { name, type, currency } = await c.req.json<Partial<Account>>();
+    const account = new AccountEntity(c.env, id);
+    if (!await account.exists()) return notFound(c, 'Account not found');
+    const updatedAccount = await account.mutate(acc => ({ ...acc, name: name || acc.name, type: type || acc.type, currency: currency || acc.currency }));
+    return ok(c, updatedAccount);
+  });
   finance.delete('/accounts/:id', async (c) => {
     const id = c.req.param('id');
     const deleted = await AccountEntity.delete(c.env, id);
@@ -46,21 +54,22 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     return ok(c, page);
   });
   finance.post('/transactions', async (c) => {
-    const body = await c.req.json<Omit<Transaction, 'id' | 'currency'> & { currency?: 'USD' | 'EUR' | 'ARS' }>();
+    const body = await c.req.json<Omit<Transaction, 'id' | 'currency'> & { currency?: Currency }>();
     if (!isStr(body.accountId) || !body.amount || !isStr(body.category)) {
       return bad(c, 'accountId, amount, and category are required');
     }
     const ledger = new LedgerEntity(c.env, 'main');
     const fromAccount = new AccountEntity(c.env, body.accountId);
     if (!await fromAccount.exists()) return notFound(c, 'Source account not found');
+    const fromAccountState = await fromAccount.getState();
+    const currency = fromAccountState.currency;
     if (body.type === 'transfer') {
       if (!body.accountTo) return bad(c, 'Destination account is required for transfers');
       const toAccount = new AccountEntity(c.env, body.accountTo);
       if (!await toAccount.exists()) return notFound(c, 'Destination account not found');
       const amount = Math.abs(body.amount);
-      // Create two transactions for the ledger
-      const expenseTxData: Omit<Transaction, 'id'> = { ...body, type: 'expense', amount: -amount };
-      const incomeTxData: Omit<Transaction, 'id'> = { ...body, accountId: body.accountTo, accountTo: body.accountId, type: 'income', amount: amount };
+      const expenseTxData: Omit<Transaction, 'id'> = { ...body, type: 'expense', amount, currency };
+      const incomeTxData: Omit<Transaction, 'id'> = { ...body, accountId: body.accountTo, accountTo: body.accountId, type: 'income', amount, currency };
       const [expenseTx, incomeTx] = await Promise.all([
         ledger.addTransaction(expenseTxData),
         ledger.addTransaction(incomeTxData),
@@ -70,14 +79,18 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
       return ok(c, { expenseTx, incomeTx });
     }
     const amount = body.type === 'income' ? Math.abs(body.amount) : -Math.abs(body.amount);
-    const newTxData: Omit<Transaction, 'id'> = { ...body, amount };
+    const newTxData: Omit<Transaction, 'id'> = { ...body, amount, currency };
     const newTx = await ledger.addTransaction(newTxData);
     await fromAccount.mutate(acc => ({ ...acc, balance: acc.balance + amount }));
     return ok(c, newTx);
   });
   // BUDGETS API
   finance.get('/budgets', async (c) => {
-    const { items } = await BudgetEntity.list(c.env);
+    let { items } = await BudgetEntity.list(c.env);
+    const accountId = c.req.query('accountId');
+    const month = c.req.query('month');
+    if (accountId) items = items.filter(b => b.accountId === accountId);
+    if (month) items = items.filter(b => b.month === Number(month));
     return ok(c, items);
   });
   finance.post('/budgets', async (c) => {

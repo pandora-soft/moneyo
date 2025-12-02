@@ -1,17 +1,22 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { CalendarIcon, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import type { Account, Budget } from '@shared/types';
 const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta."),
   category: z.string().min(2, "La categoría es requerida.").max(50),
   limit: z.coerce.number().positive("El límite debe ser un número positivo."),
-  month: z.date({ required_error: "Debe seleccionar un mes." }),
+  month: z.date(),
 });
 type BudgetFormValues = z.infer<typeof formSchema>;
 interface BudgetFormProps {
@@ -24,25 +29,101 @@ interface BudgetFormProps {
 export function BudgetForm({ onSubmit, onFinished, accounts, categories, defaultValues }: BudgetFormProps) {
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues,
+    defaultValues: {
+      month: new Date(),
+      ...defaultValues,
+    },
   });
   const { isSubmitting } = form.formState;
-  async function handleSubmit(values: BudgetFormValues) {
+  const handleSubmit: SubmitHandler<BudgetFormValues> = async (values) => {
+    const startOfMonth = new Date(values.month.getFullYear(), values.month.getMonth(), 1);
     await onSubmit({
       ...values,
-      month: values.month.getTime(),
+      month: startOfMonth.getTime(),
     });
     onFinished();
-  }
+  };
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 px-4 py-2">
-        {/* Fields for account, category, limit, month will go here */}
-        <p className="text-muted-foreground text-center py-8">
-          La gestión de presupuestos se implementará en una fase futura.
-        </p>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6">
+        <FormField
+          control={form.control}
+          name="accountId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Cuenta</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="category"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Categoría</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger><SelectValue placeholder="Seleccione una categoría" /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="limit"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Límite de Gasto</FormLabel>
+              <FormControl><Input type="number" placeholder="500.00" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="month"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel>Mes</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                      {field.value ? format(field.value, "MMMM yyyy", { locale: es }) : <span>Seleccione un mes</span>}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={field.value}
+                    onSelect={field.onChange}
+                    disabled={(date) => date < new Date("2000-01-01")}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={true || isSubmitting}>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Guardar Presupuesto
           </Button>

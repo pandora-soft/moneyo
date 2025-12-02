@@ -7,6 +7,7 @@ export interface ApiResponse<T = unknown> {
 export type AccountType = 'cash' | 'bank' | 'credit_card';
 export type TransactionType = 'expense' | 'income' | 'transfer';
 export type Currency = 'USD' | 'EUR' | 'ARS';
+export type BudgetCategory = 'food' | 'transport' | 'rent' | 'salary' | 'other';
 export interface Account {
   id: string;
   name: string;
@@ -20,7 +21,7 @@ export interface Transaction {
   accountId: string;
   accountTo?: string; // For transfers
   type: TransactionType;
-  amount: number; // Always positive for income/expense, negative for expense in some contexts
+  amount: number; // Can be positive or negative
   currency: Currency;
   category: string;
   note?: string;
@@ -37,6 +38,7 @@ export interface Settings {
   currency: Currency;
   fiscalMonthStart: number; // Day of the month (1-28)
 }
+export interface SettingsUpdate extends Partial<Settings> {}
 // Demo types from template (can be removed later)
 export interface User {
   id: string;

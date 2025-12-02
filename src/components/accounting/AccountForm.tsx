@@ -1,16 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import type { Account, AccountType } from '@shared/types';
+import type { Account, AccountType, Currency } from '@shared/types';
 const formSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres.").max(50),
-  type: z.enum(['cash', 'bank', 'credit_card'], { required_error: "Debe seleccionar un tipo de cuenta." }),
-  currency: z.enum(['USD', 'EUR', 'ARS'], { required_error: "Debe seleccionar una moneda." }),
+  type: z.enum(['cash', 'bank', 'credit_card']),
+  currency: z.enum(['USD', 'EUR', 'ARS']),
   balance: z.coerce.number().default(0),
 });
 type AccountFormValues = z.infer<typeof formSchema>;
@@ -25,17 +25,18 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
     resolver: zodResolver(formSchema),
     defaultValues: {
       currency: 'USD',
+      balance: 0,
       ...defaultValues,
     },
   });
   const { isSubmitting } = form.formState;
-  async function handleSubmit(values: AccountFormValues) {
+  const handleSubmit: SubmitHandler<AccountFormValues> = async (values) => {
     await onSubmit(values);
     onFinished();
-  }
+  };
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 px-4 py-2">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6">
         <FormField
           control={form.control}
           name="name"

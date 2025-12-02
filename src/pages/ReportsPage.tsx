@@ -1,76 +1,97 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, Pie, PieChart, Cell } from 'recharts';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, Pie, PieChart, Cell, ReferenceLine } from 'recharts';
 import { api } from '@/lib/api-client';
-import type { Transaction } from '@shared/types';
-import { format } from 'date-fns';
+import type { Transaction, Budget, Account } from '@shared/types';
+import { format, getMonth, getYear, startOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, PlusCircle } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { BudgetForm } from '@/components/accounting/BudgetForm';
+import { toast } from 'sonner';
 const COLORS = ['#0F172A', '#F97316', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
 export function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        const txs = await api<{ items: Transaction[] }>('/api/finance/transactions?limit=500').then(p => p.items);
-        setTransactions(txs);
-      } catch (error) {
-        console.error("Failed to fetch transactions", error);
-      } finally {
-        setLoading(false);
-      }
+  const [isSheetOpen, setSheetOpen] = useState(false);
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [txs, bgs, accs] = await Promise.all([
+        api<{ items: Transaction[] }>('/api/finance/transactions?limit=1000').then(p => p.items),
+        api<Budget[]>('/api/finance/budgets'),
+        api<Account[]>('/api/finance/accounts'),
+      ]);
+      setTransactions(txs);
+      setBudgets(bgs);
+      setAccounts(accs);
+    } catch (error) {
+      toast.error("Error al cargar los datos de reportes.");
+      console.error("Failed to fetch report data", error);
+    } finally {
+      setLoading(false);
     }
-    fetchData();
   }, []);
-  const { monthlySummary, categorySpending } = useMemo(() => {
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+  const { monthlySummary, categorySpending, uniqueCategories } = useMemo(() => {
     const summary = transactions.reduce((acc, tx) => {
-      const month = format(new Date(tx.ts), 'MMM yyyy', { locale: es });
-      if (!acc[month]) {
-        acc[month] = { income: 0, expense: 0 };
+      const monthKey = format(new Date(tx.ts), 'yyyy-MM');
+      if (!acc[monthKey]) {
+        acc[monthKey] = { income: 0, expense: 0, name: format(new Date(tx.ts), 'MMM yyyy', { locale: es }) };
       }
-      if (tx.type === 'income') {
-        acc[month].income += tx.amount;
-      } else if (tx.type === 'expense') {
-        acc[month].expense += Math.abs(tx.amount);
-      }
+      if (tx.type === 'income') acc[monthKey].income += tx.amount;
+      else if (tx.type === 'expense') acc[monthKey].expense += Math.abs(tx.amount);
       return acc;
-    }, {} as Record<string, { income: number; expense: number }>);
-    const monthlyChartData = Object.entries(summary)
-      .map(([name, values]) => ({ name, ...values }))
-      .reverse();
+    }, {} as Record<string, { income: number; expense: number; name: string }>);
+    const monthlyChartData = Object.values(summary).reverse();
+    const currentMonthStart = startOfMonth(new Date());
     const spending = transactions
-      .filter(tx => tx.type === 'expense')
+      .filter(tx => tx.type === 'expense' && new Date(tx.ts) >= currentMonthStart)
       .reduce((acc, tx) => {
-        if (!acc[tx.category]) {
-          acc[tx.category] = 0;
-        }
+        if (!acc[tx.category]) acc[tx.category] = 0;
         acc[tx.category] += Math.abs(tx.amount);
         return acc;
       }, {} as Record<string, number>);
     const categoryChartData = Object.entries(spending)
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value]) => {
+        const budget = budgets.find(b => b.category === name && getMonth(new Date(b.month)) === getMonth(currentMonthStart) && getYear(new Date(b.month)) === getYear(currentMonthStart));
+        return { name, value, limit: budget?.limit || 0 };
+      })
       .sort((a, b) => b.value - a.value);
-    return { monthlySummary: monthlyChartData, categorySpending: categoryChartData };
-  }, [transactions]);
+    const allCategories = [...new Set(transactions.filter(t => t.type === 'expense').map(t => t.category)), 'Salario', 'Alquiler', 'Comida', 'Transporte', 'Ocio'];
+    const uniqueCategories = [...new Set(allCategories)];
+    return { monthlySummary: monthlyChartData, categorySpending: categoryChartData, uniqueCategories };
+  }, [transactions, budgets]);
   const handleExport = () => {
     const headers = "Fecha,Cuenta ID,Tipo,Monto,Moneda,Categoría,Nota\n";
-    const csvContent = transactions
-      .map(tx => `${new Date(tx.ts).toISOString()},${tx.accountId},${tx.type},${tx.amount},${tx.currency},${tx.category},"${tx.note || ''}"`)
-      .join("\n");
+    const csvContent = transactions.map(tx => `${new Date(tx.ts).toISOString()},${tx.accountId},${tx.type},${tx.amount},${tx.currency},"${tx.category}","${tx.note || ''}"`).join("\n");
     const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute("download", `casaconta_reporte_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `casaconta_reporte_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  const handleAddBudget = async (values: Omit<Budget, 'id'>) => {
+    try {
+      await api<Budget>('/api/finance/budgets', {
+        method: 'POST',
+        body: JSON.stringify(values),
+      });
+      toast.success('Presupuesto guardado.');
+      fetchData();
+    } catch (error) {
+      toast.error('Error al guardar el presupuesto.');
     }
   };
   return (
@@ -81,11 +102,22 @@ export function ReportsPage() {
             <h1 className="text-4xl font-display font-bold">Reportes</h1>
             <p className="text-muted-foreground mt-1">Visualiza tus patrones de ingresos y gastos.</p>
           </div>
-          <Button onClick={handleExport} disabled={loading || transactions.length === 0}>
-            <Download className="mr-2 size-4" /> Exportar a CSV
-          </Button>
+          <div className="flex gap-2">
+            <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline"><PlusCircle className="mr-2 size-4" /> Crear Presupuesto</Button>
+              </SheetTrigger>
+              <SheetContent className="sm:max-w-lg w-full p-0">
+                <SheetHeader className="p-6 border-b"><SheetTitle>Nuevo Presupuesto</SheetTitle></SheetHeader>
+                <BudgetForm accounts={accounts} categories={uniqueCategories} onSubmit={handleAddBudget} onFinished={() => setSheetOpen(false)} />
+              </SheetContent>
+            </Sheet>
+            <Button onClick={handleExport} disabled={loading || transactions.length === 0}>
+              <Download className="mr-2 size-4" /> Exportar a CSV
+            </Button>
+          </div>
         </header>
-        <div className="grid gap-8 lg:grid-cols-2">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid gap-8 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle>Resumen Mensual</CardTitle>
@@ -96,11 +128,8 @@ export function ReportsPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={monthlySummary}>
                     <XAxis dataKey="name" stroke="#888888" fontSize={12} />
-                    <YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => `$${v}`} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
-                      cursor={{ fill: 'hsl(var(--muted))' }}
-                    />
+                    <YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => `${v}`} />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'hsl(var(--muted))' }} />
                     <Legend />
                     <Bar dataKey="income" fill="#10B981" name="Ingresos" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expense" fill="#F97316" name="Gastos" radius={[4, 4, 0, 0]} />
@@ -111,35 +140,25 @@ export function ReportsPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Gastos por Categoría</CardTitle>
-              <CardDescription>Distribución de tus gastos totales.</CardDescription>
+              <CardTitle>Gastos por Categoría (Este Mes)</CardTitle>
+              <CardDescription>Distribución de tus gastos y comparación con presupuestos.</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? <Skeleton className="h-[300px]" /> : (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
-                    <Pie
-                      data={categorySpending}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                      nameKey="name"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
+                    <Pie data={categorySpending} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                       {categorySpending.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell key={`cell-${index}`} fill={entry.limit > 0 && entry.value > entry.limit ? '#EF4444' : COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
+                    <Tooltip formatter={(value, name, props) => [`${value}`, `${name} ${props.payload.limit > 0 ? `(Límite: ${props.payload.limit})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

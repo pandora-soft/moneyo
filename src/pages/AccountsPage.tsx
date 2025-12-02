@@ -1,17 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountCard } from '@/components/accounting/AccountCard';
 import { api } from '@/lib/api-client';
-import type { Account, Transaction } from '@shared/types';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import type { Account, Transaction, Budget } from '@shared/types';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AccountForm } from '@/components/accounting/AccountForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { startOfMonth, getMonth, getYear } from 'date-fns';
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setSheetOpen] = useState(false);
   const [isAlertOpen, setAlertOpen] = useState(false);
@@ -20,12 +24,14 @@ export function AccountsPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [accs, txs] = await Promise.all([
+      const [accs, txs, bgs] = await Promise.all([
         api<Account[]>('/api/finance/accounts'),
         api<{ items: Transaction[] }>('/api/finance/transactions').then(p => p.items),
+        api<Budget[]>('/api/finance/budgets'),
       ]);
       setAccounts(accs);
       setTransactions(txs);
+      setBudgets(bgs);
     } catch (error) {
       console.error("Failed to fetch data", error);
       toast.error('Error al cargar los datos.');
@@ -64,12 +70,14 @@ export function AccountsPage() {
       setAlertOpen(false);
     }
   };
-  const handleFormSubmit = async (values: Omit<Account, 'id' | 'createdAt'>) => {
+  const handleFormSubmit = async (values: Omit<Account, 'id' | 'createdAt' | 'balance'> & { balance?: number }) => {
     try {
       if (selectedAccount) {
-        // Editing logic would go here, but API doesn't support it yet.
-        // For now, we just show a success message.
-        toast.success('Cuenta actualizada (simulado).');
+        await api<Account>(`/api/finance/accounts/${selectedAccount.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(values),
+        });
+        toast.success('Cuenta actualizada correctamente.');
       } else {
         await api<Account>('/api/finance/accounts', {
           method: 'POST',
@@ -99,17 +107,33 @@ export function AccountsPage() {
             {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48" />)}
           </div>
         ) : accounts.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {accounts.map(account => (
-              <AccountCard
-                key={account.id}
-                account={account}
-                latestTransactions={getTransactionsForAccount(account.id)}
-                onDelete={handleDeleteClick}
-                onEdit={handleEditClick}
-              />
-            ))}
-          </div>
+          <motion.div
+            className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: {
+                  staggerChildren: 0.1,
+                },
+              },
+            }}
+            initial="hidden"
+            animate="show"
+          >
+            <AnimatePresence>
+              {accounts.map(account => (
+                <motion.div key={account.id} variants={{ hidden: { y: 20, opacity: 0 }, show: { y: 0, opacity: 1 } }} layout>
+                  <AccountCard
+                    account={account}
+                    latestTransactions={getTransactionsForAccount(account.id)}
+                    onDelete={handleDeleteClick}
+                    onEdit={handleEditClick}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
         ) : (
           <div className="text-center py-20 border-2 border-dashed rounded-lg">
             <h3 className="text-xl font-semibold">No has creado ninguna cuenta todavía.</h3>
