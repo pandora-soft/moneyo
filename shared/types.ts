@@ -26,6 +26,9 @@ export interface Transaction {
   category: string;
   note?: string;
   ts: number; // epoch millis
+  recurrent?: boolean;
+  frequency?: 'monthly' | 'weekly';
+  parentId?: string; // To link generated transactions to their recurrent template
 }
 export interface Budget {
   id: string;
@@ -37,6 +40,7 @@ export interface Budget {
 export interface Settings {
   currency: Currency;
   fiscalMonthStart: number; // Day of the month (1-28)
+  recurrentDefaultFrequency: 'monthly' | 'weekly';
 }
 export type SettingsUpdate = Partial<Settings>;
 // Demo types from template (can be removed later)

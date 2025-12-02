@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountCard } from '@/components/accounting/AccountCard';
@@ -11,7 +10,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { AccountForm } from '@/components/accounting/AccountForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { startOfMonth, getMonth, getYear } from 'date-fns';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -42,21 +42,11 @@ export function AccountsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-  const getTransactionsForAccount = (accountId: string) => {
-    return transactions.filter(tx => tx.accountId === accountId);
-  };
-  const handleCreateClick = () => {
-    setSelectedAccount(null);
-    setSheetOpen(true);
-  };
-  const handleEditClick = (account: Account) => {
-    setSelectedAccount(account);
-    setSheetOpen(true);
-  };
-  const handleDeleteClick = (accountId: string) => {
-    setAccountToDelete(accountId);
-    setAlertOpen(true);
-  };
+  const getTransactionsForAccount = (accountId: string) => transactions.filter(tx => tx.accountId === accountId);
+  const getRecurrentCountForAccount = (accountId: string) => transactions.filter(tx => tx.accountId === accountId && tx.recurrent).length;
+  const handleCreateClick = () => { setSelectedAccount(null); setSheetOpen(true); };
+  const handleEditClick = (account: Account) => { setSelectedAccount(account); setSheetOpen(true); };
+  const handleDeleteClick = (accountId: string) => { setAccountToDelete(accountId); setAlertOpen(true); };
   const confirmDelete = async () => {
     if (!accountToDelete) return;
     try {
@@ -73,16 +63,10 @@ export function AccountsPage() {
   const handleFormSubmit = async (values: Omit<Account, 'id' | 'createdAt' | 'balance'> & { balance?: number }) => {
     try {
       if (selectedAccount) {
-        await api<Account>(`/api/finance/accounts/${selectedAccount.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(values),
-        });
+        await api<Account>(`/api/finance/accounts/${selectedAccount.id}`, { method: 'PUT', body: JSON.stringify(values) });
         toast.success('Cuenta actualizada correctamente.');
       } else {
-        await api<Account>('/api/finance/accounts', {
-          method: 'POST',
-          body: JSON.stringify(values),
-        });
+        await api<Account>('/api/finance/accounts', { method: 'POST', body: JSON.stringify(values) });
         toast.success('Cuenta creada correctamente.');
       }
       fetchData();
@@ -109,27 +93,35 @@ export function AccountsPage() {
         ) : accounts.length > 0 ? (
           <motion.div
             className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-            variants={{
-              hidden: { opacity: 0 },
-              show: {
-                opacity: 1,
-                transition: {
-                  staggerChildren: 0.1,
-                },
-              },
-            }}
+            variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }}
             initial="hidden"
             animate="show"
           >
             <AnimatePresence>
               {accounts.map(account => (
                 <motion.div key={account.id} variants={{ hidden: { y: 20, opacity: 0 }, show: { y: 0, opacity: 1 } }} layout>
-                  <AccountCard
-                    account={account}
-                    latestTransactions={getTransactionsForAccount(account.id)}
-                    onDelete={handleDeleteClick}
-                    onEdit={handleEditClick}
-                  />
+                  <AccountCard account={account} onDelete={handleDeleteClick} onEdit={handleEditClick}>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="transactions">
+                        <AccordionTrigger>Últimos Movimientos</AccordionTrigger>
+                        <AccordionContent>
+                          {getTransactionsForAccount(account.id).slice(0, 3).map(tx => (
+                            <div key={tx.id} className="flex justify-between items-center text-sm py-1">
+                              <span>{tx.category}</span>
+                              <span className={tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'}>{tx.type === 'income' ? '+' : '-'}{new Intl.NumberFormat('en-US', { style: 'currency', currency: account.currency }).format(tx.amount)}</span>
+                            </div>
+                          ))}
+                          {getTransactionsForAccount(account.id).length === 0 && <p className="text-sm text-muted-foreground">Sin movimientos.</p>}
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="recurrent">
+                        <AccordionTrigger>Recurrentes</AccordionTrigger>
+                        <AccordionContent>
+                            <Badge variant="outline"><Repeat className="mr-2 size-4" /> {getRecurrentCountForAccount(account.id)} activas</Badge>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </AccountCard>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -146,29 +138,14 @@ export function AccountsPage() {
       </div>
       <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="sm:max-w-lg w-full p-0">
-          <SheetHeader className="p-6 border-b">
-            <SheetTitle>{selectedAccount ? 'Editar Cuenta' : 'Nueva Cuenta'}</SheetTitle>
-          </SheetHeader>
-          <AccountForm
-            onSubmit={handleFormSubmit}
-            onFinished={() => setSheetOpen(false)}
-            defaultValues={selectedAccount || {}}
-            isEditing={!!selectedAccount}
-          />
+          <SheetHeader className="p-6 border-b"><SheetTitle>{selectedAccount ? 'Editar Cuenta' : 'Nueva Cuenta'}</SheetTitle></SheetHeader>
+          <AccountForm onSubmit={handleFormSubmit} onFinished={() => setSheetOpen(false)} defaultValues={selectedAccount || {}} isEditing={!!selectedAccount} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={isAlertOpen} onOpenChange={setAlertOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Continuar</AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

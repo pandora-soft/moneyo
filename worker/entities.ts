@@ -1,6 +1,7 @@
 import { IndexedEntity, Entity, Env } from "./core-utils";
 import type { Account, Transaction, Budget, Settings } from "@shared/types";
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@shared/mock-data";
+import { addMonths, addWeeks, isBefore, startOfToday } from 'date-fns';
 export class AccountEntity extends IndexedEntity<Account> {
   static readonly entityName = "account";
   static readonly indexName = "accounts";
@@ -24,6 +25,56 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     });
     return newTx;
   }
+  async bulkAddTransactions(txs: Omit<Transaction, 'id'>[]): Promise<Transaction[]> {
+    const newTxs: Transaction[] = txs.map(tx => ({ ...tx, id: crypto.randomUUID() }));
+    const accountBalanceChanges = new Map<string, number>();
+    for (const tx of newTxs) {
+      const amount = tx.type === 'income' ? Math.abs(tx.amount) : -Math.abs(tx.amount);
+      accountBalanceChanges.set(tx.accountId, (accountBalanceChanges.get(tx.accountId) || 0) + amount);
+    }
+    const accountMutations = Array.from(accountBalanceChanges.entries()).map(([accountId, change]) => {
+      const account = new AccountEntity(this.env, accountId);
+      return account.mutate(acc => ({ ...acc, balance: acc.balance + change }));
+    });
+    await Promise.all([
+      ...accountMutations,
+      this.mutate(s => ({
+        ...s,
+        transactions: [...s.transactions, ...newTxs].sort((a, b) => b.ts - a.ts)
+      }))
+    ]);
+    return newTxs;
+  }
+  async generateRecurrents(): Promise<Transaction[]> {
+    const { transactions } = await this.getState();
+    const recurrentTemplates = transactions.filter(t => t.recurrent);
+    const today = startOfToday();
+    const generatedTxs: Omit<Transaction, 'id'>[] = [];
+    for (const template of recurrentTemplates) {
+      let nextDate = new Date(template.ts);
+      while (isBefore(nextDate, today)) {
+        const nextDueDate = template.frequency === 'weekly' ? addWeeks(nextDate, 1) : addMonths(nextDate, 1);
+        if (isBefore(nextDueDate, today)) {
+          const alreadyGenerated = transactions.some(t => t.parentId === template.id && t.ts === nextDueDate.getTime());
+          if (!alreadyGenerated) {
+            generatedTxs.push({
+              ...template,
+              ts: nextDueDate.getTime(),
+              recurrent: false,
+              frequency: undefined,
+              parentId: template.id,
+              note: `${template.note || ''} (Recurrente)`.trim(),
+            });
+          }
+        }
+        nextDate = nextDueDate;
+      }
+    }
+    if (generatedTxs.length > 0) {
+      return this.bulkAddTransactions(generatedTxs);
+    }
+    return [];
+  }
   async listTransactions(limit = 50, cursor = 0): Promise<{ items: Transaction[]; next: number | null; }> {
     const { transactions } = await this.getState();
     const paginated = transactions.slice(cursor, cursor + limit);
@@ -35,8 +86,6 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const oldTx = transactions.find(t => t.id === id);
     if (!oldTx) throw new Error("Transaction not found");
     const newTx: Transaction = { ...oldTx, ...updates };
-    // For simplicity in this phase, we assume transfers are not editable in a way that changes accounts/type.
-    // A full implementation would require more complex logic to handle linked transactions.
     const oldAmount = oldTx.type === 'income' ? Math.abs(oldTx.amount) : -Math.abs(oldTx.amount);
     const newAmount = newTx.type === 'income' ? Math.abs(newTx.amount) : -Math.abs(newTx.amount);
     const balanceChange = newAmount - oldAmount;
@@ -55,28 +104,14 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const txToDelete = transactions.find(t => t.id === id);
     if (!txToDelete) return;
     const mutations: Promise<any>[] = [];
-    // Reverse balance for the primary transaction
-    const primaryAccount = new AccountEntity(this.env, txToDelete.accountId);
     const amountToReverse = txToDelete.type === 'income' ? -Math.abs(txToDelete.amount) : Math.abs(txToDelete.amount);
-    mutations.push(primaryAccount.mutate(acc => ({ ...acc, balance: acc.balance + amountToReverse })));
+    mutations.push(new AccountEntity(this.env, txToDelete.accountId).mutate(acc => ({ ...acc, balance: acc.balance + amountToReverse })));
     let idsToDelete = [id];
-    // If it's a transfer, find and delete the linked transaction
-    if (txToDelete.type === 'transfer' && txToDelete.accountTo) {
-      const linkedTx = transactions.find(t =>
-        t.type === 'transfer' &&
-        t.accountTo === txToDelete.accountId &&
-        t.accountId === txToDelete.accountTo &&
-        Math.abs(t.amount - txToDelete.amount) < 0.01 && // floating point comparison
-        Math.abs(t.ts - txToDelete.ts) < 2000 // assume they happen close together
-      );
-      if (linkedTx) {
-        idsToDelete.push(linkedTx.id);
-        const linkedAccount = new AccountEntity(this.env, linkedTx.accountId);
-        const linkedAmountToReverse = linkedTx.type === 'income' ? -Math.abs(linkedTx.amount) : Math.abs(linkedTx.amount);
-        mutations.push(linkedAccount.mutate(acc => ({ ...acc, balance: acc.balance + linkedAmountToReverse })));
-      }
+    // If deleting a recurrent template, also delete its children
+    if (txToDelete.recurrent) {
+        const children = transactions.filter(t => t.parentId === id);
+        idsToDelete.push(...children.map(c => c.id));
     }
-    // Update ledger state
     mutations.push(this.mutate(s => ({
       ...s,
       transactions: s.transactions.filter(t => !idsToDelete.includes(t.id))
@@ -92,7 +127,7 @@ export class BudgetEntity extends IndexedEntity<Budget> {
 }
 export class SettingsEntity extends Entity<Settings> {
   static readonly entityName = "settings";
-  static readonly initialState: Settings = { currency: 'USD', fiscalMonthStart: 1 };
+  static readonly initialState: Settings = { currency: 'USD', fiscalMonthStart: 1, recurrentDefaultFrequency: 'monthly' };
   constructor(env: Env) {
     super(env, "global");
   }

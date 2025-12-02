@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TransactionForm } from '@/components/accounting/TransactionForm';
@@ -24,16 +24,19 @@ export function TransactionsPage() {
   const [editingTxn, setEditingTxn] = useState<Partial<Transaction> | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>({
-    query: '',
-    accountId: 'all',
-    type: 'all',
-    dateRange: undefined,
-  });
+  const [filters, setFilters] = useState<Filters>({ query: '', accountId: 'all', type: 'all', dateRange: undefined });
+  const [isImportSheetOpen, setImportSheetOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const accountsById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (generateRecurrent = false) => {
     try {
       setLoading(true);
+      if (generateRecurrent) {
+        await api('/api/finance/transactions/generate', { method: 'POST' });
+      }
       const [txs, accs] = await Promise.all([
         api<{ items: Transaction[] }>('/api/finance/transactions?limit=1000').then(p => p.items),
         api<Account[]>('/api/finance/accounts'),
@@ -48,7 +51,7 @@ export function TransactionsPage() {
     }
   }, []);
   useEffect(() => {
-    fetchData();
+    fetchData(true);
   }, [fetchData]);
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
@@ -89,12 +92,52 @@ export function TransactionsPage() {
       setDeleteDialogOpen(false);
     }
   };
-  const formatCurrency = (value: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
-  const accountIcons = {
-    cash: <Banknote className="size-4 text-muted-foreground" />,
-    bank: <Landmark className="size-4 text-muted-foreground" />,
-    credit_card: <CreditCard className="size-4 text-muted-foreground" />,
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    const text = await file.text();
+    const lines = text.split('\n').slice(1).filter(l => l.trim());
+    const preview = lines.map(line => {
+        const [date, accountName, type, amount, category, note] = line.split(',');
+        return { date, accountName, type, amount, category, note };
+    });
+    setImportPreview(preview);
+    setImportSheetOpen(true);
+    event.target.value = ''; // Reset file input
   };
+  const handleImport = async () => {
+    if (!importFile) return;
+    const formData = new FormData();
+    formData.append('file', importFile);
+    try {
+      const result = await api<{ imported: number }>('/api/finance/transactions/import', { method: 'POST', body: formData });
+      toast.success(`${result.imported} transacciones importadas.`);
+      fetchData();
+    } catch (e) {
+      toast.error('Error al importar el archivo.');
+    } finally {
+      setImportSheetOpen(false);
+      setImportFile(null);
+      setImportPreview([]);
+    }
+  };
+  const handleGenerateRecurrents = async () => {
+    setIsGenerating(true);
+    try {
+        const result = await api<{ generated: number }>('/api/finance/transactions/generate', { method: 'POST' });
+        toast.success(`${result.generated} transacciones recurrentes generadas.`);
+        if (result.generated > 0) {
+            fetchData();
+        }
+    } catch (e) {
+        toast.error('Error al generar transacciones recurrentes.');
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+  const formatCurrency = (value: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
+  const accountIcons = { cash: <Banknote className="size-4 text-muted-foreground" />, bank: <Landmark className="size-4 text-muted-foreground" />, credit_card: <CreditCard className="size-4 text-muted-foreground" /> };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -103,9 +146,17 @@ export function TransactionsPage() {
             <h1 className="text-4xl font-display font-bold">Transacciones</h1>
             <p className="text-muted-foreground mt-1">Tu historial de ingresos y gastos.</p>
           </div>
-          <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingTxn({}); setSheetOpen(true); }}>
-            <PlusCircle className="mr-2 size-5" /> Agregar Transacción
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 size-4" /> Importar CSV</Button>
+            <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating}>
+                {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />}
+                Generar Recurrentes
+            </Button>
+            <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingTxn({}); setSheetOpen(true); }}>
+              <PlusCircle className="mr-2 size-5" /> Agregar Transacción
+            </Button>
+          </div>
         </header>
         <TransactionFilters filters={filters} setFilters={setFilters} accounts={accounts} />
         <Card>
@@ -123,43 +174,29 @@ export function TransactionsPage() {
               <TableBody>
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
-                    </TableRow>
+                    <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                   ))
                 ) : filteredTransactions.length > 0 ? (
                   filteredTransactions.map((tx) => {
                     const account = accountsById.get(tx.accountId);
                     return (
                       <TableRow key={tx.id}>
+                        <TableCell><div className="flex items-center gap-2">{account && accountIcons[account.type]}<span className="font-medium">{account?.name || 'N/A'}</span></div></TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            {account && accountIcons[account.type]}
-                            <span className="font-medium">{account?.name || 'N/A'}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
+                            <div className="flex items-center gap-2">
+                                <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
+                                {tx.recurrent && <Badge variant="secondary"><Repeat className="mr-1 size-3" /> Recurrente</Badge>}
+                            </div>
                         </TableCell>
                         <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>
-                        <TableCell className={cn("text-right font-mono", tx.type === 'income' ? 'text-emerald-500' : 'text-foreground')}>
-                          {formatCurrency(tx.amount, tx.currency)}
-                        </TableCell>
+                        <TableCell className={cn("text-right font-mono", tx.type === 'income' ? 'text-emerald-500' : 'text-foreground')}>{formatCurrency(tx.amount, tx.currency)}</TableCell>
                         <TableCell>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => { setEditingTxn(tx); setSheetOpen(true); }}>
-                                <Pencil className="mr-2 h-4 w-4" /> Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; setEditingTxn({ ...copy, ts: Date.now() }); setSheetOpen(true); }}>
-                                <Copy className="mr-2 h-4 w-4" /> Duplicar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setEditingTxn(tx); setSheetOpen(true); }}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; setEditingTxn({ ...copy, ts: Date.now(), recurrent: false }); setSheetOpen(true); }}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -167,11 +204,7 @@ export function TransactionsPage() {
                     );
                   })
                 ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                      No hay transacciones que coincidan con los filtros.
-                    </TableCell>
-                  </TableRow>
+                  <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay transacciones que coincidan con los filtros.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -180,31 +213,43 @@ export function TransactionsPage() {
       </div>
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingTxn(null); setSheetOpen(open); }}>
         <SheetContent className="sm:max-w-lg w-full p-0">
-          <SheetHeader className="p-6 border-b">
-            <SheetTitle>{editingTxn?.id ? 'Editar Transacción' : 'Nueva Transacción'}</SheetTitle>
-          </SheetHeader>
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingTxn?.id ? 'Editar Transacción' : 'Nueva Transacción'}</SheetTitle></SheetHeader>
           {editingTxn && (
-            <TransactionForm
-              accounts={accounts}
-              onSubmit={handleFormSubmit}
-              onFinished={() => { setSheetOpen(false); setEditingTxn(null); }}
-              defaultValues={{ ...editingTxn, ts: new Date(editingTxn.ts || Date.now()), accountToId: editingTxn.accountTo }}
-            />
+            <TransactionForm accounts={accounts} onSubmit={handleFormSubmit} onFinished={() => { setSheetOpen(false); setEditingTxn(null); }} defaultValues={{ ...editingTxn, ts: new Date(editingTxn.ts || Date.now()), accountToId: editingTxn.accountTo }} />
           )}
+        </SheetContent>
+      </Sheet>
+      <Sheet open={isImportSheetOpen} onOpenChange={setImportSheetOpen}>
+        <SheetContent className="sm:max-w-2xl w-full">
+            <SheetHeader><SheetTitle>Importar Transacciones</SheetTitle></SheetHeader>
+            <div className="py-4">
+                <p className="text-sm text-muted-foreground mb-4">Previsualización de las transacciones a importar. Columnas requeridas: date, accountName, type, amount, category, note.</p>
+                <div className="max-h-96 overflow-auto border rounded-md">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                {importPreview[0] && Object.keys(importPreview[0]).map(key => <TableHead key={key}>{key}</TableHead>)}
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {importPreview.map((row, i) => (
+                                <TableRow key={i}>
+                                    {Object.values(row).map((val: any, j: number) => <TableCell key={j}>{val}</TableCell>)}
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+                <div className="mt-6 flex justify-end">
+                    <Button onClick={handleImport}>Confirmar Importación</Button>
+                </div>
+            </div>
         </SheetContent>
       </Sheet>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

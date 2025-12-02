@@ -3,8 +3,8 @@ import { Banknote, Landmark, CreditCard, MoreVertical, Trash2, Pencil } from 'lu
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import type { Account, Transaction } from '@shared/types';
+import type { Account } from '@shared/types';
+import React from 'react';
 const accountIcons = {
   cash: <Banknote className="size-5 text-muted-foreground" />,
   bank: <Landmark className="size-5 text-muted-foreground" />,
@@ -12,11 +12,11 @@ const accountIcons = {
 };
 interface AccountCardProps {
   account: Account;
-  latestTransactions: Transaction[];
   onDelete: (accountId: string) => void;
   onEdit: (account: Account) => void;
+  children?: React.ReactNode;
 }
-export function AccountCard({ account, latestTransactions, onDelete, onEdit }: AccountCardProps) {
+export function AccountCard({ account, onDelete, onEdit, children }: AccountCardProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: account.currency }).format(value);
   };
@@ -41,36 +41,13 @@ export function AccountCard({ account, latestTransactions, onDelete, onEdit }: A
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(account)}>
-                <Pencil className="mr-2 size-4" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDelete(account.id)} className="text-destructive">
-                <Trash2 className="mr-2 size-4" /> Delete
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(account)}><Pencil className="mr-2 size-4" /> Edit</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDelete(account.id)} className="text-destructive"><Trash2 className="mr-2 size-4" /> Delete</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col justify-end">
-          {latestTransactions.length > 0 ? (
-            <div className="space-y-2 text-sm">
-              <p className="text-xs text-muted-foreground font-medium">Últimos movimientos</p>
-              {latestTransactions.slice(0, 3).map((tx) => (
-                <div key={tx.id} className="flex justify-between items-center">
-                  <span className="truncate pr-2">{tx.category}</span>
-                  <span
-                    className={cn(
-                      'font-mono font-semibold',
-                      tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'
-                    )}
-                  >
-                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">Sin transacciones recientes.</p>
-          )}
+          {children}
         </CardContent>
       </Card>
     </motion.div>
