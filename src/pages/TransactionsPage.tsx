@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard } from 'lucide-react';
+import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TransactionForm } from '@/components/accounting/TransactionForm';
 import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
 import { api } from '@/lib/api-client';
@@ -19,6 +21,9 @@ export function TransactionsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setSheetOpen] = useState(false);
+  const [editingTxn, setEditingTxn] = useState<Partial<Transaction> | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     query: '',
     accountId: 'all',
@@ -30,7 +35,7 @@ export function TransactionsPage() {
     try {
       setLoading(true);
       const [txs, accs] = await Promise.all([
-        api<{ items: Transaction[] }>('/api/finance/transactions').then(p => p.items),
+        api<{ items: Transaction[] }>('/api/finance/transactions?limit=1000').then(p => p.items),
         api<Account[]>('/api/finance/accounts'),
       ]);
       setTransactions(txs);
@@ -60,16 +65,28 @@ export function TransactionsPage() {
       return queryMatch && accountMatch && typeMatch && dateMatch;
     });
   }, [transactions, filters]);
-  const handleAddTransaction = async (values: Omit<Transaction, 'id' | 'currency'>) => {
+  const handleFormSubmit = async (values: Omit<Transaction, 'currency'> & { id?: string }) => {
     try {
-      await api<Transaction>('/api/finance/transactions', {
-        method: 'POST',
-        body: JSON.stringify(values),
-      });
-      toast.success('Transacción guardada.');
+      const method = values.id ? 'PUT' : 'POST';
+      const url = values.id ? `/api/finance/transactions/${values.id}` : '/api/finance/transactions';
+      await api(url, { method, body: JSON.stringify(values) });
+      toast.success(values.id ? 'Transacción actualizada.' : 'Transacción creada.');
       fetchData();
-    } catch (error) {
+    } catch (e) {
       toast.error('Error al guardar la transacción.');
+    }
+  };
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    try {
+      await api(`/api/finance/transactions/${deletingId}`, { method: 'DELETE' });
+      toast.success('Transacción eliminada.');
+      fetchData();
+    } catch (e) {
+      toast.error('Error al eliminar la transacción.');
+    } finally {
+      setDeletingId(null);
+      setDeleteDialogOpen(false);
     }
   };
   const formatCurrency = (value: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
@@ -86,19 +103,9 @@ export function TransactionsPage() {
             <h1 className="text-4xl font-display font-bold">Transacciones</h1>
             <p className="text-muted-foreground mt-1">Tu historial de ingresos y gastos.</p>
           </div>
-          <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white">
-                <PlusCircle className="mr-2 size-5" /> Agregar Transacción
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="sm:max-w-lg w-full p-0">
-              <SheetHeader className="p-6 border-b">
-                <SheetTitle>Nueva Transacción</SheetTitle>
-              </SheetHeader>
-              <TransactionForm accounts={accounts} onSubmit={handleAddTransaction} onFinished={() => setSheetOpen(false)} />
-            </SheetContent>
-          </Sheet>
+          <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingTxn({}); setSheetOpen(true); }}>
+            <PlusCircle className="mr-2 size-5" /> Agregar Transacción
+          </Button>
         </header>
         <TransactionFilters filters={filters} setFilters={setFilters} accounts={accounts} />
         <Card>
@@ -108,22 +115,16 @@ export function TransactionsPage() {
                 <TableRow>
                   <TableHead>Cuenta</TableHead>
                   <TableHead>Categoría</TableHead>
-                  <TableHead>
-                    <Button variant="ghost" size="sm">
-                      Fecha <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
+                  <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                      <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : filteredTransactions.length > 0 ? (
@@ -144,12 +145,30 @@ export function TransactionsPage() {
                         <TableCell className={cn("text-right font-mono", tx.type === 'income' ? 'text-emerald-500' : 'text-foreground')}>
                           {formatCurrency(tx.amount, tx.currency)}
                         </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setEditingTxn(tx); setSheetOpen(true); }}>
+                                <Pencil className="mr-2 h-4 w-4" /> Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; setEditingTxn({ ...copy, ts: Date.now() }); setSheetOpen(true); }}>
+                                <Copy className="mr-2 h-4 w-4" /> Duplicar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}>
+                                <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                       </TableRow>
                     );
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
+                    <TableCell colSpan={5} className="h-24 text-center">
                       No hay transacciones que coincidan con los filtros.
                     </TableCell>
                   </TableRow>
@@ -159,6 +178,35 @@ export function TransactionsPage() {
           </CardContent>
         </Card>
       </div>
+      <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingTxn(null); setSheetOpen(open); }}>
+        <SheetContent className="sm:max-w-lg w-full p-0">
+          <SheetHeader className="p-6 border-b">
+            <SheetTitle>{editingTxn?.id ? 'Editar Transacción' : 'Nueva Transacción'}</SheetTitle>
+          </SheetHeader>
+          {editingTxn && (
+            <TransactionForm
+              accounts={accounts}
+              onSubmit={handleFormSubmit}
+              onFinished={() => { setSheetOpen(false); setEditingTxn(null); }}
+              defaultValues={{ ...editingTxn, ts: new Date(editingTxn.ts || Date.now()), accountToId: editingTxn.accountTo }}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

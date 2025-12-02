@@ -13,8 +13,15 @@ const formSchema = z.object({
   currency: z.enum(['USD', 'EUR', 'ARS']),
   balance: z.preprocess(
     (val: unknown) => (val === '' || val === undefined ? 0 : Number(val)),
-    z.number().min(0, "El saldo no puede ser negativo.").default(0)
+    z.number().default(0)
   ),
+}).refine((data) => {
+  // Allow negative balances only for credit_card accounts
+  if (data.type === 'credit_card') return true;
+  return data.balance >= 0;
+}, {
+  path: ['balance'],
+  message: "El saldo no puede ser negativo.",
 });
 type AccountFormValues = z.infer<typeof formSchema>;
 interface AccountFormProps {

@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -70,7 +71,7 @@ export function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <FormLabel>Tema</FormLabel>
+                <Label>Tema</Label>
                 <div className="flex items-center gap-2">
                   <span>{isDark ? 'Oscuro' : 'Claro'}</span>
                   <ThemeToggle className="relative top-0 right-0" />
@@ -78,21 +79,29 @@ export function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Finanzas</CardTitle>
-                  <CardDescription>Ajustes relacionados con la moneda y fechas.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {loading ? (
-                    <>
-                      <Skeleton className="h-10 w-full" />
-                      <Skeleton className="h-10 w-full" />
-                    </>
-                  ) : (
-                    <>
+          {loading ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Finanzas</CardTitle>
+                <CardDescription>Ajustes relacionados con la moneda y fechas.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </CardContent>
+              <div className="flex justify-end p-6 border-t">
+                <Button disabled>Guardar Cambios</Button>
+              </div>
+            </Card>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Finanzas</CardTitle>
+                    <CardDescription>Ajustes relacionados con la moneda y fechas.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
                       <FormField
                         control={form.control}
                         name="currency"
@@ -141,18 +150,17 @@ export function SettingsPage() {
                           </FormItem>
                         )}
                       />
-                    </>
-                  )}
-                </CardContent>
-                <div className="flex justify-end p-6 border-t">
-                  <Button type="submit" disabled={isSubmitting || !isDirty}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Guardar Cambios
-                  </Button>
-                </div>
-              </Card>
-            </form>
-          </Form>
+                  </CardContent>
+                  <div className="flex justify-end p-6 border-t">
+                    <Button type="submit" disabled={isSubmitting || !isDirty}>
+                      {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Guardar Cambios
+                    </Button>
+                  </div>
+                </Card>
+              </form>
+            </Form>
+          )}
         </div>
       </div>
     </div>

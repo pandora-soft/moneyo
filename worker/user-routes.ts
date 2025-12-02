@@ -68,8 +68,8 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
       const toAccount = new AccountEntity(c.env, body.accountTo);
       if (!await toAccount.exists()) return notFound(c, 'Destination account not found');
       const amount = Math.abs(body.amount);
-      const expenseTxData: Omit<Transaction, 'id'> = { ...body, type: 'expense', amount, currency };
-      const incomeTxData: Omit<Transaction, 'id'> = { ...body, accountId: body.accountTo, accountTo: body.accountId, type: 'income', amount, currency };
+      const expenseTxData: Omit<Transaction, 'id'> = { ...body, type: 'transfer', amount, currency };
+      const incomeTxData: Omit<Transaction, 'id'> = { ...body, accountId: body.accountTo, accountTo: body.accountId, type: 'transfer', amount, currency };
       const [expenseTx, incomeTx] = await Promise.all([
         ledger.addTransaction(expenseTxData),
         ledger.addTransaction(incomeTxData),
@@ -83,6 +83,27 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const newTx = await ledger.addTransaction(newTxData);
     await fromAccount.mutate(acc => ({ ...acc, balance: acc.balance + amount }));
     return ok(c, newTx);
+  });
+  finance.put('/transactions/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'Invalid ID');
+    const updates = await c.req.json<Partial<Omit<Transaction, 'id'>>>();
+    if (!Object.keys(updates).length) return bad(c, 'No updates provided');
+    const ledger = new LedgerEntity(c.env, 'main');
+    try {
+      const updated = await ledger.updateTransaction(id, updates);
+      return ok(c, updated);
+    } catch (e: any) {
+      if (e.message === "Transaction not found") return notFound(c, e.message);
+      return bad(c, "Failed to update transaction");
+    }
+  });
+  finance.delete('/transactions/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'Invalid ID');
+    const ledger = new LedgerEntity(c.env, 'main');
+    await ledger.deleteTransaction(id);
+    return ok(c, { id, deleted: true });
   });
   // BUDGETS API
   finance.get('/budgets', async (c) => {

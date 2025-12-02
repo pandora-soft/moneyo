@@ -15,17 +15,16 @@ import { es } from 'date-fns/locale';
 import type { Account, Transaction } from '@shared/types';
 import { useEffect } from 'react';
 const formSchema = z.object({
+  id: z.string().optional(),
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
   amount: z.preprocess(
     (val: unknown) => {
       if (val === null || val === undefined) return 0;
-      if (typeof val === 'string') {
-        if (val.trim() === '') return 0;
-        return Number(val);
-      }
-      return Number(val as any);
+      const strVal = String(val).trim();
+      if (strVal === '') return 0;
+      return Math.abs(Number(strVal));
     },
     z.number().positive("El monto debe ser positivo.")
   ),
@@ -44,7 +43,7 @@ const formSchema = z.object({
 type TransactionFormValues = z.infer<typeof formSchema>;
 interface TransactionFormProps {
   accounts: Account[];
-  onSubmit: (values: Omit<Transaction, 'id' | 'currency'>) => Promise<void>;
+  onSubmit: (values: Omit<Transaction, 'currency'> & { id?: string }) => Promise<void>;
   onFinished: () => void;
   defaultValues?: Partial<TransactionFormValues>;
 }
@@ -55,7 +54,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       type: 'expense',
       ts: new Date(),
       amount: 0,
-      ...defaultValues
+      ...defaultValues,
     }
   });
   const { isSubmitting } = form.formState;
@@ -68,7 +67,8 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
     }
   }, [transactionType, form]);
   const handleSubmit: SubmitHandler<TransactionFormValues> = async (values) => {
-    const finalValues: Omit<Transaction, 'id' | 'currency'> = {
+    const finalValues: Omit<Transaction, 'currency'> & { id?: string } = {
+      id: values.id,
       accountId: values.accountId,
       type: values.type,
       amount: values.amount,
@@ -196,7 +196,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar Transacción
+            {defaultValues?.id ? 'Actualizar Transacción' : 'Guardar Transacción'}
           </Button>
         </div>
       </form>

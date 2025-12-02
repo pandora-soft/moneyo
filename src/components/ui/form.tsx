@@ -44,13 +44,32 @@ const FormField = <
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const itemContext = React.useContext(FormItemContext)
-  const { getFieldState, formState } = useFormContext()
 
-  const fieldState = getFieldState(fieldContext.name, formState)
+  // Call hook unconditionally at top-level to satisfy rules-of-hooks.
+  // Use 'as any' to avoid TypeScript issues in environments where the provider may be missing.
+  const formContext = useFormContext() as any
 
-  if (!fieldContext) {
+  if (!fieldContext || fieldContext.name == null) {
     throw new Error("useFormField should be used within <FormField>")
   }
+
+  if (!formContext) {
+    throw new Error(
+      "useFormField must be used within a FormProvider (e.g., <FormProvider>)"
+    )
+  }
+
+  if (!itemContext || itemContext.id == null) {
+    throw new Error("useFormField must be used within a <FormItem>")
+  }
+
+  const { getFieldState, formState } = formContext
+
+  // Use getFieldState to retrieve the specific field's state. Mirror previous
+  // behavior by providing safe defaults if getFieldState is not available.
+  const fieldState = getFieldState
+    ? getFieldState(fieldContext.name, formState)
+    : { invalid: false, isTouched: false, isDirty: false, error: undefined }
 
   const { id } = itemContext
 
