@@ -10,6 +10,7 @@ import '@/index.css';
 import { HomePage } from '@/pages/HomePage';
 import { AccountsPage } from '@/pages/AccountsPage';
 import { TransactionsPage } from '@/pages/TransactionsPage';
+import { BudgetsPage } from '@/pages/BudgetsPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { Toaster } from '@/components/ui/sonner';
@@ -26,11 +27,14 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
   { href: '/accounts', label: 'Cuentas', icon: Wallet },
   { href: '/transactions', label: 'Transacciones', icon: List },
+  { href: '/budgets', label: 'Presupuestos', icon: PiggyBank },
   { href: '/reports', label: 'Reportes', icon: BarChart },
   { href: '/settings', label: 'Ajustes', icon: Settings },
 ];
 const GlobalTransactionSheet = () => {
-  const { isModalOpen, modalInitialValues, closeModal } = useAppStore();
+  const isModalOpen = useAppStore(s => s.isModalOpen);
+  const modalInitialValues = useAppStore(s => s.modalInitialValues);
+  const closeModal = useAppStore(s => s.closeModal);
   const [accounts, setAccounts] = useState<Account[]>([]);
   useEffect(() => {
     if (isModalOpen) {
@@ -44,7 +48,7 @@ const GlobalTransactionSheet = () => {
       const method = values.id ? 'PUT' : 'POST';
       const url = values.id ? `/api/finance/transactions/${values.id}` : '/api/finance/transactions';
       await api(url, { method, body: JSON.stringify(values) });
-      toast.success(values.id ? 'Transacción actualizada.' : 'Transacción creada.');
+      toast.success(values.id ? 'Transacci��n actualizada.' : 'Transacción creada.');
       useAppStore.getState().triggerRefetch(); // Trigger global refetch
       closeModal();
     } catch (e) {
@@ -121,6 +125,7 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: "accounts", element: <AccountsPage /> },
       { path: "transactions", element: <TransactionsPage /> },
+      { path: "budgets", element: <BudgetsPage /> },
       { path: "reports", element: <ReportsPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],

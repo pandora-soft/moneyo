@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -218,13 +219,6 @@ export function ReportsPage() {
             <p className="text-muted-foreground mt-1">Visualiza tus patrones de ingresos y gastos.</p>
           </div>
           <div className="flex gap-2">
-            <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
-              <SheetTrigger asChild><Button variant="outline"><PlusCircle className="mr-2 size-4" /> Crear Presupuesto</Button></SheetTrigger>
-              <SheetContent className="sm:max-w-lg w-full p-0">
-                <SheetHeader className="p-6 border-b"><SheetTitle>Nuevo Presupuesto</SheetTitle></SheetHeader>
-                <BudgetForm categories={uniqueCategories} onSubmit={handleAddBudget} onFinished={() => setSheetOpen(false)} />
-              </SheetContent>
-            </Sheet>
             <Button onClick={() => handleExport('csv')} disabled={loading || transactions.length === 0}><Download className="mr-2 size-4" /> CSV</Button>
             <Button onClick={() => handleExport('pdf')} disabled={generatingPDF || loading}>
                 {generatingPDF ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />} Reporte Gráfico</Button>
@@ -255,7 +249,7 @@ export function ReportsPage() {
                       <Pie data={categorySpending} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                         {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.limit > 0 && entry.value > entry.limit ? '#EF4444' : COLORS[index % COLORS.length]} />))}
                       </Pie>
-                      <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
+                      <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.value)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -264,33 +258,19 @@ export function ReportsPage() {
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
             <Card>
-              <CardHeader><CardTitle>{t('labels.budgetList')}</CardTitle><CardDescription>Administra tus presupuestos mensuales.</CardDescription></CardHeader>
+              <CardHeader><CardTitle>{t('budget.list')} Overview</CardTitle><CardDescription>Un vistazo rápido a tus presupuestos activos.</CardDescription></CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <AnimatePresence>
-                    {budgetsWithActuals.map(budget => (
-                      <motion.div key={budget.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border rounded-lg">
-                          <div className="flex-1">
-                            <p className="font-semibold">{budget.category}</p>
-                            <p className="text-sm text-muted-foreground">{format(new Date(budget.month), 'MMMM yyyy', { locale: es })}</p>
-                          </div>
-                          <div className="w-full sm:w-auto flex-1">
-                            <div className="flex justify-between text-sm mb-1">
-                              <span>{formatCurrency(budget.actual)}</span>
-                              <span className="text-muted-foreground">{formatCurrency(budget.limit)}</span>
-                            </div>
-                            <Progress value={(budget.actual / budget.limit) * 100} className={cn('h-2', budget.actual > budget.limit && 'bg-red-500')} />
-                          </div>
-                          <div className="flex gap-2 self-end sm:self-center">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingBudget(budget)}><Pencil className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDeletingBudget(budget.id); setDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4" /></Button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                  {budgetsWithActuals.length === 0 && !loading && <p className="text-center text-muted-foreground py-8">No hay presupuestos creados.</p>}
+                <div className="space-y-2">
+                  {budgetsWithActuals.slice(0, 5).map(b => (
+                    <div key={b.id} className="flex justify-between text-sm">
+                      <span>{b.category} - {format(new Date(b.month), 'MMM yyyy', { locale: es })}</span>
+                      <span className={cn('font-medium', b.actual > b.limit ? 'text-destructive' : 'text-emerald-500')}>{formatCurrency(b.actual)} / {formatCurrency(b.limit)}</span>
+                    </div>
+                  ))}
+                   {budgetsWithActuals.length === 0 && !loading && <p className="text-center text-muted-foreground py-4">No hay presupuestos para mostrar.</p>}
+                  <Button asChild variant="link" className="mt-4 w-full p-0 h-auto">
+                    <Link to="/budgets">Ver Todos los Presupuestos</Link>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
