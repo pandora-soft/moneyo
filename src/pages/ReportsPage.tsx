@@ -14,6 +14,7 @@ import { BudgetForm } from '@/components/accounting/BudgetForm';
 import { toast } from 'sonner';
 import { useFormatCurrency } from '@/lib/formatCurrency';
 import { useAppStore } from '@/stores/useAppStore';
+import t from '@/lib/i18n';
 const COLORS = ['#0F172A', '#F97316', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
 export function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -110,8 +111,8 @@ export function ReportsPage() {
             // Monthly Summary Table
             ctx.fillStyle = '#0F172A';
             ctx.font = 'bold 20px sans-serif';
-            ctx.fillText('Resumen Mensual', 40, 150);
-            const headers = ['Mes', 'Ingresos', 'Gastos'];
+            ctx.fillText(t('labels.monthlySummary'), 40, 150);
+            const headers = ['Mes', t('finance.income'), t('finance.expense')];
             let y = 190;
             ctx.font = 'bold 14px sans-serif';
             headers.forEach((header, i) => ctx.fillText(header, 40 + i * 200, y));
@@ -128,19 +129,25 @@ export function ReportsPage() {
             // Category Spending Bars
             y += 60;
             ctx.font = 'bold 20px sans-serif';
-            ctx.fillText('Gastos por Categoría (Este Mes)', 40, y);
+            ctx.fillText(t('labels.categorySpending'), 40, y);
             y += 40;
             const maxSpending = Math.max(...categorySpending.map(c => c.value), 1);
             categorySpending.slice(0, 8).forEach((cat, i) => {
                 ctx.font = '14px sans-serif';
                 ctx.fillStyle = '#0F172A';
                 ctx.fillText(cat.name, 40, y);
-                const barWidth = (cat.value / maxSpending) * 500;
-                ctx.fillStyle = cat.limit > 0 && cat.value > cat.limit ? '#EF4444' : COLORS[i % COLORS.length];
+                const barWidth = (cat.value / maxSpending) * 400;
+                const overBudget = cat.limit > 0 && cat.value > cat.limit;
+                ctx.fillStyle = overBudget ? '#EF4444' : COLORS[i % COLORS.length];
                 ctx.fillRect(200, y - 12, barWidth, 18);
                 ctx.fillStyle = 'white';
                 ctx.font = 'bold 12px sans-serif';
                 ctx.fillText(formatCurrency(cat.value), 205, y + 2);
+                ctx.fillStyle = overBudget ? '#EF4444' : '#64748B';
+                ctx.font = '12px sans-serif';
+                if (cat.limit > 0) {
+                    ctx.fillText(`/ ${formatCurrency(cat.limit)}`, 210 + barWidth, y + 2);
+                }
                 y += 35;
             });
             const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
@@ -171,7 +178,7 @@ export function ReportsPage() {
       <div className="py-8 md:py-10 lg:py-12">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <div>
-            <h1 className="text-4xl font-display font-bold">Reportes</h1>
+            <h1 className="text-4xl font-display font-bold">{t('pages.reports')}</h1>
             <p className="text-muted-foreground mt-1">Visualiza tus patrones de ingresos y gastos.</p>
           </div>
           <div className="flex gap-2">
@@ -189,21 +196,21 @@ export function ReportsPage() {
         </header>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid gap-8 lg:grid-cols-2">
           <Card>
-            <CardHeader><CardTitle>Resumen Mensual</CardTitle><CardDescription>Ingresos vs. Gastos por mes.</CardDescription></CardHeader>
+            <CardHeader><CardTitle>{t('labels.monthlySummary')}</CardTitle><CardDescription>Ingresos vs. Gastos por mes.</CardDescription></CardHeader>
             <CardContent>
               {loading ? <Skeleton className="h-[300px]" /> : (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={monthlySummary}>
                     <XAxis dataKey="name" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'hsl(var(--muted))' }} formatter={(value: number) => formatCurrency(value)} /><Legend />
-                    <Bar dataKey="income" fill="#10B981" name="Ingresos" radius={[4, 4, 0, 0]} /><Bar dataKey="expense" fill="#F97316" name="Gastos" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="income" fill="#10B981" name={t('finance.income')} radius={[4, 4, 0, 0]} /><Bar dataKey="expense" fill="#F97316" name={t('finance.expense')} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Gastos por Categoría (Este Mes)</CardTitle><CardDescription>Distribución de tus gastos y comparación con presupuestos.</CardDescription></CardHeader>
+            <CardHeader><CardTitle>{t('labels.categorySpending')}</CardTitle><CardDescription>Distribución de tus gastos y comparación con presupuestos.</CardDescription></CardHeader>
             <CardContent>
               {loading ? <Skeleton className="h-[300px]" /> : (
                 <ResponsiveContainer width="100%" height={300}>

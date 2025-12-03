@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/useAppStore';
 import { useFormatCurrency } from '@/lib/formatCurrency';
+import t from '@/lib/i18n';
 export function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -128,7 +129,7 @@ export function TransactionsPage() {
       <div className="py-8 md:py-10 lg:py-12">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <div>
-            <h1 className="text-4xl font-display font-bold">Transacciones</h1>
+            <h1 className="text-4xl font-display font-bold">{t('pages.transactions')}</h1>
             <p className="text-muted-foreground mt-1">Tu historial de ingresos y gastos.</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -139,7 +140,7 @@ export function TransactionsPage() {
                 Generar Recurrentes
             </Button>
             <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => openModal()}>
-              <PlusCircle className="mr-2 size-5" /> Agregar Transacción
+              <PlusCircle className="mr-2 size-5" /> {t('common.add')} Transacción
             </Button>
           </div>
         </header>
@@ -180,9 +181,9 @@ export function TransactionsPage() {
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openModal(tx)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openModal(tx)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -228,7 +229,7 @@ export function TransactionsPage() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
