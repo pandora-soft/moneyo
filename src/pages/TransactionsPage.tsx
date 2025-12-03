@@ -172,7 +172,7 @@ export function TransactionsPage() {
                             <div className="flex items-center gap-2 flex-wrap">
                                 <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
                                 {tx.recurrent && <Badge variant="secondary"><Repeat className="mr-1 size-3" /> Recurrente</Badge>}
-                                {tx.parentId && <Badge variant="ghost" className="text-xs">Generada</Badge>}
+                                {tx.parentId && <Badge variant="secondary" className="text-xs">Generada</Badge>}
                             </div>
                         </TableCell>
                         <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>

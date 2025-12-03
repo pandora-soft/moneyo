@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { jsPDF } from 'jspdf';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,6 +31,8 @@ export function ReportsPage() {
   const [deletingBudget, setDeletingBudget] = useState<string | null>(null);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const formatCurrency = useFormatCurrency();
+  const barChartRef = useRef<HTMLDivElement | null>(null);
+  const pieChartRef = useRef<HTMLDivElement | null>(null);
   const refetchTrigger = useAppStore((state) => state.refetchData);
   const fetchData = useCallback(async () => {
     try {
@@ -136,73 +139,93 @@ export function ReportsPage() {
     } else {
         setGeneratingPDF(true);
         try {
-            const canvas = document.createElement('canvas');
-            canvas.width = 800;
-            canvas.height = 1120;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                toast.error("No se pudo generar el PDF.");
-                return;
-            }
-            // Background
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            // Header
-            ctx.fillStyle = '#0F172A';
-            ctx.font = 'bold 32px sans-serif';
-            ctx.fillText('Reporte Financiero - CasaConta', 40, 60);
-            ctx.font = '16px sans-serif';
-            ctx.fillStyle = '#64748B';
-            ctx.fillText(`Generado el: ${format(new Date(), 'PPP', { locale: es })}`, 40, 90);
-            // Monthly Summary Table
-            ctx.fillStyle = '#0F172A';
-            ctx.font = 'bold 20px sans-serif';
-            ctx.fillText(t('labels.monthlySummary'), 40, 150);
-            const headers = ['Mes', t('finance.income'), t('finance.expense')];
-            let y = 190;
-            ctx.font = 'bold 14px sans-serif';
-            headers.forEach((header, i) => ctx.fillText(header, 40 + i * 200, y));
-            ctx.font = '14px sans-serif';
-            monthlySummary.slice(0, 5).forEach(row => {
-                y += 30;
-                ctx.fillText(row.name, 40, y);
-                ctx.fillStyle = '#10B981';
-                ctx.fillText(formatCurrency(row.income), 240, y);
-                ctx.fillStyle = '#F97316';
-                ctx.fillText(formatCurrency(row.expense), 440, y);
-                ctx.fillStyle = '#0F172A';
-            });
-            // Category Spending Bars
-            y += 60;
-            ctx.font = 'bold 20px sans-serif';
-            ctx.fillText(t('labels.categorySpending'), 40, y);
-            y += 40;
-            const maxSpending = Math.max(...categorySpending.map(c => c.value), 1);
-            categorySpending.slice(0, 8).forEach((cat, i) => {
-                ctx.font = '14px sans-serif';
-                ctx.fillStyle = '#0F172A';
-                ctx.fillText(cat.name, 40, y);
-                const barWidth = (cat.value / maxSpending) * 400;
-                const overBudget = cat.limit > 0 && cat.value > cat.limit;
-                ctx.fillStyle = overBudget ? '#EF4444' : COLORS[i % COLORS.length];
-                ctx.fillRect(200, y - 12, barWidth, 18);
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 12px sans-serif';
-                ctx.fillText(formatCurrency(cat.value), 205, y + 2);
-                ctx.fillStyle = overBudget ? '#EF4444' : '#64748B';
-                ctx.font = '12px sans-serif';
-                if (cat.limit > 0) {
-                    ctx.fillText(`/ ${formatCurrency(cat.limit)}`, 210 + barWidth, y + 2);
+            // Helper: convert an SVG element to a PNG data URL by inlining styles and drawing to canvas
+            const svgToPngDataUrl = async (svgEl: SVGSVGElement | null, width = 800, height = 400) => {
+              if (!svgEl) return null;
+              const clone = svgEl.cloneNode(true) as SVGSVGElement;
+
+              const traverse = (node: Element) => {
+                const computed = window.getComputedStyle(node);
+                let styleText = '';
+                for (let i = 0; i < computed.length; i++) {
+                  const prop = computed[i];
+                  styleText += `${prop}:${computed.getPropertyValue(prop)};`;
                 }
-                y += 35;
+                node.setAttribute('style', styleText);
+                Array.from(node.children).forEach(child => traverse(child as Element));
+              };
+              traverse(clone as Element);
+
+              const svgString = new XMLSerializer().serializeToString(clone);
+              const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const img = new Image();
+              img.width = width;
+              img.height = height;
+              await new Promise<void>((resolve, reject) => {
+                img.onload = () => resolve();
+                img.onerror = () => reject(new Error('SVG to PNG conversion failed'));
+                img.src = url;
+              });
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) return null;
+              ctx.fillStyle = 'white';
+              ctx.fillRect(0, 0, width, height);
+              ctx.drawImage(img, 0, 0, width, height);
+              URL.revokeObjectURL(url);
+              return canvas.toDataURL('image/png');
+            };
+
+            // Capture SVGs from the rendered chart containers
+            const barSvg = barChartRef.current?.querySelector('svg') as SVGSVGElement | undefined;
+            const pieSvg = pieChartRef.current?.querySelector('svg') as SVGSVGElement | undefined;
+            const barImg = await svgToPngDataUrl(barSvg || null, 800, 400);
+            const pieImg = await svgToPngDataUrl(pieSvg || null, 600, 400);
+
+            // Compose PDF
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            doc.setFontSize(18);
+            doc.setTextColor('#0F172A');
+            doc.text('Reporte Financiero - CasaConta', 40, 40);
+            doc.setFontSize(11);
+            doc.setTextColor('#64748B');
+            doc.text(`Generado el: ${format(new Date(), 'PPP', { locale: es })}`, 40, 60);
+
+            // Monthly summary table
+            doc.setTextColor('#0F172A');
+            doc.setFontSize(12);
+            doc.text(t('labels.monthlySummary'), 40, 90);
+            let y = 110;
+            const headers = ['Mes', t('finance.income'), t('finance.expense')];
+            doc.setFont('helvetica', 'bold');
+            doc.text(headers.join('    '), 40, y);
+            doc.setFont('helvetica', 'normal');
+            monthlySummary.slice(0, 5).forEach(row => {
+              y += 16;
+              doc.text(row.name, 40, y);
+              doc.text(formatCurrency(row.income), 240, y);
+              doc.text(formatCurrency(row.expense), 420, y);
             });
-            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-            if (blob) {
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = `casaconta_reporte_${new Date().toISOString().split('T')[0]}.png`;
-                link.click();
+
+            // Add bar chart image
+            if (barImg) {
+              doc.addPage();
+              doc.text(t('labels.monthlySummary'), 40, 40);
+              doc.addImage(barImg, 'PNG', 40, 60, 520, 260);
             }
+
+            // Add pie chart image
+            if (pieImg) {
+              doc.addPage();
+              doc.text(t('labels.categorySpending'), 40, 40);
+              doc.addImage(pieImg, 'PNG', 40, 60, 480, 260);
+            }
+
+            doc.save(`casaconta-reporte.pdf`);
+            toast.success('Reporte PDF generado.');
         } catch (e) {
             toast.error("Ocurrió un error al generar el reporte.");
         } finally {
@@ -230,13 +253,15 @@ export function ReportsPage() {
               <CardHeader><CardTitle>{t('labels.monthlySummary')}</CardTitle><CardDescription>Ingresos vs. Gastos por mes.</CardDescription></CardHeader>
               <CardContent>
                 {loading ? <Skeleton className="h-[300px]" /> : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={monthlySummary}>
-                      <XAxis dataKey="name" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
-                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'hsl(var(--muted))' }} formatter={(value: number) => formatCurrency(value)} /><Legend />
-                      <Bar dataKey="income" fill="#10B981" name={t('finance.income')} radius={[4, 4, 0, 0]} /><Bar dataKey="expense" fill="#F97316" name={t('finance.expense')} radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div ref={barChartRef} className="h-[300px]">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={monthlySummary}>
+                        <XAxis dataKey="name" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'hsl(var(--muted))' }} formatter={(value: number) => formatCurrency(value)} /><Legend />
+                        <Bar dataKey="income" fill="#10B981" name={t('finance.income')} radius={[4, 4, 0, 0]} /><Bar dataKey="expense" fill="#F97316" name={t('finance.expense')} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -244,14 +269,16 @@ export function ReportsPage() {
               <CardHeader><CardTitle>{t('labels.categorySpending')}</CardTitle><CardDescription>Distribución de tus gastos y comparación con presupuestos.</CardDescription></CardHeader>
               <CardContent>
                 {loading ? <Skeleton className="h-[300px]" /> : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie data={categorySpending} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                        {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.limit > 0 && entry.computedActual > entry.limit ? '#EF4444' : COLORS[index % COLORS.length]} />))}
-                      </Pie>
-                      <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.computedActual)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div ref={pieChartRef} className="h-[300px]">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie data={categorySpending} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                          {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.limit > 0 && entry.computedActual > entry.limit ? '#EF4444' : COLORS[index % COLORS.length]} />))}
+                        </Pie>
+                        <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.computedActual)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                 )}
               </CardContent>
             </Card>
