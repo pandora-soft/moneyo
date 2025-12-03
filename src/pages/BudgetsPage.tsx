@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { api } from '@/lib/api-client';
 import type { Transaction, Budget } from '@shared/types';
-import { format, getMonth, getYear, startOfMonth, addMonths, endOfMonth } from 'date-fns';
+import { format, getMonth, getYear, startOfMonth, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreVertical, Pencil, Trash2, Copy } from 'lucide-react';
@@ -20,13 +20,13 @@ import { useAppStore } from '@/stores/useAppStore';
 import t from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-const COLORS = ['#0F172A', '#F97316', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+import { Badge } from '@/components/ui/badge';
 export function BudgetsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setSheetOpen] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [editingBudget, setEditingBudget] = useState<Partial<Budget> | null>(null);
   const [deletingBudget, setDeletingBudget] = useState<string | null>(null);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [filterDate, setFilterDate] = useState<Date>(startOfMonth(new Date()));
@@ -61,12 +61,12 @@ export function BudgetsPage() {
       const actual = transactions
         .filter(t => t.type === 'expense' && getMonth(new Date(t.ts)) === getMonth(monthStart) && getYear(new Date(t.ts)) === getYear(monthStart) && t.category === b.category)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      return { ...b, actual };
+      return { ...b, computedActual: actual };
     }).sort((a, b) => a.category.localeCompare(b.category));
     const chartData = budgetsWithActuals.map(b => ({
       name: b.category,
       limit: b.limit,
-      actual: b.actual,
+      actual: b.computedActual,
     }));
     return { uniqueMonths: uniqueMonthKeys, uniqueCategories, filteredBudgetsWithActuals: budgetsWithActuals, chartData };
   }, [budgets, transactions, filterDate]);
@@ -76,8 +76,9 @@ export function BudgetsPage() {
         await api(`/api/finance/budgets/${editingBudget.id}`, { method: 'PUT', body: JSON.stringify(values) });
         toast.success('Presupuesto actualizado.');
       } else {
-        await api('/api/finance/budgets', { method: 'POST', body: JSON.stringify(values) });
+        const newBudget = await api<Budget>('/api/finance/budgets', { method: 'POST', body: JSON.stringify(values) });
         toast.success('Presupuesto creado.');
+        setBudgets(prev => [...prev, { ...newBudget, computedActual: 0 }]); // Optimistic update
       }
       fetchData();
     } catch (error) {
@@ -101,9 +102,9 @@ export function BudgetsPage() {
     }
   };
   const handleDuplicate = (budget: Budget) => {
-    const { id, ...newBudget } = budget;
+    const { id, computedActual, ...newBudget } = budget;
     const nextMonth = addMonths(new Date(budget.month), 1);
-    setEditingBudget({ ...newBudget, id: '', month: nextMonth.getTime(), actual: 0 });
+    setEditingBudget({ ...newBudget, month: nextMonth.getTime() });
     setSheetOpen(true);
   };
   return (
@@ -158,17 +159,18 @@ export function BudgetsPage() {
             <AnimatePresence>
               {filteredBudgetsWithActuals.map(budget => (
                 <motion.div key={budget.id} layout variants={{ hidden: { y: 20, opacity: 0 }, show: { y: 0, opacity: 1 } }} exit={{ opacity: 0, y: -20 }}>
-                  <Card>
+                  <Card className="hover:shadow-lg transition-shadow duration-200">
                     <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex-1 font-semibold">{budget.category}</div>
                       <div className="w-full sm:w-1/2">
                         <div className="flex justify-between text-sm mb-1">
-                          <span className={cn(budget.actual > budget.limit && 'text-destructive font-bold')}>{formatCurrency(budget.actual)}</span>
+                          <span className={cn(budget.computedActual > budget.limit && 'text-destructive font-bold')}>{formatCurrency(budget.computedActual)}</span>
                           <span className="text-muted-foreground">{t('budget.limit')}: {formatCurrency(budget.limit)}</span>
                         </div>
-                        <Progress value={(budget.actual / budget.limit) * 100} className={cn('h-2', budget.actual > budget.limit && '[&>div]:bg-destructive')} />
+                        <Progress value={(budget.computedActual / budget.limit) * 100} className={cn('h-2', budget.computedActual > budget.limit && '[&>div]:bg-destructive')} />
                       </div>
-                      <div className="flex gap-2 self-end sm:self-center">
+                      <div className="flex gap-2 self-end sm:self-center items-center">
+                        <Badge variant={budget.computedActual > budget.limit ? 'destructive' : 'default'}>{budget.computedActual > budget.limit ? t('budget.over') : t('budget.under')}</Badge>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end">

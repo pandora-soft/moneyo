@@ -31,11 +31,11 @@ export interface Transaction {
   parentId?: string; // To link generated transactions to their recurrent template
 }
 export interface Budget {
-  id: string;
-  accountId?: string; // Now optional for global budgets
+  id:string;
   month: number; // epoch millis for start of month
   category: string;
   limit: number;
+  computedActual?: number; // Optional field for frontend-computed values
 }
 export interface Settings {
   currency: Currency;

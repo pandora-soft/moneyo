@@ -72,7 +72,7 @@ export function ReportsPage() {
     const categoryChartData = Object.entries(spending)
       .map(([name, value]) => {
         const budget = budgets.find(b => b.category === name && getMonth(new Date(b.month)) === getMonth(currentMonthStart) && getYear(new Date(b.month)) === getYear(currentMonthStart));
-        return { name, value, limit: budget?.limit || 0 };
+        return { name, value, limit: budget?.limit || 0, computedActual: value };
       })
       .sort((a, b) => b.value - a.value);
     const allCategories = [...new Set(transactions.filter(t => t.type === 'expense').map(t => t.category)), 'Salario', 'Alquiler', 'Comida', 'Transporte', 'Ocio'];
@@ -82,7 +82,7 @@ export function ReportsPage() {
       const actual = transactions
         .filter(t => t.type === 'expense' && getMonth(new Date(t.ts)) === getMonth(monthStart) && getYear(new Date(t.ts)) === getYear(monthStart) && t.category === b.category)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      return { ...b, actual };
+      return { ...b, computedActual: actual };
     }).sort((a, b) => b.month - a.month);
     return { monthlySummary: monthlyChartData, categorySpending: categoryChartData, uniqueCategories, budgetsWithActuals };
   }, [transactions, budgets]);
@@ -247,9 +247,9 @@ export function ReportsPage() {
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie data={categorySpending} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                        {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.limit > 0 && entry.value > entry.limit ? '#EF4444' : COLORS[index % COLORS.length]} />))}
+                        {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.limit > 0 && entry.computedActual > entry.limit ? '#EF4444' : COLORS[index % COLORS.length]} />))}
                       </Pie>
-                      <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.value)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
+                      <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.computedActual)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -260,11 +260,14 @@ export function ReportsPage() {
             <Card>
               <CardHeader><CardTitle>{t('budget.list')} Overview</CardTitle><CardDescription>Un vistazo rápido a tus presupuestos activos.</CardDescription></CardHeader>
               <CardContent>
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {budgetsWithActuals.slice(0, 5).map(b => (
-                    <div key={b.id} className="flex justify-between text-sm">
-                      <span>{b.category} - {format(new Date(b.month), 'MMM yyyy', { locale: es })}</span>
-                      <span className={cn('font-medium', b.actual > b.limit ? 'text-destructive' : 'text-emerald-500')}>{formatCurrency(b.actual)} / {formatCurrency(b.limit)}</span>
+                    <div key={b.id} className="flex flex-col text-sm">
+                      <div className="flex justify-between">
+                        <span>{b.category} - {format(new Date(b.month), 'MMM yyyy', { locale: es })}</span>
+                        <span className={cn('font-medium', b.computedActual > b.limit ? 'text-destructive' : 'text-emerald-500')}>{formatCurrency(b.computedActual)} / {formatCurrency(b.limit)}</span>
+                      </div>
+                      <Progress value={(b.computedActual / b.limit) * 100} className={cn('w-full mt-1 h-1', b.computedActual > b.limit ? '[&>div]:bg-destructive' : '[&>div]:bg-emerald-500')} />
                     </div>
                   ))}
                    {budgetsWithActuals.length === 0 && !loading && <p className="text-center text-muted-foreground py-4">No hay presupuestos para mostrar.</p>}
