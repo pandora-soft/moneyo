@@ -161,6 +161,23 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     await BudgetEntity.create(c.env, newBudget);
     return ok(c, newBudget);
   });
+  finance.put('/budgets/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'Invalid ID');
+    const { month, category, limit } = await c.req.json<Omit<Budget, 'id' | 'accountId'>>();
+    if (!month || !category || !limit) return bad(c, 'Missing required fields for budget');
+    const budget = new BudgetEntity(c.env, id);
+    if (!await budget.exists()) return notFound(c, 'Budget not found');
+    const updated = await budget.mutate(b => ({ ...b, month, category, limit }));
+    return ok(c, updated);
+  });
+  finance.delete('/budgets/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'Invalid ID');
+    const deleted = await BudgetEntity.delete(c.env, id);
+    if (!deleted) return notFound(c, 'Budget not found');
+    return ok(c, { id, deleted: true });
+  });
   // SETTINGS API
   finance.get('/settings', async (c) => {
     const settings = await new SettingsEntity(c.env).getState();

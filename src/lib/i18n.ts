@@ -26,17 +26,30 @@ const translations = {
   labels: {
     monthlySummary: 'Resumen Mensual',
     categorySpending: 'Gastos por Categoría (Este Mes)',
-  }
+    budgetList: 'Lista de Presupuestos',
+    overBudget: 'Excedido',
+  },
+  budget: {
+    list: 'Presupuestos',
+    actual: 'Gasto Real',
+    limit: 'Límite',
+    status: 'Estado',
+    under: 'Bajo Límite',
+    over: 'Sobre Límite',
+  },
 } as const;
-type TranslationKey = 
+type TranslationKey =
   | `common.${keyof typeof translations.common}`
   | `pages.${keyof typeof translations.pages}`
   | `finance.${keyof typeof translations.finance}`
-  | `labels.${keyof typeof translations.labels}`;
+  | `labels.${keyof typeof translations.labels}`
+  | `budget.${keyof typeof translations.budget}`;
 // A simple t function for demonstration. In a real app, this would be more robust.
 const t = (key: TranslationKey): string => {
-  const [namespace, subkey] = key.split('.');
-  const dict = translations[namespace as keyof typeof translations];
+  const parts = key.split('.');
+  const namespace = parts[0] as keyof typeof translations;
+  const subkey = parts[1] as any;
+  const dict = translations[namespace];
   if (dict && subkey in dict) {
     return dict[subkey as keyof typeof dict];
   }
