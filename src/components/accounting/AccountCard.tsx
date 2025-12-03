@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import type { Account } from '@shared/types';
 import React from 'react';
+import { useFormatCurrency } from '@/lib/formatCurrency';
 const accountIcons = {
   cash: <Banknote className="size-5 text-muted-foreground" />,
   bank: <Landmark className="size-5 text-muted-foreground" />,
@@ -17,9 +18,7 @@ interface AccountCardProps {
   children?: React.ReactNode;
 }
 export function AccountCard({ account, onDelete, onEdit, children }: AccountCardProps) {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: account.currency }).format(value);
-  };
+  const formatCurrency = useFormatCurrency();
   return (
     <motion.div
       whileHover={{ y: -5, scale: 1.02 }}
@@ -32,7 +31,7 @@ export function AccountCard({ account, onDelete, onEdit, children }: AccountCard
               {accountIcons[account.type]}
               {account.name}
             </CardTitle>
-            <CardDescription>{formatCurrency(account.balance)}</CardDescription>
+            <CardDescription>{formatCurrency(account.balance, account.currency)}</CardDescription>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

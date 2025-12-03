@@ -15,6 +15,7 @@ import { api } from '@/lib/api-client';
 import type { Settings } from '@shared/types';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { useAppStore } from '@/stores/useAppStore';
 const settingsSchema = z.object({
   currency: z.enum(['USD', 'EUR', 'ARS']),
   fiscalMonthStart: z.preprocess(
@@ -26,6 +27,7 @@ const settingsSchema = z.object({
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 export function SettingsPage() {
   const { isDark } = useTheme();
+  const { setCurrency, setSettings } = useAppStore.getState();
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema) as any,
   });
@@ -37,6 +39,7 @@ export function SettingsPage() {
       try {
         const settings = await api<Settings>('/api/finance/settings');
         form.reset(settings);
+        setSettings(settings);
       } catch (error) {
         toast.error('No se pudieron cargar los ajustes.');
         console.error(error);
@@ -45,15 +48,17 @@ export function SettingsPage() {
       }
     }
     fetchSettings();
-  }, [form]);
+  }, [form, setSettings]);
   const onSubmit: SubmitHandler<SettingsFormValues> = async (data) => {
     try {
-      await api<Settings>('/api/finance/settings', {
+      const updatedSettings = await api<Settings>('/api/finance/settings', {
         method: 'POST',
         body: JSON.stringify(data),
       });
       toast.success('Ajustes guardados correctamente.');
-      form.reset(data);
+      form.reset(updatedSettings);
+      setCurrency(updatedSettings.currency);
+      setSettings(updatedSettings);
     } catch (error) {
       toast.error('Error al guardar los ajustes.');
     }
@@ -76,7 +81,7 @@ export function SettingsPage() {
             {loading ? (
               <Card>
                 <CardHeader><CardTitle>Finanzas</CardTitle><CardDescription>Ajustes relacionados con la moneda y fechas.</CardDescription></CardHeader>
-                <CardContent className="space-y-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent>
+                <CardContent className="space-y-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent>
                 <div className="flex justify-end p-6 border-t"><Button disabled>Guardar Cambios</Button></div>
               </Card>
             ) : (

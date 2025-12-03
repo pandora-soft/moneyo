@@ -64,13 +64,12 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const fromAccountState = await fromAccount.getState();
     const currency = fromAccountState.currency;
     if (body.type === 'transfer') {
-      // Transfers cannot be recurrent in this implementation
       body.recurrent = false;
       if (!body.accountTo) return bad(c, 'Destination account is required for transfers');
       const toAccount = new AccountEntity(c.env, body.accountTo);
       if (!await toAccount.exists()) return notFound(c, 'Destination account not found');
       const amount = Math.abs(body.amount);
-      const expenseTxData: Omit<Transaction, 'id'> = { ...body, type: 'transfer', amount, currency };
+      const expenseTxData: Omit<Transaction, 'id'> = { ...body, type: 'transfer', amount: -amount, currency };
       const incomeTxData: Omit<Transaction, 'id'> = { ...body, accountId: body.accountTo, accountTo: body.accountId, type: 'transfer', amount, currency };
       const [expenseTx, incomeTx] = await Promise.all([
         ledger.addTransaction(expenseTxData),
@@ -100,7 +99,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     for (const line of lines) {
         const [date, accountName, type, amount, category, note] = line.split(',');
         const account = accountsMap.get(accountName?.trim().toLowerCase());
-        if (!account) continue; // Skip if account not found
+        if (!account) continue;
         const parsedAmount = parseFloat(amount);
         if (isNaN(parsedAmount)) continue;
         txs.push({
@@ -118,9 +117,14 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     return ok(c, { imported: imported.length });
   });
   finance.post('/transactions/generate', async (c) => {
-    const ledger = new LedgerEntity(c.env, 'main');
-    const generated = await ledger.generateRecurrents();
-    return ok(c, { generated: generated.length });
+    try {
+      const ledger = new LedgerEntity(c.env, 'main');
+      const generated = await ledger.generateRecurrents();
+      return ok(c, { generated: generated.length });
+    } catch (e: any) {
+      console.error("Recurrent generation failed:", e);
+      return bad(c, e.message || "Failed to generate recurrent transactions");
+    }
   });
   finance.put('/transactions/:id', async (c) => {
     const id = c.req.param('id');
@@ -149,11 +153,11 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     return ok(c, items);
   });
   finance.post('/budgets', async (c) => {
-    const body = await c.req.json<Omit<Budget, 'id'>>();
-    if (!body.accountId || !body.category || !body.limit || !body.month) {
+    const { month, category, limit } = await c.req.json<Omit<Budget, 'id' | 'accountId'>>();
+    if (!month || !category || !limit) {
       return bad(c, 'Missing required fields for budget');
     }
-    const newBudget: Budget = { ...body, id: crypto.randomUUID() };
+    const newBudget: Budget = { id: crypto.randomUUID(), month, category, limit };
     await BudgetEntity.create(c.env, newBudget);
     return ok(c, newBudget);
   });

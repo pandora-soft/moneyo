@@ -12,6 +12,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from 'sonner';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import { useFormatCurrency } from '@/lib/formatCurrency';
+import { useAppStore } from '@/stores/useAppStore';
+import { getMonth, getYear, startOfMonth } from 'date-fns';
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -21,6 +24,8 @@ export function AccountsPage() {
   const [isAlertOpen, setAlertOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+  const formatCurrency = useFormatCurrency();
+  const refetchTrigger = useAppStore((state) => state.refetchData);
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -41,9 +46,9 @@ export function AccountsPage() {
   }, []);
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, refetchTrigger]);
   const getTransactionsForAccount = (accountId: string) => transactions.filter(tx => tx.accountId === accountId);
-  const getRecurrentCountForAccount = (accountId: string) => transactions.filter(tx => tx.accountId === accountId && tx.recurrent).length;
+  const getRecurrentCountForAccount = (accountId: string) => transactions.filter(tx => tx.accountId === accountId && (tx.recurrent || tx.parentId)).length;
   const handleCreateClick = () => { setSelectedAccount(null); setSheetOpen(true); };
   const handleEditClick = (account: Account) => { setSelectedAccount(account); setSheetOpen(true); };
   const handleDeleteClick = (accountId: string) => { setAccountToDelete(accountId); setAlertOpen(true); };
@@ -108,7 +113,7 @@ export function AccountsPage() {
                           {getTransactionsForAccount(account.id).slice(0, 3).map(tx => (
                             <div key={tx.id} className="flex justify-between items-center text-sm py-1">
                               <span>{tx.category}</span>
-                              <span className={tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'}>{tx.type === 'income' ? '+' : '-'}{new Intl.NumberFormat('en-US', { style: 'currency', currency: account.currency }).format(tx.amount)}</span>
+                              <span className={tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'}>{tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, account.currency)}</span>
                             </div>
                           ))}
                           {getTransactionsForAccount(account.id).length === 0 && <p className="text-sm text-muted-foreground">Sin movimientos.</p>}

@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Account, Transaction } from '@shared/types';
 import { useEffect } from 'react';
+import { useAppStore } from '@/stores/useAppStore';
 const formSchema = z.object({
   id: z.string().optional(),
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
@@ -59,19 +60,20 @@ interface TransactionFormProps {
   defaultValues?: Partial<TransactionFormValues>;
 }
 export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues }: TransactionFormProps) {
+  const settings = useAppStore((state) => state.settings);
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
-      id: defaultValues?.id ?? undefined,
-      type: defaultValues?.type ?? 'expense',
-      accountId: defaultValues?.accountId ?? '',
-      accountToId: defaultValues?.accountToId ?? '',
-      amount: defaultValues?.amount ?? 0,
-      category: defaultValues?.category ?? '',
-      ts: defaultValues?.ts ?? new Date(),
-      note: defaultValues?.note ?? '',
-      recurrent: defaultValues?.recurrent ?? false,
-      frequency: defaultValues?.frequency ?? undefined,
+      type: 'expense',
+      accountId: '',
+      accountToId: '',
+      amount: 0,
+      category: '',
+      ts: new Date(),
+      note: '',
+      recurrent: false,
+      frequency: settings.recurrentDefaultFrequency || 'monthly',
+      ...defaultValues,
     }
   });
   const { isSubmitting } = form.formState;

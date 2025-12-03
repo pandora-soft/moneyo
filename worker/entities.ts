@@ -46,34 +46,41 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     return newTxs;
   }
   async generateRecurrents(): Promise<Transaction[]> {
-    const { transactions } = await this.getState();
-    const recurrentTemplates = transactions.filter(t => t.recurrent);
-    const today = startOfToday();
-    const generatedTxs: Omit<Transaction, 'id'>[] = [];
-    for (const template of recurrentTemplates) {
-      let nextDate = new Date(template.ts);
-      while (isBefore(nextDate, today)) {
-        const nextDueDate = template.frequency === 'weekly' ? addWeeks(nextDate, 1) : addMonths(nextDate, 1);
-        if (isBefore(nextDueDate, today)) {
-          const alreadyGenerated = transactions.some(t => t.parentId === template.id && t.ts === nextDueDate.getTime());
-          if (!alreadyGenerated) {
-            generatedTxs.push({
-              ...template,
-              ts: nextDueDate.getTime(),
-              recurrent: false,
-              frequency: undefined,
-              parentId: template.id,
-              note: `${template.note || ''} (Recurrente)`.trim(),
-            });
+    try {
+      const { transactions } = await this.getState();
+      const recurrentTemplates = transactions.filter(t => t.recurrent);
+      const today = startOfToday();
+      const generatedTxs: Omit<Transaction, 'id'>[] = [];
+      for (const template of recurrentTemplates) {
+        let nextDate = new Date(template.ts);
+        while (isBefore(nextDate, today)) {
+          const nextDueDate = template.frequency === 'weekly' 
+            ? addWeeks(nextDate, 1) 
+            : addMonths(nextDate, 1);
+          if (isBefore(nextDueDate, today)) {
+            const alreadyGenerated = transactions.some(t => t.parentId === template.id && t.ts === nextDueDate.getTime());
+            if (!alreadyGenerated) {
+              generatedTxs.push({
+                ...template,
+                ts: nextDueDate.getTime(),
+                recurrent: false,
+                frequency: undefined,
+                parentId: template.id,
+                note: `${template.note || ''} (Recurrente)`.trim(),
+              });
+            }
           }
+          nextDate = nextDueDate;
         }
-        nextDate = nextDueDate;
       }
+      if (generatedTxs.length > 0) {
+        return this.bulkAddTransactions(generatedTxs);
+      }
+      return [];
+    } catch (e) {
+      console.error('Error generating recurrent transactions:', e);
+      return [];
     }
-    if (generatedTxs.length > 0) {
-      return this.bulkAddTransactions(generatedTxs);
-    }
-    return [];
   }
   async listTransactions(limit = 50, cursor = 0): Promise<{ items: Transaction[]; next: number | null; }> {
     const { transactions } = await this.getState();
@@ -89,7 +96,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const oldAmount = oldTx.type === 'income' ? Math.abs(oldTx.amount) : -Math.abs(oldTx.amount);
     const newAmount = newTx.type === 'income' ? Math.abs(newTx.amount) : -Math.abs(newTx.amount);
     const balanceChange = newAmount - oldAmount;
-    if (balanceChange !== 0) {
+    if (balanceChange !== 0 && !newTx.recurrent) { // Don't adjust balance for recurrent templates
       const account = new AccountEntity(this.env, oldTx.accountId);
       await account.mutate(acc => ({ ...acc, balance: acc.balance + balanceChange }));
     }
@@ -104,10 +111,11 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const txToDelete = transactions.find(t => t.id === id);
     if (!txToDelete) return;
     const mutations: Promise<any>[] = [];
-    const amountToReverse = txToDelete.type === 'income' ? -Math.abs(txToDelete.amount) : Math.abs(txToDelete.amount);
-    mutations.push(new AccountEntity(this.env, txToDelete.accountId).mutate(acc => ({ ...acc, balance: acc.balance + amountToReverse })));
+    if (!txToDelete.recurrent) { // Don't adjust balance if it's a template
+        const amountToReverse = txToDelete.type === 'income' ? -Math.abs(txToDelete.amount) : Math.abs(txToDelete.amount);
+        mutations.push(new AccountEntity(this.env, txToDelete.accountId).mutate(acc => ({ ...acc, balance: acc.balance + amountToReverse })));
+    }
     let idsToDelete = [id];
-    // If deleting a recurrent template, also delete its children
     if (txToDelete.recurrent) {
         const children = transactions.filter(t => t.parentId === id);
         idsToDelete.push(...children.map(c => c.id));
@@ -122,7 +130,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
 export class BudgetEntity extends IndexedEntity<Budget> {
   static readonly entityName = "budget";
   static readonly indexName = "budgets";
-  static readonly initialState: Budget = { id: "", accountId: "", month: 0, category: "", limit: 0 };
+  static readonly initialState: Budget = { id: "", month: 0, category: "", limit: 0 };
   static seedData = [];
 }
 export class SettingsEntity extends Entity<Settings> {

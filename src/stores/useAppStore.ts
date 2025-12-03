@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Transaction, Settings, Currency } from '@shared/types';
-export type CurrencyMap = { [code: string]: { symbol: string; suffix: boolean } };
+import type { Transaction, Currency, Settings } from '@shared/types';
 export type ModalState = {
   isModalOpen: boolean;
   modalInitialValues: Partial<Transaction>;
@@ -9,13 +8,11 @@ export type ModalState = {
   closeModal: () => void;
 };
 export type AppState = ModalState & {
-  currency: string; // code
+  currency: Currency;
   settings: Partial<Settings>;
-  currencies: CurrencyMap;
-  setCurrency: (currency: string) => void;
+  setCurrency: (currency: Currency) => void;
   setSettings: (settings: Partial<Settings>) => void;
-  setCurrencies: (currencies: Currency[]) => void;
-  refetchData: number;
+  refetchData: () => void; // Dummy function to trigger refetches
   triggerRefetch: () => void;
 };
 export const useAppStore = create<AppState>()(
@@ -27,39 +24,18 @@ export const useAppStore = create<AppState>()(
       openModal: (initialValues = {}) => set({ isModalOpen: true, modalInitialValues: initialValues }),
       closeModal: () => set({ isModalOpen: false, modalInitialValues: {} }),
       // App State
-      currency: 'EUR',
+      currency: 'USD',
       settings: {},
-      currencies: {
-        EUR: { symbol: '€', suffix: true },
-        USD: { symbol: '$', suffix: false },
-        ARS: { symbol: '$', suffix: false },
-      },
       setCurrency: (currency) => set({ currency }),
-      setSettings: (settings) => set((state) => {
-        if (settings.currency && state.currency !== settings.currency) {
-          return { settings: { ...state.settings, ...settings }, currency: settings.currency };
-        }
-        return { settings: { ...state.settings, ...settings } };
-      }),
-      setCurrencies: (currencies) => {
-        const currencyMap = currencies.reduce((acc, cur) => {
-          acc[cur.code] = { symbol: cur.symbol, suffix: cur.suffix };
-          return acc;
-        }, {} as CurrencyMap);
-        set({ currencies: currencyMap });
-      },
-      // Refetch trigger for synchronization
-      refetchData: 0,
-      triggerRefetch: () => set(state => ({ refetchData: state.refetchData + 1 })),
+      setSettings: (settings) => set((state) => ({ settings: { ...state.settings, ...settings } })),
+      // Refetch trigger
+      refetchData: () => {}, // Initial no-op
+      triggerRefetch: () => set(state => ({ refetchData: () => {} })), // This will change identity and trigger effects
     }),
     {
-      name: 'moneyo-app-storage',
+      name: 'casaconta-app-storage',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
-        currency: state.currency,
-        settings: state.settings,
-        currencies: state.currencies
-      }),
+      partialize: (state) => ({ currency: state.currency, settings: state.settings }),
     }
   )
 );

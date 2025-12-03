@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +12,8 @@ import { Download, PlusCircle, Loader2 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { BudgetForm } from '@/components/accounting/BudgetForm';
 import { toast } from 'sonner';
+import { useFormatCurrency } from '@/lib/formatCurrency';
+import { useAppStore } from '@/stores/useAppStore';
 const COLORS = ['#0F172A', '#F97316', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
 export function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -20,8 +22,8 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setSheetOpen] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
-  const monthlyChartRef = useRef<HTMLDivElement>(null);
-  const categoryChartRef = useRef<HTMLDivElement>(null);
+  const formatCurrency = useFormatCurrency();
+  const refetchTrigger = useAppStore((state) => state.refetchData);
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -42,7 +44,7 @@ export function ReportsPage() {
   }, []);
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, refetchTrigger]);
   const { monthlySummary, categorySpending, uniqueCategories } = useMemo(() => {
     const summary = transactions.reduce((acc, tx) => {
       const monthKey = format(new Date(tx.ts), 'yyyy-MM');
@@ -72,7 +74,7 @@ export function ReportsPage() {
     const uniqueCategories = [...new Set(allCategories)];
     return { monthlySummary: monthlyChartData, categorySpending: categoryChartData, uniqueCategories };
   }, [transactions, budgets]);
-  const handleExport = (type: 'csv' | 'pdf') => {
+  const handleExport = async (type: 'csv' | 'pdf') => {
     if (type === 'csv') {
         const headers = "Fecha,Cuenta ID,Tipo,Monto,Moneda,Categoría,Nota\n";
         const csvContent = transactions.map(tx => `${new Date(tx.ts).toISOString()},${tx.accountId},${tx.type},${tx.amount},${tx.currency},"${tx.category}","${tx.note || ''}"`).join("\n");
@@ -85,23 +87,77 @@ export function ReportsPage() {
         link.click();
         document.body.removeChild(link);
     } else {
-        toast.info("La exportación a PDF está en desarrollo y será una simulación simple.");
         setGeneratingPDF(true);
-        // This is a simplified simulation as client-side PDF generation is complex without libraries.
-        setTimeout(() => {
-            const reportWindow = window.open('', '_blank');
-            reportWindow?.document.write('<html><head><title>Reporte CasaConta</title></head><body>');
-            reportWindow?.document.write('<h1>Reporte Financiero</h1>');
-            reportWindow?.document.write('<h2>Resumen Mensual</h2><pre>' + JSON.stringify(monthlySummary, null, 2) + '</pre>');
-            reportWindow?.document.write('<h2>Gastos por Categoría</h2><pre>' + JSON.stringify(categorySpending, null, 2) + '</pre>');
-            reportWindow?.document.write('</body></html>');
-            reportWindow?.document.close();
-            reportWindow?.print();
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 800;
+            canvas.height = 1120;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                toast.error("No se pudo generar el PDF.");
+                return;
+            }
+            // Background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Header
+            ctx.fillStyle = '#0F172A';
+            ctx.font = 'bold 32px sans-serif';
+            ctx.fillText('Reporte Financiero - CasaConta', 40, 60);
+            ctx.font = '16px sans-serif';
+            ctx.fillStyle = '#64748B';
+            ctx.fillText(`Generado el: ${format(new Date(), 'PPP', { locale: es })}`, 40, 90);
+            // Monthly Summary Table
+            ctx.fillStyle = '#0F172A';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.fillText('Resumen Mensual', 40, 150);
+            const headers = ['Mes', 'Ingresos', 'Gastos'];
+            let y = 190;
+            ctx.font = 'bold 14px sans-serif';
+            headers.forEach((header, i) => ctx.fillText(header, 40 + i * 200, y));
+            ctx.font = '14px sans-serif';
+            monthlySummary.slice(0, 5).forEach(row => {
+                y += 30;
+                ctx.fillText(row.name, 40, y);
+                ctx.fillStyle = '#10B981';
+                ctx.fillText(formatCurrency(row.income), 240, y);
+                ctx.fillStyle = '#F97316';
+                ctx.fillText(formatCurrency(row.expense), 440, y);
+                ctx.fillStyle = '#0F172A';
+            });
+            // Category Spending Bars
+            y += 60;
+            ctx.font = 'bold 20px sans-serif';
+            ctx.fillText('Gastos por Categoría (Este Mes)', 40, y);
+            y += 40;
+            const maxSpending = Math.max(...categorySpending.map(c => c.value), 1);
+            categorySpending.slice(0, 8).forEach((cat, i) => {
+                ctx.font = '14px sans-serif';
+                ctx.fillStyle = '#0F172A';
+                ctx.fillText(cat.name, 40, y);
+                const barWidth = (cat.value / maxSpending) * 500;
+                ctx.fillStyle = cat.limit > 0 && cat.value > cat.limit ? '#EF4444' : COLORS[i % COLORS.length];
+                ctx.fillRect(200, y - 12, barWidth, 18);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(formatCurrency(cat.value), 205, y + 2);
+                y += 35;
+            });
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+            if (blob) {
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `casaconta_reporte_${new Date().toISOString().split('T')[0]}.png`;
+                link.click();
+            }
+        } catch (e) {
+            toast.error("Ocurrió un error al generar el reporte.");
+        } finally {
             setGeneratingPDF(false);
-        }, 1000);
+        }
     }
   };
-  const handleAddBudget = async (values: Omit<Budget, 'id'>) => {
+  const handleAddBudget = async (values: Omit<Budget, 'id' | 'accountId'>) => {
     try {
       await api<Budget>('/api/finance/budgets', { method: 'POST', body: JSON.stringify(values) });
       toast.success('Presupuesto guardado.');
@@ -123,24 +179,23 @@ export function ReportsPage() {
               <SheetTrigger asChild><Button variant="outline"><PlusCircle className="mr-2 size-4" /> Crear Presupuesto</Button></SheetTrigger>
               <SheetContent className="sm:max-w-lg w-full p-0">
                 <SheetHeader className="p-6 border-b"><SheetTitle>Nuevo Presupuesto</SheetTitle></SheetHeader>
-                <BudgetForm accounts={accounts} categories={uniqueCategories} onSubmit={handleAddBudget} onFinished={() => setSheetOpen(false)} />
+                <BudgetForm categories={uniqueCategories} onSubmit={handleAddBudget} onFinished={() => setSheetOpen(false)} />
               </SheetContent>
             </Sheet>
             <Button onClick={() => handleExport('csv')} disabled={loading || transactions.length === 0}><Download className="mr-2 size-4" /> CSV</Button>
             <Button onClick={() => handleExport('pdf')} disabled={generatingPDF || loading}>
-                {generatingPDF ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />} PDF
-            </Button>
+                {generatingPDF ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />} Reporte Gráfico</Button>
           </div>
         </header>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid gap-8 lg:grid-cols-2">
           <Card>
             <CardHeader><CardTitle>Resumen Mensual</CardTitle><CardDescription>Ingresos vs. Gastos por mes.</CardDescription></CardHeader>
-            <CardContent ref={monthlyChartRef}>
+            <CardContent>
               {loading ? <Skeleton className="h-[300px]" /> : (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={monthlySummary}>
-                    <XAxis dataKey="name" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => `${v}`} />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'hsl(var(--muted))' }} /><Legend />
+                    <XAxis dataKey="name" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'hsl(var(--muted))' }} formatter={(value: number) => formatCurrency(value)} /><Legend />
                     <Bar dataKey="income" fill="#10B981" name="Ingresos" radius={[4, 4, 0, 0]} /><Bar dataKey="expense" fill="#F97316" name="Gastos" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -149,14 +204,14 @@ export function ReportsPage() {
           </Card>
           <Card>
             <CardHeader><CardTitle>Gastos por Categoría (Este Mes)</CardTitle><CardDescription>Distribución de tus gastos y comparación con presupuestos.</CardDescription></CardHeader>
-            <CardContent ref={categoryChartRef}>
+            <CardContent>
               {loading ? <Skeleton className="h-[300px]" /> : (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie data={categorySpending} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                       {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.limit > 0 && entry.value > entry.limit ? '#EF4444' : COLORS[index % COLORS.length]} />))}
                     </Pie>
-                    <Tooltip formatter={(value, name, props) => [`${value}`, `${name} ${props.payload.limit > 0 ? `(Límite: ${props.payload.limit})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
+                    <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(Límite: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                   </PieChart>
                 </ResponsiveContainer>
               )}

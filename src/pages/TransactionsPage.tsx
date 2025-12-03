@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { TransactionForm } from '@/components/accounting/TransactionForm';
 import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
 import { api } from '@/lib/api-client';
 import type { Account, Transaction } from '@shared/types';
@@ -16,12 +15,12 @@ import { format, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAppStore } from '@/stores/useAppStore';
+import { useFormatCurrency } from '@/lib/formatCurrency';
 export function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSheetOpen, setSheetOpen] = useState(false);
-  const [editingTxn, setEditingTxn] = useState<Partial<Transaction> | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>({ query: '', accountId: 'all', type: 'all', dateRange: undefined });
@@ -30,13 +29,13 @@ export function TransactionsPage() {
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { openModal } = useAppStore();
+  const refetchTrigger = useAppStore((state) => state.refetchData);
+  const formatCurrency = useFormatCurrency();
   const accountsById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
-  const fetchData = useCallback(async (generateRecurrent = false) => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      if (generateRecurrent) {
-        await api('/api/finance/transactions/generate', { method: 'POST' });
-      }
       const [txs, accs] = await Promise.all([
         api<{ items: Transaction[] }>('/api/finance/transactions?limit=1000').then(p => p.items),
         api<Account[]>('/api/finance/accounts'),
@@ -51,8 +50,8 @@ export function TransactionsPage() {
     }
   }, []);
   useEffect(() => {
-    fetchData(true);
-  }, [fetchData]);
+    fetchData();
+  }, [fetchData, refetchTrigger]);
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
       const queryMatch = filters.query.length > 1 ?
@@ -68,17 +67,6 @@ export function TransactionsPage() {
       return queryMatch && accountMatch && typeMatch && dateMatch;
     });
   }, [transactions, filters]);
-  const handleFormSubmit = async (values: Omit<Transaction, 'currency'> & { id?: string }) => {
-    try {
-      const method = values.id ? 'PUT' : 'POST';
-      const url = values.id ? `/api/finance/transactions/${values.id}` : '/api/finance/transactions';
-      await api(url, { method, body: JSON.stringify(values) });
-      toast.success(values.id ? 'Transacción actualizada.' : 'Transacción creada.');
-      fetchData();
-    } catch (e) {
-      toast.error('Error al guardar la transacción.');
-    }
-  };
   const handleDelete = async () => {
     if (!deletingId) return;
     try {
@@ -127,16 +115,13 @@ export function TransactionsPage() {
     try {
         const result = await api<{ generated: number }>('/api/finance/transactions/generate', { method: 'POST' });
         toast.success(`${result.generated} transacciones recurrentes generadas.`);
-        if (result.generated > 0) {
-            fetchData();
-        }
-    } catch (e) {
-        toast.error('Error al generar transacciones recurrentes.');
+    } catch (e: any) {
+        toast.error(e.message || 'Error al generar transacciones recurrentes.');
     } finally {
         setIsGenerating(false);
+        fetchData();
     }
   };
-  const formatCurrency = (value: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
   const accountIcons = { cash: <Banknote className="size-4 text-muted-foreground" />, bank: <Landmark className="size-4 text-muted-foreground" />, credit_card: <CreditCard className="size-4 text-muted-foreground" /> };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -153,7 +138,7 @@ export function TransactionsPage() {
                 {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />}
                 Generar Recurrentes
             </Button>
-            <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingTxn({}); setSheetOpen(true); }}>
+            <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => openModal()}>
               <PlusCircle className="mr-2 size-5" /> Agregar Transacción
             </Button>
           </div>
@@ -183,9 +168,10 @@ export function TransactionsPage() {
                       <TableRow key={tx.id}>
                         <TableCell><div className="flex items-center gap-2">{account && accountIcons[account.type]}<span className="font-medium">{account?.name || 'N/A'}</span></div></TableCell>
                         <TableCell>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
                                 {tx.recurrent && <Badge variant="secondary"><Repeat className="mr-1 size-3" /> Recurrente</Badge>}
+                                {tx.parentId && <Badge variant="ghost" className="text-xs">Generada</Badge>}
                             </div>
                         </TableCell>
                         <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>
@@ -194,8 +180,8 @@ export function TransactionsPage() {
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => { setEditingTxn(tx); setSheetOpen(true); }}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; setEditingTxn({ ...copy, ts: Date.now(), recurrent: false }); setSheetOpen(true); }}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openModal(tx)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -211,15 +197,6 @@ export function TransactionsPage() {
           </CardContent>
         </Card>
       </div>
-      <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingTxn(null); setSheetOpen(open); }}>
-        <SheetContent className="sm:max-w-lg w-full p-0">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingTxn?.id ? 'Editar Transacción' : 'Nueva Transacción'}</SheetTitle></SheetHeader>
-          <SheetDescription id="transaction-sheet-desc">Aquí puedes crear o editar una transacción. Completa los campos y guarda los cambios.</SheetDescription>
-          {editingTxn && (
-            <TransactionForm accounts={accounts} onSubmit={handleFormSubmit} onFinished={() => { setSheetOpen(false); setEditingTxn(null); }} defaultValues={{ ...editingTxn, ts: new Date(editingTxn.ts || Date.now()), accountToId: editingTxn.accountTo }} />
-          )}
-        </SheetContent>
-      </Sheet>
       <Sheet open={isImportSheetOpen} onOpenChange={setImportSheetOpen}>
         <SheetContent className="sm:max-w-2xl w-full">
             <SheetHeader><SheetTitle>Importar Transacciones</SheetTitle></SheetHeader>

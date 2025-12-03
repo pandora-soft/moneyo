@@ -11,9 +11,8 @@ import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type { Account, Budget } from '@shared/types';
+import type { Budget } from '@shared/types';
 const formSchema = z.object({
-  accountId: z.string().min(1, "Debe seleccionar una cuenta."),
   category: z.string().min(2, "La categoría es requerida.").max(50),
   limit: z.preprocess(
     (val: unknown) => (val === '' ? 0 : Number(val)),
@@ -23,13 +22,12 @@ const formSchema = z.object({
 });
 type BudgetFormValues = z.infer<typeof formSchema>;
 interface BudgetFormProps {
-  onSubmit: (values: Omit<Budget, 'id'>) => Promise<void>;
+  onSubmit: (values: Omit<Budget, 'id' | 'accountId'>) => Promise<void>;
   onFinished: () => void;
-  accounts: Account[];
   categories: string[];
   defaultValues?: Partial<BudgetFormValues>;
 }
-export function BudgetForm({ onSubmit, onFinished, accounts, categories, defaultValues }: BudgetFormProps) {
+export function BudgetForm({ onSubmit, onFinished, categories, defaultValues }: BudgetFormProps) {
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
@@ -51,24 +49,6 @@ export function BudgetForm({ onSubmit, onFinished, accounts, categories, default
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6">
-        <FormField
-          control={form.control}
-          name="accountId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Cuenta</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <FormField
           control={form.control}
           name="category"

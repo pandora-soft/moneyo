@@ -32,7 +32,7 @@ export interface Transaction {
 }
 export interface Budget {
   id: string;
-  accountId: string;
+  accountId?: string; // Now optional for global budgets
   month: number; // epoch millis for start of month
   category: string;
   limit: number;
