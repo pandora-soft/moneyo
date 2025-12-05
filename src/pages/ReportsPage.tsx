@@ -138,52 +138,72 @@ export function ReportsPage() {
         document.body.removeChild(link);
     } else {
         setGeneratingPDF(true);
+        toast.info('Generando reporte...');
         try {
             // Helper: convert an SVG element to a PNG data URL by inlining styles and drawing to canvas
             const svgToPngDataUrl = async (svgEl: SVGSVGElement | null, width = 800, height = 400) => {
               if (!svgEl) return null;
-              const clone = svgEl.cloneNode(true) as SVGSVGElement;
+              try {
+                const clone = svgEl.cloneNode(true) as SVGSVGElement;
 
-              const traverse = (node: Element) => {
-                const computed = window.getComputedStyle(node);
-                let styleText = '';
-                for (let i = 0; i < computed.length; i++) {
-                  const prop = computed[i];
-                  styleText += `${prop}:${computed.getPropertyValue(prop)};`;
+                const traverse = (node: Element) => {
+                  const computed = window.getComputedStyle(node);
+                  let styleText = '';
+                  for (let i = 0; i < computed.length; i++) {
+                    const prop = computed[i];
+                    styleText += `${prop}:${computed.getPropertyValue(prop)};`;
+                  }
+                  node.setAttribute('style', styleText);
+                  Array.from(node.children).forEach(child => traverse(child as Element));
+                };
+                traverse(clone as Element);
+
+                const svgString = new XMLSerializer().serializeToString(clone);
+                const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                img.width = width;
+                img.height = height;
+                await new Promise<void>((resolve, reject) => {
+                  img.onload = () => resolve();
+                  img.onerror = () => reject(new Error('SVG to PNG conversion failed'));
+                  img.src = url;
+                });
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                  URL.revokeObjectURL(url);
+                  return null;
                 }
-                node.setAttribute('style', styleText);
-                Array.from(node.children).forEach(child => traverse(child as Element));
-              };
-              traverse(clone as Element);
-
-              const svgString = new XMLSerializer().serializeToString(clone);
-              const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-              const url = URL.createObjectURL(blob);
-              const img = new Image();
-              img.width = width;
-              img.height = height;
-              await new Promise<void>((resolve, reject) => {
-                img.onload = () => resolve();
-                img.onerror = () => reject(new Error('SVG to PNG conversion failed'));
-                img.src = url;
-              });
-              const canvas = document.createElement('canvas');
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              if (!ctx) return null;
-              ctx.fillStyle = 'white';
-              ctx.fillRect(0, 0, width, height);
-              ctx.drawImage(img, 0, 0, width, height);
-              URL.revokeObjectURL(url);
-              return canvas.toDataURL('image/png');
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+                URL.revokeObjectURL(url);
+                return canvas.toDataURL('image/png');
+              } catch (err) {
+                console.error('SVG to PNG conversion failed', err);
+                try {
+                  toast.error(`Error capturando la imagen del gráfico: ${err instanceof Error ? err.message : String(err)}`);
+                } catch (_) {
+                  // swallow if toast fails for some reason
+                }
+                return null;
+              }
             };
 
-            // Capture SVGs from the rendered chart containers
+            // Capture SVGs from the rendered chart containers (in parallel)
             const barSvg = barChartRef.current?.querySelector('svg') as SVGSVGElement | undefined;
             const pieSvg = pieChartRef.current?.querySelector('svg') as SVGSVGElement | undefined;
-            const barImg = await svgToPngDataUrl(barSvg || null, 800, 400);
-            const pieImg = await svgToPngDataUrl(pieSvg || null, 600, 400);
+            const [barImg, pieImg] = await Promise.all([
+              svgToPngDataUrl(barSvg || null, 800, 400),
+              svgToPngDataUrl(pieSvg || null, 600, 400),
+            ]);
+            console.log('Chart image capture results:', { barImg: !!barImg, pieImg: !!pieImg });
+            try {
+              toast.info('Capturas de imagen completadas.');
+            } catch (_) { /* ignore */ }
 
             // Compose PDF
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -224,10 +244,26 @@ export function ReportsPage() {
               doc.addImage(pieImg, 'PNG', 40, 60, 480, 260);
             }
 
-            doc.save(`casaconta-reporte.pdf`);
+            // Generate blob and trigger robust download
+            const pdfBlob = doc.output('blob');
+            console.log('Generated PDF blob:', { size: pdfBlob.size, type: pdfBlob.type });
+            try {
+              toast.info('Descarga iniciada...');
+            } catch (_) { /* ignore */ }
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = pdfUrl;
+            link.download = `casaconta-reporte.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(pdfUrl);
             toast.success('Reporte PDF generado.');
         } catch (e) {
-            toast.error("Ocurrió un error al generar el reporte.");
+            console.error('Failed to generate PDF report', e);
+            try {
+              toast.error(`Error al generar el reporte: ${e instanceof Error ? e.message : String(e)}`);
+            } catch (_) { /* ignore */ }
         } finally {
             setGeneratingPDF(false);
         }
