@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -27,6 +28,59 @@ export function ReportsPage() {
   const formatCurrency = useFormatCurrency();
   const barChartRef = useRef<HTMLDivElement | null>(null);
   const pieChartRef = useRef<HTMLDivElement | null>(null);
+
+  // Helper: convert an SVG inside a container div to a PNG data URL (returns null on failure)
+  const svgToPngDataUrl = async (container: HTMLDivElement | null, defaultWidth = 600, defaultHeight = 300): Promise<string | null> => {
+    try {
+      if (!container) return null;
+      const svgEl = container.querySelector('svg') as SVGElement | null;
+      if (!svgEl) return null;
+
+      // Clone to avoid mutating the live SVG
+      const cloned = svgEl.cloneNode(true) as SVGElement;
+      if (!cloned.getAttribute('xmlns')) cloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      if (!cloned.getAttribute('viewBox')) {
+        const w = cloned.getAttribute('width') || String(defaultWidth);
+        const h = cloned.getAttribute('height') || String(defaultHeight);
+        cloned.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      }
+
+      const svgString = new XMLSerializer().serializeToString(cloned);
+      const data = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+
+      const img = new Image();
+      // Ensure CORS is not an issue; data URL is same-origin
+      const png = await new Promise<string | null>((resolve) => {
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width || defaultWidth;
+            canvas.height = img.height || defaultHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(null);
+              return;
+            }
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          } catch (err) {
+            console.error('svgToPngDataUrl draw error', err);
+            resolve(null);
+          }
+        };
+        img.onerror = (err) => {
+          console.error('svgToPngDataUrl image load error', err);
+          resolve(null);
+        };
+        img.src = data;
+      });
+
+      return png;
+    } catch (err) {
+      console.error('svgToPngDataUrl unexpected error', err);
+      return null;
+    }
+  };
   const refetchTrigger = useAppStore((state) => state.refetchData);
   const fetchData = useCallback(async () => {
     try {
@@ -115,25 +169,97 @@ export function ReportsPage() {
             doc.text(`Generado el: ${format(new Date(), 'PPP', { locale: es })}`, 40, 60);
             doc.setFontSize(12);
             doc.text(t('labels.monthlySummary'), 40, 90);
-            if (monthlySummary.length > 0) {
-                (doc as any).autoTable({
-                    startY: 100,
-                    head: [['Mes', t('finance.income'), t('finance.expense')]],
-                    body: monthlySummary.slice(0, 10).map(row => [row.name, formatCurrency(row.income), formatCurrency(row.expense)]),
-                });
-            } else {
-                doc.text("No hay datos de resumen mensual.", 40, 110);
+
+            const formatForTable = (n: number) => n < 0 ? `(${formatCurrency(Math.abs(n))})` : formatCurrency(n);
+
+            // Attempt to capture chart images (SVG -> PNG). These may fail; we handle nulls gracefully.
+            const [barImage, pieImage] = await Promise.all([
+              svgToPngDataUrl(barChartRef.current, 600, 300),
+              svgToPngDataUrl(pieChartRef.current, 600, 300),
+            ]);
+
+            // place bar chart image if available
+            let currentY = 100;
+            if (barImage) {
+              try {
+                const pageWidth = ((doc as any).internal?.pageSize?.getWidth && (doc as any).internal.pageSize.getWidth()) || 595;
+                const maxWidth = pageWidth - 80;
+                const imgHeight = Math.max(120, (300 * maxWidth) / 600);
+                (doc as any).addImage(barImage, 'PNG', 40, currentY, maxWidth, imgHeight);
+                currentY += imgHeight + 10;
+              } catch (e) {
+                console.error('Failed to add bar chart image to PDF', e);
+              }
             }
+
+            // monthly summary table (autoTable with fallback)
+            try {
+              const monthSlice = monthlySummary.slice(0, 10);
+              autoTable(doc as any, {
+                startY: currentY,
+                head: [['Mes', t('finance.income'), t('finance.expense')]],
+                body: monthSlice.map(row => [row.name, formatForTable(row.income), formatForTable(row.expense)]),
+              });
+              // try to move cursor after the table if plugin exposes lastAutoTable
+              currentY = (doc as any).lastAutoTable?.finalY || currentY + 100;
+            } catch (e) {
+              console.error('autoTable failed for monthly summary', e);
+              if (monthlySummary.length === 0) {
+                doc.text("No hay datos de resumen mensual.", 40, currentY);
+              } else {
+                doc.text('Mes | ' + t('finance.income') + ' | ' + t('finance.expense'), 40, currentY + 10);
+                monthlySummary.slice(0, 10).forEach((r, i) => {
+                  doc.text(`${r.name} - ${formatForTable(r.income)} - ${formatForTable(r.expense)}`, 40, currentY + 30 + i * 12);
+                });
+                currentY += 30 + Math.min(10, monthlySummary.length) * 12;
+              }
+            }
+
             doc.addPage();
             doc.text(t('labels.categorySpending'), 40, 40);
-            if (categorySpending.length > 0) {
-                (doc as any).autoTable({
-                    startY: 50,
-                    head: [['Categoría', 'Gasto', 'Límite']],
-                    body: categorySpending.slice(0, 10).map(row => [row.name, formatCurrency(row.value), row.limit > 0 ? formatCurrency(row.limit) : 'N/A']),
+            currentY = 50;
+
+            if (pieImage) {
+              try {
+                const pageWidth = ((doc as any).internal?.pageSize?.getWidth && (doc as any).internal.pageSize.getWidth()) || 595;
+                const maxWidth = pageWidth - 80;
+                const imgHeight = Math.max(120, (300 * maxWidth) / 600);
+                (doc as any).addImage(pieImage, 'PNG', 40, currentY, maxWidth, imgHeight);
+                currentY += imgHeight + 10;
+              } catch (e) {
+                console.error('Failed to add pie chart image to PDF', e);
+              }
+            }
+
+            // category spending table with conditional styling for over-budget rows
+            try {
+              const catSlice = categorySpending.slice(0, 10);
+              autoTable(doc as any, {
+                startY: currentY,
+                head: [['Categoría', 'Gasto', 'Límite']],
+                body: catSlice.map(row => [row.name, formatForTable(row.value), row.limit > 0 ? formatForTable(row.limit) : 'N/A']),
+                didParseCell: (data: any) => {
+                  // If the row corresponds to an over-budget category, color the 'Gasto' cell red
+                  if (data && data.row && typeof data.row.index === 'number') {
+                    const row = catSlice[data.row.index];
+                    if (row && row.limit > 0 && row.computedActual > row.limit) {
+                      if (data.column.index === 1) {
+                        data.cell.styles.textColor = [255, 0, 0];
+                      }
+                    }
+                  }
+                }
+              });
+            } catch (e) {
+              console.error('autoTable failed for category spending', e);
+              if (categorySpending.length === 0) {
+                doc.text("No hay datos de gastos por categoría.", 40, currentY);
+              } else {
+                doc.text('Categoría | Gasto | Límite', 40, currentY + 10);
+                categorySpending.slice(0, 10).forEach((r, i) => {
+                  doc.text(`${r.name} - ${formatForTable(r.value)} - ${r.limit > 0 ? formatForTable(r.limit) : 'N/A'}`, 40, currentY + 30 + i * 12);
                 });
-            } else {
-                doc.text("No hay datos de gastos por categoría.", 40, 60);
+              }
             }
             const pdfBlob = doc.output('blob');
             const pdfUrl = URL.createObjectURL(pdfBlob);
