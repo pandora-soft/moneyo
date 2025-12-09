@@ -8,7 +8,7 @@ import type { Transaction, Budget } from '@shared/types';
 import { format, getMonth, getYear, startOfMonth, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreVertical, Pencil, Trash2, Copy } from 'lucide-react';
+import { PlusCircle, MoreVertical, Pencil, Trash2, Copy, Download } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -103,9 +103,28 @@ export function BudgetsPage() {
   };
   const handleDuplicate = (budget: Budget) => {
     const { id, computedActual, ...newBudget } = budget;
-    const nextMonth = addMonths(new Date(budget.month), 1);
+    let nextMonth = addMonths(new Date(budget.month), 1);
+    const existingMonths = budgets.map(b => format(new Date(b.month), 'yyyy-MM'));
+    while(existingMonths.includes(format(nextMonth, 'yyyy-MM'))) {
+      nextMonth = addMonths(nextMonth, 1);
+    }
     setEditingBudget({ ...newBudget, month: nextMonth.getTime() });
     setSheetOpen(true);
+  };
+  const exportFilteredBudgets = () => {
+    const headers = "Mes,Categoría,Límite,Gasto Real,Estado\n";
+    const csvContent = filteredBudgetsWithActuals.map(b => {
+      const status = b.computedActual > b.limit ? t('budget.over') : t('budget.under');
+      return `${format(new Date(b.month), 'yyyy-MM')},"${b.category}",${b.limit},${b.computedActual},${status}`;
+    }).join("\n");
+    const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `casaconta_presupuestos_${format(filterDate, 'yyyy-MM')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -125,25 +144,39 @@ export function BudgetsPage() {
               <CardTitle>Resumen de Presupuestos</CardTitle>
               <CardDescription>Planificado vs. Gasto real para el mes seleccionado.</CardDescription>
             </div>
-            <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(val))}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Seleccionar mes" />
-              </SelectTrigger>
-              <SelectContent>
-                {uniqueMonths.map(monthKey => (
-                  <SelectItem key={monthKey} value={monthKey}>
-                    {format(new Date(monthKey), 'MMMM yyyy', { locale: es })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(val))}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Seleccionar mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueMonths.map(monthKey => (
+                    <SelectItem key={monthKey} value={monthKey}>
+                      {format(new Date(monthKey), 'MMMM yyyy', { locale: es })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={exportFilteredBudgets} disabled={filteredBudgetsWithActuals.length === 0}>
+                <Download className="mr-2 size-4" /> Exportar CSV
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-[300px]" /> : (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
                   <XAxis dataKey="name" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
-                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'hsl(var(--muted))' }} formatter={(value: number) => formatCurrency(value)} /><Legend />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} 
+                    cursor={{ fill: 'hsl(var(--muted))' }} 
+                    formatter={(value: number, name, props) => {
+                      const { payload } = props;
+                      const status = payload.actual > payload.limit ? `(${t('budget.over')})` : `(${t('budget.under')})`;
+                      return [formatCurrency(value), `${name.charAt(0).toUpperCase() + name.slice(1)} ${status}`];
+                    }}
+                  />
+                  <Legend />
                   <Bar dataKey="limit" fill="#8884d8" name={t('budget.limit')} radius={[4, 4, 0, 0]} /><Bar dataKey="actual" fill="#82ca9d" name={t('budget.actual')} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -175,7 +208,7 @@ export function BudgetsPage() {
                           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => { setEditingBudget(budget); setSheetOpen(true); }}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDuplicate(budget)}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDuplicate(budget)}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingBudget(budget.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -188,7 +221,7 @@ export function BudgetsPage() {
           </motion.div>
         ) : (
           <div className="text-center py-20 border-2 border-dashed rounded-lg">
-            <h3 className="text-xl font-semibold">No hay presupuestos para este mes.</h3>
+            <h3 className="text-xl font-semibold">{t('labels.emptyBudgets')}</h3>
             <p className="text-muted-foreground mt-2 mb-4">Crea un presupuesto para empezar a controlar tus gastos.</p>
             <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingBudget(null); setSheetOpen(true); }}>
               <PlusCircle className="mr-2 size-5" /> Crear Presupuesto

@@ -10,6 +10,8 @@ import type { Account, Transaction } from '@shared/types';
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { useAppStore } from '@/stores/useAppStore';
 import { useFormatCurrency } from '@/lib/formatCurrency';
+import { toast } from 'sonner';
+import t from '@/lib/i18n';
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 },
@@ -32,6 +34,7 @@ export function HomePage() {
       setTransactions(txs);
     } catch (error) {
       console.error("Failed to fetch data", error);
+      toast.error('Error al cargar los datos del dashboard.');
     } finally {
       setLoading(false);
     }
@@ -57,7 +60,6 @@ export function HomePage() {
         } else if (tx.type === 'expense') {
             runningBalance += Math.abs(tx.amount);
         } else if (tx.type === 'transfer' && tx.accountTo) {
-            // This is a simplified transfer handling for trend, might not be perfect
             runningBalance += Math.abs(tx.amount);
         }
     }
@@ -90,7 +92,7 @@ export function HomePage() {
             ) : (
               <>
                 <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Balance Total</CardTitle><Wallet className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(totalBalance)}</div><p className="text-xs text-muted-foreground">En todas tus cuentas</p></CardContent></Card></motion.div>
-                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Ingresos (Últ. 30 d��as)</CardTitle><TrendingUp className="h-4 w-4 text-emerald-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-500">{formatCurrency(totalIncome)}</div><p className="text-xs text-muted-foreground">Flujo de entrada</p></CardContent></Card></motion.div>
+                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Ingresos (Últ. 30 días)</CardTitle><TrendingUp className="h-4 w-4 text-emerald-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-500">{formatCurrency(totalIncome)}</div><p className="text-xs text-muted-foreground">Flujo de entrada</p></CardContent></Card></motion.div>
                 <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Gastos (Últ. 30 días)</CardTitle><TrendingDown className="h-4 w-4 text-red-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-red-500">{formatCurrency(totalExpenses)}</div><p className="text-xs text-muted-foreground">Flujo de salida</p></CardContent></Card></motion.div>
               </>
             )}
@@ -101,7 +103,7 @@ export function HomePage() {
               <motion.div className="space-y-4" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }}>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)
-                ) : (
+                ) : accounts.length > 0 ? (
                   accounts.map(acc => (
                     <motion.div key={acc.id} variants={cardVariants}>
                       <Card className="hover:bg-muted/50 transition-colors">
@@ -112,6 +114,14 @@ export function HomePage() {
                       </Card>
                     </motion.div>
                   ))
+                ) : (
+                  <motion.div variants={cardVariants} className="text-center p-6 border-2 border-dashed rounded-lg">
+                    <Wallet className="mx-auto size-12 text-muted-foreground" />
+                    <h3 className="mt-4 text-lg font-semibold">{t('common.emptyAccounts')}</h3>
+                    <Button asChild size="sm" className="mt-4">
+                      <Link to="/accounts">Crear Cuenta</Link>
+                    </Button>
+                  </motion.div>
                 )}
               </motion.div>
             </div>

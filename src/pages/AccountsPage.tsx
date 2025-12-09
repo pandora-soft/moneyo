@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlusCircle, Repeat } from 'lucide-react';
+import { PlusCircle, Repeat, PiggyBank } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountCard } from '@/components/accounting/AccountCard';
@@ -15,6 +15,13 @@ import { Badge } from '@/components/ui/badge';
 import { useFormatCurrency } from '@/lib/formatCurrency';
 import { useAppStore } from '@/stores/useAppStore';
 import { getMonth, getYear, startOfMonth } from 'date-fns';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
+import t from '@/lib/i18n';
+const motionVariants = {
+  enter: { opacity: 1, height: 'auto', transition: { duration: 0.3, ease: 'easeInOut' } },
+  exit: { opacity: 0, height: 0, transition: { duration: 0.2, ease: 'easeInOut' } },
+};
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -47,8 +54,32 @@ export function AccountsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData, refetchTrigger]);
-  const getTransactionsForAccount = (accountId: string) => transactions.filter(tx => tx.accountId === accountId);
-  const getRecurrentCountForAccount = (accountId: string) => transactions.filter(tx => tx.accountId === accountId && (tx.recurrent || tx.parentId)).length;
+  const accountData = useMemo(() => {
+    const currentMonthStart = startOfMonth(new Date());
+    const currentMonthBudgets = budgets.filter(b => getMonth(new Date(b.month)) === getMonth(currentMonthStart) && getYear(new Date(b.month)) === getYear(currentMonthStart));
+    return accounts.map(account => {
+      const accountTransactions = transactions.filter(tx => tx.accountId === account.id);
+      const recurrentCount = accountTransactions.filter(tx => tx.recurrent || tx.parentId).length;
+      const spendingByCategory = accountTransactions
+        .filter(tx => tx.type === 'expense' && new Date(tx.ts) >= currentMonthStart)
+        .reduce((acc, tx) => {
+          acc[tx.category] = (acc[tx.category] || 0) + Math.abs(tx.amount);
+          return acc;
+        }, {} as Record<string, number>);
+      const relevantBudgets = currentMonthBudgets
+        .filter(b => spendingByCategory[b.category] > 0)
+        .map(b => ({
+          ...b,
+          actual: spendingByCategory[b.category],
+        }));
+      return {
+        ...account,
+        transactions: accountTransactions,
+        recurrentCount,
+        relevantBudgets,
+      };
+    });
+  }, [accounts, transactions, budgets]);
   const handleCreateClick = () => { setSelectedAccount(null); setSheetOpen(true); };
   const handleEditClick = (account: Account) => { setSelectedAccount(account); setSheetOpen(true); };
   const handleDeleteClick = (accountId: string) => { setAccountToDelete(accountId); setAlertOpen(true); };
@@ -95,7 +126,7 @@ export function AccountsPage() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48" />)}
           </div>
-        ) : accounts.length > 0 ? (
+        ) : accountData.length > 0 ? (
           <motion.div
             className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
             variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }}
@@ -103,26 +134,46 @@ export function AccountsPage() {
             animate="show"
           >
             <AnimatePresence>
-              {accounts.map(account => (
+              {accountData.map(account => (
                 <motion.div key={account.id} variants={{ hidden: { y: 20, opacity: 0 }, show: { y: 0, opacity: 1 } }} layout>
                   <AccountCard account={account} onDelete={handleDeleteClick} onEdit={handleEditClick}>
                     <Accordion type="single" collapsible className="w-full">
                       <AccordionItem value="transactions">
                         <AccordionTrigger>Últimos Movimientos</AccordionTrigger>
-                        <AccordionContent>
-                          {getTransactionsForAccount(account.id).slice(0, 3).map(tx => (
-                            <div key={tx.id} className="flex justify-between items-center text-sm py-1">
-                              <span>{tx.category}</span>
-                              <span className={tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'}>{tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, account.currency)}</span>
-                            </div>
-                          ))}
-                          {getTransactionsForAccount(account.id).length === 0 && <p className="text-sm text-muted-foreground">Sin movimientos.</p>}
+                        <AccordionContent asChild>
+                          <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants}>
+                            {account.transactions.slice(0, 3).map(tx => (
+                              <div key={tx.id} className="flex justify-between items-center text-sm py-1">
+                                <span>{tx.category}</span>
+                                <span className={tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'}>{tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, account.currency)}</span>
+                              </div>
+                            ))}
+                            {account.transactions.length === 0 && <p className="text-sm text-muted-foreground">Sin movimientos.</p>}
+                          </motion.div>
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="recurrent">
                         <AccordionTrigger>Recurrentes</AccordionTrigger>
-                        <AccordionContent>
-                            <Badge variant="outline"><Repeat className="mr-2 size-4" /> {getRecurrentCountForAccount(account.id)} activas</Badge>
+                        <AccordionContent asChild>
+                          <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants}>
+                            <Badge variant="outline"><Repeat className="mr-2 size-4" /> {account.recurrentCount} activas</Badge>
+                          </motion.div>
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="budgets">
+                        <AccordionTrigger>Presupuestos (Este Mes)</AccordionTrigger>
+                        <AccordionContent asChild>
+                          <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants} className="space-y-2">
+                            {account.relevantBudgets.length > 0 ? account.relevantBudgets.map(b => (
+                              <div key={b.id} className="text-sm">
+                                <div className="flex justify-between items-center">
+                                  <span>{b.category}</span>
+                                  <span className={cn(b.actual > b.limit && 'text-destructive')}>{formatCurrency(b.actual)} / {formatCurrency(b.limit)}</span>
+                                </div>
+                                <Progress value={(b.actual / b.limit) * 100} className={cn('h-1 mt-1', b.actual > b.limit && '[&>div]:bg-destructive')} />
+                              </div>
+                            )) : <p className="text-sm text-muted-foreground">Sin gastos contra presupuestos este mes.</p>}
+                          </motion.div>
                         </AccordionContent>
                       </AccordionItem>
                     </Accordion>
@@ -133,7 +184,7 @@ export function AccountsPage() {
           </motion.div>
         ) : (
           <div className="text-center py-20 border-2 border-dashed rounded-lg">
-            <h3 className="text-xl font-semibold">No has creado ninguna cuenta todavía.</h3>
+            <h3 className="text-xl font-semibold">{t('common.emptyAccounts')}</h3>
             <p className="text-muted-foreground mt-2 mb-4">¡Empieza por agregar tu primera cuenta para llevar el control!</p>
             <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={handleCreateClick}>
               <PlusCircle className="mr-2 size-5" /> Crear Primera Cuenta
@@ -149,7 +200,7 @@ export function AccountsPage() {
       </Sheet>
       <AlertDialog open={isAlertOpen} onOpenChange={setAlertOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>¿Est��s seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente y se ajustará el balance de presupuestos relacionados.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

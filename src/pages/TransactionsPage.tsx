@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
 import { api } from '@/lib/api-client';
 import type { Account, Transaction } from '@shared/types';
-import { format, isWithinInterval } from 'date-fns';
+import { format, isWithinInterval, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -89,7 +90,8 @@ export function TransactionsPage() {
     const lines = text.split('\n').slice(1).filter(l => l.trim());
     const preview = lines.map(line => {
         const [date, accountName, type, amount, category, note] = line.split(',');
-        return { date, accountName, type, amount, category, note };
+        const isDateValid = isValid(new Date(date));
+        return { date, accountName, type, amount, category, note, isDateValid };
     });
     setImportPreview(preview);
     setImportSheetOpen(true);
@@ -124,6 +126,7 @@ export function TransactionsPage() {
     }
   };
   const accountIcons = { cash: <Banknote className="size-4 text-muted-foreground" />, bank: <Landmark className="size-4 text-muted-foreground" />, credit_card: <CreditCard className="size-4 text-muted-foreground" /> };
+  const isDefaultFilter = filters.query === '' && filters.accountId === 'all' && filters.type === 'all' && !filters.dateRange;
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -151,7 +154,7 @@ export function TransactionsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Cuenta</TableHead>
-                  <TableHead>Categor��a</TableHead>
+                  <TableHead>Categoría</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -166,7 +169,7 @@ export function TransactionsPage() {
                   filteredTransactions.map((tx) => {
                     const account = accountsById.get(tx.accountId);
                     return (
-                      <TableRow key={tx.id}>
+                      <TableRow key={tx.id} className="hover:bg-muted/50 transition-colors duration-150">
                         <TableCell><div className="flex items-center gap-2">{account && accountIcons[account.type]}<span className="font-medium">{account?.name || 'N/A'}</span></div></TableCell>
                         <TableCell>
                             <div className="flex items-center gap-2 flex-wrap">
@@ -191,7 +194,20 @@ export function TransactionsPage() {
                     );
                   })
                 ) : (
-                  <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay transacciones que coincidan con los filtros.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center">
+                      {!isDefaultFilter ? (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                          <p>{t('common.noMatches')}</p>
+                          <Button variant="link" onClick={() => setFilters({ query: '', accountId: 'all', type: 'all', dateRange: undefined })}>
+                            Limpiar filtros
+                          </Button>
+                        </motion.div>
+                      ) : (
+                        "No hay transacciones todavía."
+                      )}
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -208,13 +224,17 @@ export function TransactionsPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                {importPreview[0] && Object.keys(importPreview[0]).map(key => <TableHead key={key}>{key}</TableHead>)}
+                                {importPreview[0] && Object.keys(importPreview[0]).filter(k => k !== 'isDateValid').map(key => <TableHead key={key}>{key}</TableHead>)}
+                                <TableHead>Validación</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {importPreview.map((row, i) => (
                                 <TableRow key={i}>
-                                    {Object.values(row).map((val: any, j: number) => <TableCell key={j}>{val}</TableCell>)}
+                                    {Object.entries(row).filter(([k]) => k !== 'isDateValid').map(([key, val], j) => <TableCell key={j}>{val as string}</TableCell>)}
+                                    <TableCell>
+                                        {!row.isDateValid && <Badge variant="destructive">Fecha Inválida</Badge>}
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

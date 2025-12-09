@@ -61,6 +61,9 @@ export function SettingsPage() {
         body: JSON.stringify(data),
       });
       toast.success('Ajustes guardados correctamente.');
+      if (form.getValues('currency') !== updatedSettings.currency) {
+        toast.info('Moneda actualizada - actualizando vistas.');
+      }
       form.reset(updatedSettings);
       setCurrency(updatedSettings.currency);
       setSettings(updatedSettings);
@@ -80,7 +83,17 @@ export function SettingsPage() {
           <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>
             <Card>
               <CardHeader><CardTitle>Visual</CardTitle><CardDescription>Personaliza la apariencia de CasaConta.</CardDescription></CardHeader>
-              <CardContent><div className="flex items-center justify-between"><Label>Tema</Label><div className="flex items-center gap-2"><span>{isDark ? 'Oscuro' : 'Claro'}</span><ThemeToggle className="relative top-0 right-0" /></div></div></CardContent>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <Label>Tema</Label>
+                  <div className="flex items-center gap-2">
+                    <span>{isDark ? 'Oscuro' : 'Claro'}</span>
+                    <motion.div key={isDark ? 'dark' : 'light'} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
+                      <ThemeToggle className="relative top-0 right-0" />
+                    </motion.div>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
           </motion.div>
           <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>

@@ -7,6 +7,9 @@ const translations = {
     save: 'Guardar',
     cancel: 'Cancelar',
     close: 'Cerrar',
+    emptyAccounts: 'No hay cuentas. ¡Crea tu primera!',
+    noMatches: 'No hay coincidencias. Intenta ajustar los filtros.',
+    exportBudgets: 'Exportar Presupuestos',
   },
   pages: {
     dashboard: 'Dashboard',
@@ -28,6 +31,7 @@ const translations = {
     categorySpending: 'Gastos por Categoría (Este Mes)',
     budgetList: 'Lista de Presupuestos',
     overBudget: 'Excedido',
+    emptyBudgets: 'No hay presupuestos. ¡Crea uno!',
   },
   budget: {
     list: 'Presupuestos',
@@ -36,6 +40,7 @@ const translations = {
     status: 'Estado',
     under: 'Bajo Límite',
     over: 'Sobre Límite',
+    duplicate: 'Duplicar',
   },
 } as const;
 type TranslationKey =
