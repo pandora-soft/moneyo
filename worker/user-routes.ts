@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
-import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity, CurrencyEntity } from "./entities";
+import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity, CurrencyEntity, FrequencyEntity } from "./entities";
 import { ok, bad, notFound, isStr } from './core-utils';
 import type { Account, Transaction, Budget, Settings, TransactionType, Currency } from "@shared/types";
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
@@ -12,6 +12,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
       BudgetEntity.ensureSeed(c.env),
       CategoryEntity.ensureSeed(c.env),
       CurrencyEntity.ensureSeed(c.env),
+      FrequencyEntity.ensureSeed(c.env),
     ]);
     await next();
   });
@@ -212,6 +213,45 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'ID inválido');
     const deleted = await CategoryEntity.delete(c.env, id);
+    return deleted ? ok(c, { id, deleted: true }) : notFound(c);
+  });
+  // FREQUENCIES API
+  finance.get('/frequencies', async (c) => {
+    const { items } = await FrequencyEntity.list(c.env);
+    return ok(c, items.sort((a, b) => a.name.localeCompare(b.name)));
+  });
+  finance.post('/frequencies', async (c) => {
+    const { name, interval, unit } = await c.req.json<{ name: string; interval: number; unit: 'days' | 'weeks' | 'months' }>();
+    if (!isStr(name) || interval < 1 || interval > 365 || !['days', 'weeks', 'months'].includes(unit)) {
+      return bad(c, 'Invalid data');
+    }
+    const { items } = await FrequencyEntity.list(c.env);
+    if (items.some(f => f.name.toLowerCase() === name.toLowerCase())) {
+      return bad(c, 'Frequency name already exists');
+    }
+    const newFreq = { id: crypto.randomUUID(), name: name.trim(), interval: Number(interval), unit };
+    await FrequencyEntity.create(c.env, newFreq);
+    return ok(c, newFreq);
+  });
+  finance.put('/frequencies/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'Invalid ID');
+    const updates = await c.req.json<Partial<{ name: string; interval: number; unit: 'days' | 'weeks' | 'months' }>>();
+    if (!Object.keys(updates).length) return bad(c, 'No updates provided');
+    const freq = new FrequencyEntity(c.env, id);
+    if (!await freq.exists()) return notFound(c);
+    const { items } = await FrequencyEntity.list(c.env);
+    if (updates.name && items.some(f => f.id !== id && f.name.toLowerCase() === updates.name!.toLowerCase())) {
+      return bad(c, 'Name already exists');
+    }
+    await freq.patch(updates);
+    const updated = await freq.getState();
+    return ok(c, updated);
+  });
+  finance.delete('/frequencies/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'Invalid ID');
+    const deleted = await FrequencyEntity.delete(c.env, id);
     return deleted ? ok(c, { id, deleted: true }) : notFound(c);
   });
   // CURRENCIES API

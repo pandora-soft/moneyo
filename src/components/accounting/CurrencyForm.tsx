@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -21,14 +21,13 @@ export function CurrencyForm({ onSubmit, defaultValues }: Props) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      code: '',
-      symbol: '',
-      suffix: false,
-      ...defaultValues,
+      code: defaultValues?.code || '',
+      symbol: defaultValues?.symbol || '',
+      suffix: defaultValues?.suffix ?? false,
     },
   });
   const { isSubmitting } = form.formState;
-  const handleSubmit = async (values: FormValues) => {
+  const handleSubmit: SubmitHandler<FormValues> = async (values) => {
     await onSubmit(values);
   };
   return (

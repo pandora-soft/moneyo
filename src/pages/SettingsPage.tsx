@@ -21,15 +21,17 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { CategoryForm } from '@/components/accounting/CategoryForm';
 import { CurrencyForm } from '@/components/accounting/CurrencyForm';
+import { FrequencyForm } from '@/components/accounting/FrequencyForm';
 import { Badge } from '@/components/ui/badge';
 type Category = { id: string; name: string };
+type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const settingsSchema = z.object({
   currency: z.string().min(1, "Debe seleccionar una moneda."),
   fiscalMonthStart: z.preprocess(
     (val: unknown) => Number(val),
     z.number().int().min(1, "Mínimo 1").max(28, "Máximo 28")
   ),
-  recurrentDefaultFrequency: z.enum(['monthly', 'weekly']),
+  recurrentDefaultFrequency: z.string().min(1, "Debe seleccionar una frecuencia."),
 });
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 const cardVariants: Variants = {
@@ -46,24 +48,30 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [frequencies, setFrequencies] = useState<Frequency[]>([]);
   const [isCategorySheetOpen, setCategorySheetOpen] = useState(false);
   const [isCurrencySheetOpen, setCurrencySheetOpen] = useState(false);
+  const [isFrequencySheetOpen, setFrequencySheetOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingCurrency, setEditingCurrency] = useState<Currency | null>(null);
+  const [editingFrequency, setEditingFrequency] = useState<Frequency | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [deletingCurrency, setDeletingCurrency] = useState<Currency | null>(null);
+  const [deletingFrequency, setDeletingFrequency] = useState<Frequency | null>(null);
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      const [settings, cats, currs] = await Promise.all([
+      const [settings, cats, currs, freqs] = await Promise.all([
         api<Settings>('/api/finance/settings'),
         api<Category[]>('/api/finance/categories'),
         api<Currency[]>('/api/finance/currencies'),
+        api<Frequency[]>('/api/finance/frequencies'),
       ]);
       form.reset(settings);
       setSettings(settings);
       setCategories(cats);
       setCurrencies(currs);
+      setFrequencies(freqs);
       setStoreCurrencies(currs);
     } catch (error) {
       toast.error('No se pudieron cargar los datos de configuración.');
@@ -148,6 +156,35 @@ export function SettingsPage() {
       toast.error(e.message || 'Error al eliminar la moneda.');
     }
   };
+  const handleFrequencySubmit = async (values: Omit<Frequency, 'id'>) => {
+    try {
+      if (editingFrequency) {
+        await api(`/api/finance/frequencies/${editingFrequency.id}`, { method: 'PUT', body: JSON.stringify(values) });
+        toast.success('Frecuencia actualizada.');
+      } else {
+        await api('/api/finance/frequencies', { method: 'POST', body: JSON.stringify(values) });
+        toast.success('Frecuencia creada.');
+      }
+      setFrequencySheetOpen(false);
+      setEditingFrequency(null);
+      fetchAllData();
+      triggerRefetch();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al guardar la frecuencia.');
+    }
+  };
+  const handleFrequencyDelete = async () => {
+    if (!deletingFrequency) return;
+    try {
+      await api(`/api/finance/frequencies/${deletingFrequency.id}`, { method: 'DELETE' });
+      toast.success('Frecuencia eliminada.');
+      setDeletingFrequency(null);
+      fetchAllData();
+      triggerRefetch();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar la frecuencia.');
+    }
+  };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -188,7 +225,7 @@ export function SettingsPage() {
                       <CardContent className="space-y-6">
                         <FormField control={form.control} name="currency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('finance.mainCurrency')}</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar moneda" /></SelectTrigger></FormControl><SelectContent>{currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Inicio del Mes Fiscal</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={field.value ? String(field.value) : undefined}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Frecuencia Recurrente</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent><SelectItem value="monthly">Mensual</SelectItem><SelectItem value="weekly">Semanal</SelectItem></SelectContent></Select></div><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Frecuencia Recurrente</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                       </CardContent>
                       <div className="flex justify-end p-6 border-t">
                         <Button type="submit" disabled={isSubmitting || !isDirty}>
@@ -200,6 +237,29 @@ export function SettingsPage() {
                   </form>
                 </Form>
               )}
+            </motion.div>
+            <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.5 }}>
+              <Card>
+                <CardHeader><CardTitle>{t('settings.frequencies.title')}</CardTitle><CardDescription>{t('settings.frequencies.description')}</CardDescription></CardHeader>
+                <CardContent className="space-y-4">
+                  {loading ? <Skeleton className="h-20 w-full" /> : frequencies.length > 0 ? (
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                      {frequencies.map(freq => (
+                        <div key={freq.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-md">
+                          <span>{freq.name} (Cada {freq.interval} {t(`common.${freq.unit}` as any)})</span>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingFrequency(freq); setFrequencySheetOpen(true); }}><Edit className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingFrequency(freq)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-muted-foreground text-sm text-center py-4">No hay frecuencias personalizadas.</p>}
+                  <Button variant="outline" onClick={() => { setEditingFrequency(null); setFrequencySheetOpen(true); }} className="w-full">
+                    <Plus className="mr-2 h-4 w-4" /> {t('settings.frequencies.add')}
+                  </Button>
+                </CardContent>
+              </Card>
             </motion.div>
           </div>
           <div className="space-y-8">
@@ -274,6 +334,18 @@ export function SettingsPage() {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Eliminar Moneda</AlertDialogTitle><AlertDialogDescription>¿Estás seguro de que quieres eliminar la moneda '{deletingCurrency?.code}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleCurrencyDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <Sheet open={isFrequencySheetOpen} onOpenChange={setFrequencySheetOpen}>
+        <SheetContent>
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingFrequency ? t('settings.frequencies.edit') : t('settings.frequencies.add')}</SheetTitle><SheetDescription id="frequency-sheet-desc">Define una nueva frecuencia para transacciones recurrentes.</SheetDescription></SheetHeader>
+          <FrequencyForm onSubmit={handleFrequencySubmit} defaultValues={editingFrequency || {}} />
+        </SheetContent>
+      </Sheet>
+      <AlertDialog open={!!deletingFrequency} onOpenChange={() => setDeletingFrequency(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Eliminar Frecuencia</AlertDialogTitle><AlertDialogDescription>¿Estás seguro de que quieres eliminar la frecuencia '{deletingFrequency?.name}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleFrequencyDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

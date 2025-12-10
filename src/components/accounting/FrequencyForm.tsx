@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -7,35 +7,32 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import t from '@/lib/i18n';
-type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const schema = z.object({
-  name: z.string().min(2, t('form.minChars', 2)).max(50, t('form.maxChars', 50)),
-  interval: z.number().int().min(1, 'Mínimo 1').max(365, 'Máximo 365').optional(),
-  unit: z.enum(['days', 'weeks', 'months']).optional(),
+  name: z.string().min(2, 'Mínimo 2 caracteres').max(50, 'Máximo 50 caracteres'),
+  interval: z.preprocess(
+    (val) => Number(val),
+    z.number().int().min(1, 'Mínimo 1').max(365, 'Máximo 365')
+  ),
+  unit: z.enum(['days', 'weeks', 'months']),
 });
 type FormValues = z.infer<typeof schema>;
 interface Props {
-  onSubmit: (values: Omit<Frequency, 'id'>) => Promise<void>;
+  onSubmit: (values: FormValues) => Promise<void>;
   defaultValues?: Partial<FormValues>;
 }
 export function FrequencyForm({ onSubmit, defaultValues }: Props) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    mode: 'onChange',
     defaultValues: {
-      name: defaultValues?.name || '',
-      interval: defaultValues?.interval ?? 1,
-      unit: defaultValues?.unit ?? 'weeks',
+      name: '',
+      interval: 1,
+      unit: 'weeks',
+      ...defaultValues,
     },
   });
   const { isSubmitting } = form.formState;
-  const handleSubmit: SubmitHandler<FormValues> = async (values) => {
-    const payload: Omit<Frequency, 'id'> = {
-      name: values.name.trim(),
-      interval: values.interval ?? 1,
-      unit: values.unit ?? 'weeks',
-    };
-    await onSubmit(payload);
+  const handleSubmit = async (values: FormValues) => {
+    await onSubmit(values);
   };
   return (
     <Form {...form}>
@@ -60,12 +57,7 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
             <FormItem>
               <FormLabel>{t('settings.frequencies.interval')}</FormLabel>
               <FormControl>
-                <Input
-                  type="number"
-                  placeholder="15"
-                  {...field}
-                  onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
-                />
+                <Input type="number" placeholder="15" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -77,16 +69,16 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>{t('settings.frequencies.unit')}</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value || 'weeks'}>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccione una unidad" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="days">{t('common.days')}</SelectItem>
-                  <SelectItem value="weeks">{t('common.weeks')}</SelectItem>
-                  <SelectItem value="months">{t('common.months')}</SelectItem>
+                  <SelectItem value="days">Días</SelectItem>
+                  <SelectItem value="weeks">Semanas</SelectItem>
+                  <SelectItem value="months">Meses</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -94,9 +86,9 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
           )}
         />
         <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={!form.formState.isValid || isSubmitting}>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {defaultValues?.name ? t('common.save') : t('common.add')}
+            {defaultValues?.name ? 'Actualizar' : 'Crear'}
           </Button>
         </div>
       </form>

@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { api } from '@/lib/api-client';
 import { Combobox } from '@/components/ui/combobox';
+type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const formSchema = z.object({
   id: z.string().optional(),
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
@@ -36,7 +37,7 @@ const formSchema = z.object({
   ts: z.date(),
   note: z.string().max(100).optional(),
   recurrent: z.boolean().default(false),
-  frequency: z.enum(['monthly', 'weekly']).optional(),
+  frequency: z.string().optional(),
 }).refine((data) => {
   if (data.type === 'transfer') {
     return !!data.accountToId && data.accountToId !== data.accountId;
@@ -65,6 +66,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   const settings = useAppStore((state) => state.settings);
   const refetchTrigger = useAppStore((state) => state.refetchData);
   const [categories, setCategories] = useState<{ value: string; label: string }[]>([]);
+  const [frequencies, setFrequencies] = useState<Frequency[]>([]);
   useEffect(() => {
     api<{ id: string; name: string }[]>('/api/finance/categories')
       .then(cats => setCategories(cats.map(c => ({ value: c.name, label: c.name }))))
@@ -74,6 +76,12 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         { value: 'Alquiler', label: 'Alquiler' },
         { value: 'Salario', label: 'Salario' },
         { value: 'Otro', label: 'Otro' },
+      ]));
+    api<Frequency[]>('/api/finance/frequencies')
+      .then(setFrequencies)
+      .catch(() => setFrequencies([
+        { id: 'weekly', name: 'Semanal', interval: 1, unit: 'weeks' },
+        { id: 'monthly', name: 'Mensual', interval: 1, unit: 'months' },
       ]));
   }, [refetchTrigger]);
   const form = useForm<TransactionFormValues>({
@@ -87,7 +95,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       ts: new Date(),
       note: '',
       recurrent: false,
-      frequency: settings.recurrentDefaultFrequency || 'monthly',
+      frequency: settings.recurrentDefaultFrequency || 'Mensual',
       ...defaultValues,
     }
   });
@@ -267,8 +275,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
                                         <SelectTrigger><SelectValue placeholder="Seleccione una frecuencia" /></SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        <SelectItem value="monthly">Mensual</SelectItem>
-                                        <SelectItem value="weekly">Semanal</SelectItem>
+                                        {frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name} (Cada {f.interval} {f.unit})</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />

@@ -1,7 +1,7 @@
 import { IndexedEntity, Entity, Env } from "./core-utils";
 import type { Account, Transaction, Budget, Settings, Currency } from "@shared/types";
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@shared/mock-data";
-import { addMonths, addWeeks, isBefore, startOfToday } from 'date-fns';
+import { addDays, addMonths, addWeeks, isBefore, startOfToday } from 'date-fns';
 export class AccountEntity extends IndexedEntity<Account> {
   static readonly entityName = "account";
   static readonly indexName = "accounts";
@@ -12,6 +12,21 @@ export type LedgerState = {
   id: string;
   transactions: Transaction[];
 };
+export type Frequency = {
+  id: string;
+  name: string;
+  interval: number;
+  unit: 'days' | 'weeks' | 'months';
+};
+export class FrequencyEntity extends IndexedEntity<Frequency> {
+  static readonly entityName = "frequency";
+  static readonly indexName = "frequencies";
+  static readonly initialState: Frequency = { id: "", name: "", interval: 1, unit: 'weeks' };
+  static seedData = [
+    { id: 'weekly', name: 'Semanal', interval: 1, unit: 'weeks' as const },
+    { id: 'monthly', name: 'Mensual', interval: 1, unit: 'months' as const },
+  ];
+}
 export class LedgerEntity extends IndexedEntity<LedgerState> {
   static readonly entityName = "ledger";
   static readonly indexName = "ledgers";
@@ -48,15 +63,26 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
   async generateRecurrents(): Promise<Transaction[]> {
     try {
       const { transactions } = await this.getState();
-      const recurrentTemplates = transactions.filter(t => t.recurrent);
+      const { items: frequencies } = await FrequencyEntity.list(this.env);
+      const freqMap = new Map(frequencies.map(f => [f.name, f]));
+      const recurrentTemplates = transactions.filter(t => t.recurrent && t.frequency);
       const today = startOfToday();
       const generatedTxs: Omit<Transaction, 'id'>[] = [];
       for (const template of recurrentTemplates) {
+        const freq = freqMap.get(template.frequency!);
+        if (!freq) {
+          console.warn(`Frequency "${template.frequency}" not found for transaction ${template.id}. Skipping.`);
+          continue;
+        }
         let nextDate = new Date(template.ts);
         while (isBefore(nextDate, today)) {
-          const nextDueDate = template.frequency === 'weekly'
-            ? addWeeks(nextDate, 1)
-            : addMonths(nextDate, 1);
+          let nextDueDate: Date;
+          switch (freq.unit) {
+            case 'days': nextDueDate = addDays(nextDate, freq.interval); break;
+            case 'weeks': nextDueDate = addWeeks(nextDate, freq.interval); break;
+            case 'months': nextDueDate = addMonths(nextDate, freq.interval); break;
+            default: nextDueDate = addMonths(nextDate, 1); // Fallback
+          }
           if (isBefore(nextDueDate, today)) {
             const alreadyGenerated = transactions.some(t => t.parentId === template.id && t.ts === nextDueDate.getTime());
             if (!alreadyGenerated) {
