@@ -313,38 +313,38 @@ export function SettingsPage() {
         </div>
       </div>
       <Sheet open={isCategorySheetOpen} onOpenChange={setCategorySheetOpen}>
-        <SheetContent>
+        <SheetContent aria-describedby="category-sheet-desc">
           <SheetHeader className="p-6 border-b"><SheetTitle>{editingCategory ? t('settings.categories.edit') : t('settings.categories.add')}</SheetTitle><SheetDescription id="category-sheet-desc">Crea o modifica una categoría para tus transacciones.</SheetDescription></SheetHeader>
           <CategoryForm onSubmit={handleCategorySubmit} defaultValues={editingCategory ? { name: editingCategory.name } : {}} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingCategory} onOpenChange={() => setDeletingCategory(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Eliminar Categoría</AlertDialogTitle><AlertDialogDescription>¿Estás seguro de que quieres eliminar la categoría '{deletingCategory?.name}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogContent aria-describedby="delete-category-desc">
+          <AlertDialogHeader><AlertDialogTitle>Eliminar Categoría</AlertDialogTitle><AlertDialogDescription id="delete-category-desc">¿Estás seguro de que quieres eliminar la categoría '{deletingCategory?.name}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleCategoryDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <Sheet open={isCurrencySheetOpen} onOpenChange={setCurrencySheetOpen}>
-        <SheetContent>
+        <SheetContent aria-describedby="currency-sheet-desc">
           <SheetHeader className="p-6 border-b"><SheetTitle>{editingCurrency ? t('settings.currencies.edit') : t('settings.currencies.add')}</SheetTitle><SheetDescription id="currency-sheet-desc">Define una nueva moneda para usar en tus cuentas.</SheetDescription></SheetHeader>
           <CurrencyForm onSubmit={handleCurrencySubmit} defaultValues={editingCurrency || {}} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingCurrency} onOpenChange={() => setDeletingCurrency(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Eliminar Moneda</AlertDialogTitle><AlertDialogDescription>¿Estás seguro de que quieres eliminar la moneda '{deletingCurrency?.code}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogContent aria-describedby="delete-currency-desc">
+          <AlertDialogHeader><AlertDialogTitle>Eliminar Moneda</AlertDialogTitle><AlertDialogDescription id="delete-currency-desc">¿Estás seguro de que quieres eliminar la moneda '{deletingCurrency?.code}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleCurrencyDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <Sheet open={isFrequencySheetOpen} onOpenChange={setFrequencySheetOpen}>
-        <SheetContent>
+        <SheetContent aria-describedby="frequency-sheet-desc">
           <SheetHeader className="p-6 border-b"><SheetTitle>{editingFrequency ? t('settings.frequencies.edit') : t('settings.frequencies.add')}</SheetTitle><SheetDescription id="frequency-sheet-desc">Define una nueva frecuencia para transacciones recurrentes.</SheetDescription></SheetHeader>
           <FrequencyForm onSubmit={handleFrequencySubmit} defaultValues={editingFrequency || {}} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingFrequency} onOpenChange={() => setDeletingFrequency(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Eliminar Frecuencia</AlertDialogTitle><AlertDialogDescription>¿Estás seguro de que quieres eliminar la frecuencia '{deletingFrequency?.name}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogContent aria-describedby="delete-frequency-desc">
+          <AlertDialogHeader><AlertDialogTitle>Eliminar Frecuencia</AlertDialogTitle><AlertDialogDescription id="delete-frequency-desc">¿Estás seguro de que quieres eliminar la frecuencia '{deletingFrequency?.name}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleFrequencyDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

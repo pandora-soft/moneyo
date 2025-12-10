@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 import { useAppStore } from '@/stores/useAppStore';
 import { useFormatCurrency } from '@/lib/formatCurrency';
 import t from '@/lib/i18n';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 export function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -30,6 +32,7 @@ export function TransactionsPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRecurrentView, setIsRecurrentView] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { openModal } = useAppStore();
   const refetchTrigger = useAppStore((state) => state.refetchData);
@@ -56,6 +59,9 @@ export function TransactionsPage() {
   }, [fetchData, refetchTrigger]);
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
+      if (isRecurrentView && !tx.recurrent && !tx.parentId) {
+        return false;
+      }
       const queryMatch = filters.query.length > 1 ?
         tx.category.toLowerCase().includes(filters.query.toLowerCase()) ||
         tx.note?.toLowerCase().includes(filters.query.toLowerCase()) : true;
@@ -68,7 +74,7 @@ export function TransactionsPage() {
         }) : true;
       return queryMatch && accountMatch && typeMatch && dateMatch;
     });
-  }, [transactions, filters]);
+  }, [transactions, filters, isRecurrentView]);
   const handleDelete = async () => {
     if (!deletingId) return;
     try {
@@ -115,9 +121,14 @@ export function TransactionsPage() {
   };
   const handleGenerateRecurrents = async () => {
     setIsGenerating(true);
+    toast.info('Generando transacciones recurrentes...');
     try {
         const result = await api<{ generated: number }>('/api/finance/transactions/generate', { method: 'POST' });
-        toast.success(`${result.generated} transacciones recurrentes generadas.`);
+        if (result.generated > 0) {
+            toast.success(`${result.generated} transacciones recurrentes generadas.`);
+        } else {
+            toast.info('No hay nuevas transacciones recurrentes para generar.');
+        }
     } catch (e: any) {
         toast.error(e.message || 'Error al generar transacciones recurrentes.');
     } finally {
@@ -138,16 +149,25 @@ export function TransactionsPage() {
           <div className="flex flex-wrap gap-2">
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 size-4" /> Importar CSV</Button>
-            <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating}>
-                {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />}
-                Generar Recurrentes
-            </Button>
             <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => openModal()}>
               <PlusCircle className="mr-2 size-5" /> {t('common.add')} Transacción
             </Button>
           </div>
         </header>
         <TransactionFilters filters={filters} setFilters={setFilters} accounts={accounts} />
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+            <p className="text-sm text-muted-foreground">
+                Mostrando {filteredTransactions.length} de {transactions.length} transacciones.
+            </p>
+            <div className="flex items-center space-x-2">
+                <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating}>
+                    {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />}
+                    Generar Todas
+                </Button>
+                <Switch id="recurrent-view" checked={isRecurrentView} onCheckedChange={setIsRecurrentView} />
+                <Label htmlFor="recurrent-view">Ver solo recurrentes</Label>
+            </div>
+        </div>
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -169,12 +189,12 @@ export function TransactionsPage() {
                   filteredTransactions.map((tx) => {
                     const account = accountsById.get(tx.accountId);
                     return (
-                      <TableRow key={tx.id} className="hover:bg-muted/50 transition-colors duration-150">
+                      <TableRow key={tx.id} className={cn("hover:bg-muted/50 transition-colors duration-150", (tx.recurrent || tx.parentId) && 'bg-muted/30')}>
                         <TableCell><div className="flex items-center gap-2">{account && accountIcons[account.type]}<span className="font-medium">{account?.name || 'N/A'}</span></div></TableCell>
                         <TableCell>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
-                                {tx.recurrent && <Badge variant="secondary"><Repeat className="mr-1 size-3" /> Recurrente</Badge>}
+                                {tx.recurrent && <Badge variant="secondary">Plantilla</Badge>}
                                 {tx.parentId && <Badge variant="secondary" className="text-xs">Generada</Badge>}
                             </div>
                         </TableCell>
@@ -185,7 +205,7 @@ export function TransactionsPage() {
                             <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-transparent hover:border-input hover:bg-accent"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => openModal(tx)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, frequency: undefined, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -196,16 +216,18 @@ export function TransactionsPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
-                      {!isDefaultFilter ? (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                          <p>{t('common.noMatches')}</p>
-                          <Button variant="link" onClick={() => setFilters({ query: '', accountId: 'all', type: 'all', dateRange: undefined })}>
-                            Limpiar filtros
-                          </Button>
-                        </motion.div>
-                      ) : (
-                        "No hay transacciones todavía."
-                      )}
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                        {isRecurrentView ? "No hay transacciones recurrentes." : !isDefaultFilter ? (
+                          <>
+                            <p>{t('common.noMatches')}</p>
+                            <Button variant="link" onClick={() => setFilters({ query: '', accountId: 'all', type: 'all', dateRange: undefined })}>
+                              Limpiar filtros
+                            </Button>
+                          </>
+                        ) : (
+                          "No hay transacciones todavía."
+                        )}
+                      </motion.div>
                     </TableCell>
                   </TableRow>
                 )}
@@ -215,7 +237,7 @@ export function TransactionsPage() {
         </Card>
       </div>
       <Sheet open={isImportSheetOpen} onOpenChange={setImportSheetOpen}>
-        <SheetContent className="sm:max-w-2xl w-full">
+            <SheetContent className="sm:max-w-2xl w-full" aria-describedby="import-sheet-desc">
             <SheetHeader><SheetTitle>Importar Transacciones</SheetTitle></SheetHeader>
             <SheetDescription id="import-sheet-desc">Sube un archivo CSV para previsualizar y confirmar la importación de transacciones.</SheetDescription>
             <div className="py-4">
@@ -233,7 +255,7 @@ export function TransactionsPage() {
                                 <TableRow key={i}>
                                     {Object.entries(row).filter(([k]) => k !== 'isDateValid').map(([key, val], j) => <TableCell key={j}>{val as string}</TableCell>)}
                                     <TableCell>
-                                        {!row.isDateValid && <Badge variant="destructive">Fecha Inválida</Badge>}
+                                        {!row.isDateValid && <Badge variant="destructive">Fecha Inv��lida</Badge>}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -251,7 +273,7 @@ export function TransactionsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription id="delete-transaction-description">
-              Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta.
+              Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta. Si es una plantilla recurrente, se eliminarán también todas las transacciones generadas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

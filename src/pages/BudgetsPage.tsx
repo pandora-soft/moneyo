@@ -244,8 +244,8 @@ export function BudgetsPage() {
         </SheetContent>
       </Sheet>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará el presupuesto permanentemente.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogContent aria-describedby="delete-budget-desc">
+          <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription id="delete-budget-desc">Esta acción no se puede deshacer. Se eliminará el presupuesto permanentemente.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteBudget}>Eliminar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

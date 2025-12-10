@@ -85,7 +85,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       ]));
   }, [refetchTrigger]);
   const form = useForm<TransactionFormValues>({
-    resolver: zodResolver(formSchema) as any,
+    resolver: zodResolver(formSchema),
     defaultValues: {
       type: 'expense',
       accountId: '',
@@ -95,7 +95,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       ts: new Date(),
       note: '',
       recurrent: false,
-      frequency: settings.recurrentDefaultFrequency || 'Mensual',
+      frequency: String(settings.recurrentDefaultFrequency || 'Mensual'),
       ...defaultValues,
     }
   });

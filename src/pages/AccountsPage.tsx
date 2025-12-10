@@ -199,8 +199,8 @@ export function AccountsPage() {
         </SheetContent>
       </Sheet>
       <AlertDialog open={isAlertOpen} onOpenChange={setAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente y se ajustará el balance de presupuestos relacionados.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogContent aria-describedby="delete-account-desc">
+          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription id="delete-account-desc">Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente y se ajustará el balance de presupuestos relacionados.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
