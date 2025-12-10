@@ -70,15 +70,14 @@ export function BudgetsPage() {
     }));
     return { uniqueMonths: uniqueMonthKeys, uniqueCategories, filteredBudgetsWithActuals: budgetsWithActuals, chartData };
   }, [budgets, transactions, filterDate]);
-  const handleFormSubmit = async (values: Omit<Budget, 'id' | 'accountId'>) => {
+  const handleFormSubmit = async (values: Omit<Budget, 'id' | 'computedActual'>) => {
     try {
       if (editingBudget?.id) {
         await api(`/api/finance/budgets/${editingBudget.id}`, { method: 'PUT', body: JSON.stringify(values) });
         toast.success('Presupuesto actualizado.');
       } else {
-        const newBudget = await api<Budget>('/api/finance/budgets', { method: 'POST', body: JSON.stringify(values) });
+        await api<Budget>('/api/finance/budgets', { method: 'POST', body: JSON.stringify(values) });
         toast.success('Presupuesto creado.');
-        setBudgets(prev => [...prev, { ...newBudget, computedActual: 0 }]); // Optimistic update
       }
       fetchData();
     } catch (error) {
@@ -173,8 +172,9 @@ export function BudgetsPage() {
                     contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
                     cursor={{ fill: 'hsl(var(--muted))' }}
                     formatter={(value: number, name, props) => {
-                      const safeName = String(name);
+                      const safeName = typeof name === 'string' ? name : String(name);
                       const { payload } = props;
+                      if (!payload) return [formatCurrency(value), safeName];
                       const status = payload.actual > payload.limit ? `(${t('budget.over')})` : `(${t('budget.under')})`;
                       return [formatCurrency(value), `${safeName.charAt(0).toUpperCase() + safeName.slice(1)} ${status}`];
                     }}
@@ -235,7 +235,12 @@ export function BudgetsPage() {
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) { setSheetOpen(false); setEditingBudget(null); } else { setSheetOpen(true); } }}>
         <SheetContent className="sm:max-w-lg w-full p-0">
           <SheetHeader className="p-6 border-b"><SheetTitle>{editingBudget?.id ? 'Editar' : 'Nuevo'} Presupuesto</SheetTitle></SheetHeader>
-          <BudgetForm categories={uniqueCategories} onSubmit={handleFormSubmit} onFinished={() => { setSheetOpen(false); setEditingBudget(null); }} defaultValues={editingBudget ? {...editingBudget, month: new Date(editingBudget.month)} : { month: filterDate }} />
+          <BudgetForm
+            categories={uniqueCategories}
+            onSubmit={handleFormSubmit}
+            onFinished={() => { setSheetOpen(false); setEditingBudget(null); }}
+            defaultValues={editingBudget ? {...editingBudget, month: new Date(editingBudget.month || Date.now())} : { month: filterDate }}
+          />
         </SheetContent>
       </Sheet>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

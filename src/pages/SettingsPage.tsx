@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -46,7 +46,7 @@ export function SettingsPage() {
   const [isCategorySheetOpen, setCategorySheetOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
-  const fetchSettingsAndCategories = async () => {
+  const fetchSettingsAndCategories = useCallback(async () => {
     setLoading(true);
     try {
       const [settings, cats] = await Promise.all([
@@ -62,10 +62,10 @@ export function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [form, setSettings]);
   useEffect(() => {
     fetchSettingsAndCategories();
-  }, [form, setSettings]);
+  }, [fetchSettingsAndCategories]);
   const onSubmit: SubmitHandler<SettingsFormValues> = async (data) => {
     try {
       const updatedSettings = await api<Settings>('/api/finance/settings', {

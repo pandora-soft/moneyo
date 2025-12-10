@@ -12,9 +12,6 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Budget } from '@shared/types';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api-client';
-import { useAppStore } from '@/stores/useAppStore';
 const formSchema = z.object({
   category: z.string().min(2, "La categoría es requerida.").max(50),
   limit: z.preprocess(
@@ -25,18 +22,12 @@ const formSchema = z.object({
 });
 type BudgetFormValues = z.infer<typeof formSchema>;
 interface BudgetFormProps {
-  onSubmit: (values: Omit<Budget, 'id' | 'accountId'>) => Promise<void>;
+  onSubmit: (values: Omit<Budget, 'id' | 'computedActual'>) => Promise<void>;
   onFinished: () => void;
   defaultValues?: Partial<BudgetFormValues>;
+  categories?: string[];
 }
-export function BudgetForm({ onSubmit, onFinished, defaultValues }: BudgetFormProps) {
-  const [categories, setCategories] = useState<string[]>([]);
-  const refetchTrigger = useAppStore((state) => state.refetchData);
-  useEffect(() => {
-    api<{ id: string; name: string }[]>('/api/finance/categories')
-      .then(cats => setCategories(cats.map(c => c.name)))
-      .catch(() => setCategories(['Comida', 'Transporte', 'Alquiler', 'Salario', 'Otro']));
-  }, [refetchTrigger]);
+export function BudgetForm({ onSubmit, onFinished, defaultValues, categories = [] }: BudgetFormProps) {
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
@@ -55,6 +46,7 @@ export function BudgetForm({ onSubmit, onFinished, defaultValues }: BudgetFormPr
     });
     onFinished();
   };
+  const availableCategories = categories.length > 0 ? categories : ['Comida', 'Transporte', 'Alquiler', 'Salario', 'Otro'];
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6">
@@ -69,7 +61,7 @@ export function BudgetForm({ onSubmit, onFinished, defaultValues }: BudgetFormPr
                   <SelectTrigger><SelectValue placeholder="Seleccione una categoría" /></SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                  {availableCategories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
                 </SelectContent>
               </Select>
               <FormMessage />

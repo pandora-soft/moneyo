@@ -1,19 +1,35 @@
 import React, { useState, useLayoutEffect } from 'react';
-export function useTheme() {
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
+// Moved initializer function outside the component to ensure it's a pure function
+// and to avoid potential issues with React StrictMode's double invocation.
+const getInitialTheme = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  try {
     const savedTheme = localStorage.getItem('theme');
-    return savedTheme ? savedTheme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
+    if (savedTheme) {
+      return savedTheme === 'dark';
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } catch (e) {
+    // Fallback in case of any storage access errors
+    return false;
+  }
+};
+export function useTheme() {
+  const [isDark, setIsDark] = useState<boolean>(getInitialTheme);
   useLayoutEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+    // This effect runs synchronously after every render, but the dependency array
+    // ensures it only executes its logic when `isDark` changes.
+    // This is safe and does not change hook order.
+    if (typeof document !== 'undefined') {
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
     }
   }, [isDark]);
   const toggleTheme = () => {
