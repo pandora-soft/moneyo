@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -10,7 +10,7 @@ import t from '@/lib/i18n';
 const schema = z.object({
   name: z.string().min(2, 'Mínimo 2 caracteres').max(50, 'Máximo 50 caracteres'),
   interval: z.preprocess(
-    (val) => Number(val),
+    (val) => Number(String(val).trim()),
     z.number().int().min(1, 'Mínimo 1').max(365, 'Máximo 365')
   ),
   unit: z.enum(['days', 'weeks', 'months']),
@@ -24,14 +24,13 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      name: '',
-      interval: 1,
-      unit: 'weeks',
-      ...defaultValues,
+      name: defaultValues?.name || '',
+      interval: defaultValues?.interval || 1,
+      unit: defaultValues?.unit || 'weeks',
     },
   });
   const { isSubmitting } = form.formState;
-  const handleSubmit = async (values: FormValues) => {
+  const handleSubmit: SubmitHandler<FormValues> = async (values) => {
     await onSubmit(values);
   };
   return (
