@@ -133,11 +133,16 @@ const router = createBrowserRouter([
 ]);
 const rootElement = document.getElementById('root');
 if (rootElement) {
-  createRoot(rootElement).render(
-    <StrictMode>
-      <ErrorBoundary>
-        <RouterProvider router={router} />
-      </ErrorBoundary>
-    </StrictMode>,
-  );
+  if (!rootElement.innerHTML) { // Ensure we only render once.
+    const root = createRoot(rootElement);
+    root.render(
+      <StrictMode>
+        <ErrorBoundary>
+          <RouterProvider router={router} />
+        </ErrorBoundary>
+      </StrictMode>
+    );
+  }
+} else {
+    console.warn("Root element with id 'root' not found in the document. App could not be mounted.");
 }

@@ -106,8 +106,10 @@ export function ReportsPage() {
       return { ...b, computedActual: actual };
     });
     computedBudgets.sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+      const key = sortConfig.key;
+      const direction = sortConfig.direction === 'asc' ? 1 : -1;
+      if (a[key] < b[key]) return -1 * direction;
+      if (a[key] > b[key]) return 1 * direction;
       return 0;
     });
     return { monthlySummary: monthlyChartData, categorySpending: categoryChartData, budgetsWithActuals: computedBudgets };
@@ -123,7 +125,7 @@ export function ReportsPage() {
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", `moneyo_reporte_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `moneyo-reporte-${format(new Date(), 'yyyy-MM-dd')}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -184,7 +186,7 @@ export function ReportsPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `moneyo_presupuestos_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `moneyo-presupuestos-${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
