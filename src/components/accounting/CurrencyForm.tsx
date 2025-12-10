@@ -10,7 +10,7 @@ import t from '@/lib/i18n';
 const schema = z.object({
   code: z.string().min(3, 'Mínimo 3 caracteres').max(5, 'Máximo 5 caracteres').transform(v => v.toUpperCase()),
   symbol: z.string().min(1, 'Requerido').max(5, 'Máximo 5 caracteres'),
-  suffix: z.boolean().default(false),
+  suffix: z.boolean().optional().default(false),
 });
 type FormValues = z.infer<typeof schema>;
 interface Props {
@@ -20,7 +20,12 @@ interface Props {
 export function CurrencyForm({ onSubmit, defaultValues }: Props) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: defaultValues || { code: '', symbol: '', suffix: false },
+    defaultValues: {
+      code: '',
+      symbol: '',
+      suffix: false,
+      ...defaultValues,
+    },
   });
   const { isSubmitting } = form.formState;
   const handleSubmit = async (values: FormValues) => {

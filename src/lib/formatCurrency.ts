@@ -18,12 +18,13 @@ export function formatCurrency(value: number, currencyCode?: string): string {
 }
 export function useFormatCurrency() {
   const currencyCode = useAppStore((state) => state.currency);
-  const currencies = useAppStore((state) => state.currencies);
+  // The 'currencies' state is not needed as a dependency because formatCurrency
+  // reads the latest value directly from the store via getState().
   const format = useCallback(
     (value: number, overrideCurrencyCode?: string) => {
       return formatCurrency(value, overrideCurrencyCode || currencyCode);
     },
-    [currencyCode, currencies]
+    [currencyCode]
   );
   return format;
 }
