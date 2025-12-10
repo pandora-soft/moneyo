@@ -6,18 +6,19 @@ This project follows a phased development approach: starting with a stunning fro
 ## Key Features
 - **Account Management**: Create, edit, and delete accounts with real-time balance tracking.
 - **Transaction Handling**: Log expenses, incomes, and transfers with categorization, date filtering, and search.
-- **Budget Tools**: Simple monthly budgets to monitor spending against limits.
-- **Reporting**: Visual monthly summaries, balance history, and category breakdowns (with charts via Recharts).
+- **Recurring Transactions**: Define transaction templates that automatically generate on a schedule (e.g., monthly rent).
+- **Budget Tools**: Simple monthly budgets to monitor spending against limits, with visual progress bars.
+- **Reporting**: Visual monthly summaries, balance history, and category breakdowns with charts via Recharts.
+- **Data Import/Export**: Full support for CSV import of transactions and export of transactions, budgets, and PDF reports.
 - **User-Friendly Interface**: Responsive design, intuitive navigation, and delightful interactions using Shadcn UI and Tailwind CSS.
 - **Secure Persistence**: Backend powered by Cloudflare Durable Objects for reliable, atomic data operations.
-- **Export Support**: CSV import/export and report generation (phased implementation).
-- **Settings**: Customizable currency, fiscal month start, and theme preferences.
+- **Settings**: Customizable currency, fiscal month start, theme preferences, and management of categories and recurring frequencies.
 The app ensures a seamless experience across devices, with mobile-first responsive layouts and accessibility best practices.
 ## Technology Stack
 - **Frontend**: React 18, TypeScript, React Router, Shadcn UI, Tailwind CSS 3, Framer Motion (micro-interactions), Recharts (charts), Date-fns (date utilities), Zustand (state management), Sonner (toasts).
 - **Backend**: Cloudflare Workers, Hono (routing), Durable Objects (via custom Entity wrappers for persistence).
 - **Build Tools**: Vite (bundler), Bun (package manager), Wrangler (deployment).
-- **Utilities**: Lucide React (icons), Zod (validation), Immer (immutable updates), clsx/tailwind-merge (styling helpers).
+- **Utilities**: Lucide React (icons), Zod (validation), Immer (immutable updates), clsx/tailwind-merge (styling helpers), jsPDF (PDF generation).
 - **Shared**: Type-safe API responses and data models in TypeScript.
 No external APIs or additional servers required—all data is stored client-side via the single GlobalDurableObject binding.
 ## Installation
@@ -51,31 +52,35 @@ The app will be available at `http://localhost:3000` (or the port specified in y
 - **Transactions**: Filter by date, account, or type; add/edit via intuitive forms in modals.
 - **Reports**: Generate monthly overviews with bar charts for categories.
 - **Settings**: Adjust currency (e.g., USD, EUR) and theme (light/dark).
-API endpoints are accessible at `/api/finance/*` (e.g., `GET /api/finance/accounts` for listing accounts). Mock data seeds on first load for demo purposes.
 Example API call from frontend (using the provided `api` helper):
 ```typescript
 import { api } from '@/lib/api-client';
-const accounts = await api<{ items: Account[]; next: string | null }>('/api/finance/accounts');
+const accounts = await api<Account[]>('/api/finance/accounts');
 ```
-## Development
-### Project Structure
-- **src/**: React frontend (pages, components, hooks, lib).
-- **worker/**: Hono-based backend routes and entities (do not modify `core-utils.ts` or `index.ts`).
-- **shared/**: TypeScript types and mock data (extend for app-specific models).
-- **Root**: Config files (Tailwind, Vite, TypeScript, Wrangler).
-### Adding Features
-1. **Frontend Pages**: Add routes in `src/main.tsx` using React Router. Use `AppLayout` for consistent structure.
-2. **API Routes**: Implement in `worker/user-routes.ts` using Entity classes from `worker/entities.ts` (e.g., extend `IndexedEntity` for new models like `AccountEntity`).
-3. **Entities**: Define in `worker/entities.ts` with static `indexName`, `initialState`, and methods (e.g., `createTransaction`).
-4. **State Management**: Use Zustand stores with primitive selectors to avoid re-render loops.
-5. **Styling**: Leverage Shadcn UI components (import from `@/components/ui/*`) and Tailwind utilities. Ensure responsive wrappers: `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8` with section padding `py-8 md:py-10 lg:py-12`.
-6. **Validation**: Use React Hook Form + Zod for forms.
-7. **Linting/Type Checking**: Run `bun run lint` or `tsc --noEmit`.
-Follow UI non-negotiables: mobile-first, high contrast, smooth transitions. Test for infinite loops (e.g., no setState in render).
-### Testing
-- Local API: Use browser dev tools or tools like Postman to hit `/api/*`.
-- End-to-End: Manually test CRUD flows; the template includes error boundaries.
-- Seeding: Entities auto-seed mock data via `ensureSeed` on first request.
+## API Endpoints
+All endpoints are prefixed with `/api/finance`.
+- `GET /accounts`: List all accounts.
+- `POST /accounts`: Create a new account. Payload: `{ name, type, currency, balance }`.
+- `PUT /accounts/:id`: Update an account. Payload: `{ name, type, currency }`.
+- `DELETE /accounts/:id`: Delete an account.
+- `GET /transactions`: List transactions (paginated with `?limit=` and `?cursor=`).
+- `POST /transactions`: Create a transaction. Payload: `{ accountId, type, amount, category, ts, ... }`.
+- `PUT /transactions/:id`: Update a transaction. Payload: `Partial<Transaction>`.
+- `DELETE /transactions/:id`: Delete a transaction.
+- `POST /transactions/import`: Import transactions from a CSV file.
+- `POST /transactions/generate`: Trigger generation of recurrent transactions.
+- `GET /budgets`: List all budgets.
+- `POST /budgets`: Create a budget. Payload: `{ month, category, limit }`.
+- `PUT /budgets/:id`: Update a budget.
+- `DELETE /budgets/:id`: Delete a budget.
+- `GET /categories`, `POST`, `PUT /:id`, `DELETE /:id`: CRUD for categories.
+- `GET /currencies`, `POST`, `PUT /:id`, `DELETE /:id`: CRUD for currencies.
+- `GET /frequencies`, `POST`, `PUT /:id`, `DELETE /:id`: CRUD for recurring frequencies.
+- `GET /settings`, `POST /settings`: Get or update global settings.
+## Troubleshooting
+- **Theme or Currency Not Updating**: The app uses `localStorage` to persist theme and currency settings. If you encounter issues, try clearing your browser's local storage for the site.
+- **Browser Compatibility**: The app is tested on modern versions of Chrome, Firefox, and Safari. Older browsers may have rendering issues.
+- **Build Errors**: Ensure all dependencies are installed with `bun install`. If TypeScript errors persist, run `bun run cf-typegen` to update worker types.
 ## Deployment
 Deploy to Cloudflare Workers for global edge runtime:
 1. Login to Cloudflare:
@@ -87,12 +92,9 @@ Deploy to Cloudflare Workers for global edge runtime:
    bun run deploy
    ```
    This builds the frontend (Vite) and deploys the Worker bundle. The app will be live at your Workers subdomain (e.g., `moneyo-fqyoxziaw_plrx7p6fcfh.your-account.workers.dev`).
-3. For custom domains: Update `wrangler.jsonc` (name and assets) and run `wrangler deploy` again.
+3. **Monitoring**: Use `wrangler tail` to view live logs from your deployed worker. Check the Cloudflare dashboard for analytics and error reports.
+4. **Custom Domains**: To use a custom domain, add it to your Cloudflare account and update `wrangler.jsonc` with the appropriate routes before deploying.
 [cloudflarebutton]
-**Notes**:
-- Assets (static files) are served via Workers Sites integration.
-- Durable Objects provide stateful storage without additional config.
-- Monitor logs via `wrangler tail` and metrics in the Cloudflare dashboard.
 ## Contributing
 1. Fork the repository.
 2. Create a feature branch (`git checkout -b feature/amazing-feature`).
