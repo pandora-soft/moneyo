@@ -14,9 +14,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api-client';
 import type { Settings } from '@shared/types';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import t from '@/lib/i18n';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { CategoryForm } from '@/components/accounting/CategoryForm';
+type Category = { id: string; name: string };
 const settingsSchema = z.object({
   currency: z.enum(['USD', 'EUR', 'ARS']),
   fiscalMonthStart: z.preprocess(
@@ -38,21 +42,29 @@ export function SettingsPage() {
   });
   const { isSubmitting, isDirty } = form.formState;
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    async function fetchSettings() {
-      setLoading(true);
-      try {
-        const settings = await api<Settings>('/api/finance/settings');
-        form.reset(settings);
-        setSettings(settings);
-      } catch (error) {
-        toast.error('No se pudieron cargar los ajustes.');
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isCategorySheetOpen, setCategorySheetOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const fetchSettingsAndCategories = async () => {
+    setLoading(true);
+    try {
+      const [settings, cats] = await Promise.all([
+        api<Settings>('/api/finance/settings'),
+        api<Category[]>('/api/finance/categories'),
+      ]);
+      form.reset(settings);
+      setSettings(settings);
+      setCategories(cats);
+    } catch (error) {
+      toast.error('No se pudieron cargar los datos de configuración.');
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
-    fetchSettings();
+  };
+  useEffect(() => {
+    fetchSettingsAndCategories();
   }, [form, setSettings]);
   const onSubmit: SubmitHandler<SettingsFormValues> = async (data) => {
     try {
@@ -70,6 +82,37 @@ export function SettingsPage() {
       triggerRefetch();
     } catch (error) {
       toast.error('Error al guardar los ajustes.');
+    }
+  };
+  const handleCategorySubmit = async (values: { name: string }) => {
+    try {
+      if (editingCategory) {
+        await api(`/api/finance/categories/${editingCategory.id}`, { method: 'PUT', body: JSON.stringify(values) });
+        toast.success('Categoría actualizada.');
+      } else {
+        await api('/api/finance/categories', { method: 'POST', body: JSON.stringify(values) });
+        toast.success('Categoría creada.');
+      }
+      setCategorySheetOpen(false);
+      setEditingCategory(null);
+      const updatedCats = await api<Category[]>('/api/finance/categories');
+      setCategories(updatedCats);
+      triggerRefetch();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al guardar la categoría.');
+    }
+  };
+  const handleCategoryDelete = async () => {
+    if (!deletingCategory) return;
+    try {
+      await api(`/api/finance/categories/${deletingCategory.id}`, { method: 'DELETE' });
+      toast.success('Categoría eliminada.');
+      setDeletingCategory(null);
+      const updatedCats = await api<Category[]>('/api/finance/categories');
+      setCategories(updatedCats);
+      triggerRefetch();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar la categoría.');
     }
   };
   return (
@@ -124,8 +167,43 @@ export function SettingsPage() {
               </Form>
             )}
           </motion.div>
+          <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.3 }}>
+            <Card>
+              <CardHeader><CardTitle>{t('settings.categories.title')}</CardTitle><CardDescription>{t('settings.categories.description')}</CardDescription></CardHeader>
+              <CardContent className="space-y-4">
+                {loading ? <Skeleton className="h-20 w-full" /> : categories.length > 0 ? (
+                  <div className="space-y-2">
+                    {categories.map(cat => (
+                      <div key={cat.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-md">
+                        <span>{cat.name}</span>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingCategory(cat); setCategorySheetOpen(true); }}><Edit className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingCategory(cat)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-muted-foreground text-sm text-center py-4">No hay categorías personalizadas.</p>}
+                <Button variant="outline" onClick={() => { setEditingCategory(null); setCategorySheetOpen(true); }} className="w-full">
+                  <Plus className="mr-2 h-4 w-4" /> {t('settings.categories.add')}
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
       </div>
+      <Sheet open={isCategorySheetOpen} onOpenChange={setCategorySheetOpen}>
+        <SheetContent>
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingCategory ? t('settings.categories.edit') : t('settings.categories.add')}</SheetTitle></SheetHeader>
+          <CategoryForm onSubmit={handleCategorySubmit} defaultValues={editingCategory ? { name: editingCategory.name } : {}} />
+        </SheetContent>
+      </Sheet>
+      <AlertDialog open={!!deletingCategory} onOpenChange={() => setDeletingCategory(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Eliminar Categoría</AlertDialogTitle><AlertDialogDescription>¿Estás seguro de que quieres eliminar la categoría '{deletingCategory?.name}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleCategoryDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

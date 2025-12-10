@@ -104,8 +104,10 @@ export function BudgetsPage() {
   const handleDuplicate = (budget: Budget) => {
     const { id, computedActual, ...newBudget } = budget;
     let nextMonth = addMonths(new Date(budget.month), 1);
-    const existingMonths = budgets.map(b => format(new Date(b.month), 'yyyy-MM'));
-    while(existingMonths.includes(format(nextMonth, 'yyyy-MM'))) {
+    const existingBudgetsForCategory = budgets
+      .filter(b => b.category === budget.category)
+      .map(b => format(new Date(b.month), 'yyyy-MM'));
+    while (existingBudgetsForCategory.includes(format(nextMonth, 'yyyy-MM'))) {
       nextMonth = addMonths(nextMonth, 1);
     }
     setEditingBudget({ ...newBudget, month: nextMonth.getTime() });
@@ -145,14 +147,14 @@ export function BudgetsPage() {
               <CardDescription>Planificado vs. Gasto real para el mes seleccionado.</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(val))}>
+              <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(`${val}-02`))}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Seleccionar mes" />
                 </SelectTrigger>
                 <SelectContent>
                   {uniqueMonths.map(monthKey => (
                     <SelectItem key={monthKey} value={monthKey}>
-                      {format(new Date(monthKey), 'MMMM yyyy', { locale: es })}
+                      {format(new Date(`${monthKey}-02`), 'MMMM yyyy', { locale: es })}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -167,13 +169,14 @@ export function BudgetsPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
                   <XAxis dataKey="name" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} 
-                    cursor={{ fill: 'hsl(var(--muted))' }} 
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                    cursor={{ fill: 'hsl(var(--muted))' }}
                     formatter={(value: number, name, props) => {
+                      const safeName = String(name);
                       const { payload } = props;
                       const status = payload.actual > payload.limit ? `(${t('budget.over')})` : `(${t('budget.under')})`;
-                      return [formatCurrency(value), `${name.charAt(0).toUpperCase() + name.slice(1)} ${status}`];
+                      return [formatCurrency(value), `${safeName.charAt(0).toUpperCase() + safeName.slice(1)} ${status}`];
                     }}
                   />
                   <Legend />

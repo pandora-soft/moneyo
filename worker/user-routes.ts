@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
-import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity } from "./entities";
+import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity } from "./entities";
 import { ok, bad, notFound, isStr } from './core-utils';
 import type { Account, Transaction, Budget, Settings, Currency, TransactionType } from "@shared/types";
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
@@ -10,6 +10,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
       AccountEntity.ensureSeed(c.env),
       LedgerEntity.ensureSeed(c.env),
       BudgetEntity.ensureSeed(c.env),
+      CategoryEntity.ensureSeed(c.env),
     ]);
     await next();
   });
@@ -177,6 +178,40 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const deleted = await BudgetEntity.delete(c.env, id);
     if (!deleted) return notFound(c, 'Budget not found');
     return ok(c, { id, deleted: true });
+  });
+  // CATEGORIES API
+  finance.get('/categories', async (c) => {
+    const { items } = await CategoryEntity.list(c.env);
+    return ok(c, items.sort((a, b) => a.name.localeCompare(b.name)));
+  });
+  finance.post('/categories', async (c) => {
+    const { name } = await c.req.json<{name: string}>();
+    if (!isStr(name) || name.length < 2) return bad(c, 'Nombre requerido (mín. 2 chars)');
+    const { items } = await CategoryEntity.list(c.env);
+    const existing = items.find(cat => cat.name.toLowerCase() === name.toLowerCase());
+    if (existing) return bad(c, 'Categoría ya existe');
+    const newCat = { id: crypto.randomUUID(), name: name.trim() };
+    await CategoryEntity.create(c.env, newCat);
+    return ok(c, newCat);
+  });
+  finance.put('/categories/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'ID inválido');
+    const { name } = await c.req.json<{name: string}>();
+    if (!isStr(name) || name.length < 2) return bad(c, 'Nombre requerido');
+    const cat = new CategoryEntity(c.env, id);
+    if (!await cat.exists()) return notFound(c);
+    const { items } = await CategoryEntity.list(c.env);
+    const others = items.filter(c => c.id !== id);
+    if (others.some(o => o.name.toLowerCase() === name.toLowerCase())) return bad(c, 'Nombre ya en uso');
+    const updated = await cat.mutate(c => ({ ...c, name: name.trim() }));
+    return ok(c, updated);
+  });
+  finance.delete('/categories/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'ID inválido');
+    const deleted = await CategoryEntity.delete(c.env, id);
+    return deleted ? ok(c, { id, deleted: true }) : notFound(c);
   });
   // SETTINGS API
   finance.get('/settings', async (c) => {

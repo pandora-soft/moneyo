@@ -42,23 +42,35 @@ const translations = {
     over: 'Sobre Límite',
     duplicate: 'Duplicar',
   },
+  settings: {
+    categories: {
+      title: 'Categorías',
+      add: 'Agregar Categoría',
+      edit: 'Editar Categoría',
+      delete: 'Eliminar Categoría',
+      description: 'Gestiona categorías para transacciones y presupuestos.',
+    },
+  },
 } as const;
 type TranslationKey =
   | `common.${keyof typeof translations.common}`
   | `pages.${keyof typeof translations.pages}`
   | `finance.${keyof typeof translations.finance}`
   | `labels.${keyof typeof translations.labels}`
-  | `budget.${keyof typeof translations.budget}`;
+  | `budget.${keyof typeof translations.budget}`
+  | `settings.categories.${keyof typeof translations.settings.categories}`;
 // A simple t function for demonstration. In a real app, this would be more robust.
-const t = (key: TranslationKey): string => {
+const t = (key: TranslationKey, fallback?: string): string => {
   const parts = key.split('.');
-  const namespace = parts[0] as keyof typeof translations;
-  const subkey = parts[1] as any;
-  const dict = translations[namespace];
-  if (dict && subkey in dict) {
-    return dict[subkey as keyof typeof dict];
+  let current: any = translations;
+  for (const part of parts) {
+    if (current && typeof current === 'object' && part in current) {
+      current = current[part];
+    } else {
+      return fallback || key;
+    }
   }
-  return key;
+  return typeof current === 'string' ? current : fallback || key;
 };
 export const useTranslations = () => {
   // In a real app, this would be connected to a context provider.

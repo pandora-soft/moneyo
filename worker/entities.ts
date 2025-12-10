@@ -54,8 +54,8 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
       for (const template of recurrentTemplates) {
         let nextDate = new Date(template.ts);
         while (isBefore(nextDate, today)) {
-          const nextDueDate = template.frequency === 'weekly' 
-            ? addWeeks(nextDate, 1) 
+          const nextDueDate = template.frequency === 'weekly'
+            ? addWeeks(nextDate, 1)
             : addMonths(nextDate, 1);
           if (isBefore(nextDueDate, today)) {
             const alreadyGenerated = transactions.some(t => t.parentId === template.id && t.ts === nextDueDate.getTime());
@@ -132,6 +132,18 @@ export class BudgetEntity extends IndexedEntity<Budget> {
   static readonly indexName = "budgets";
   static readonly initialState: Budget = { id: "", month: 0, category: "", limit: 0 };
   static seedData = [];
+}
+export class CategoryEntity extends IndexedEntity<{id: string, name: string}> {
+  static readonly entityName = "category";
+  static readonly indexName = "categories";
+  static readonly initialState = { id: "", name: "" };
+  static seedData = [
+    {id: 'cat_food', name: 'Comida'},
+    {id: 'cat_transport', name: 'Transporte'},
+    {id: 'cat_rent', name: 'Alquiler'},
+    {id: 'cat_salary', name: 'Salario'},
+    {id: 'cat_other', name: 'Otro'}
+  ];
 }
 export class SettingsEntity extends Entity<Settings> {
   static readonly entityName = "settings";

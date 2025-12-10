@@ -1,3 +1,4 @@
+"use client"
 import * as React from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -15,7 +16,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { useCategoryColor } from "@/hooks/useCategoryColor"
 interface ComboboxProps {
   options: { value: string; label: string }[];
   value: string;
@@ -23,26 +23,6 @@ interface ComboboxProps {
   placeholder?: string;
   disabled?: boolean;
 }
-
-const ComboboxItem = ({ option, value, onSelect }: { option: { value: string; label: string }, value: string, onSelect: (currentValue: string) => void }) => {
-  const colorClass = useCategoryColor(option.value);
-  return (
-    <CommandItem
-      value={option.value}
-      onSelect={onSelect}
-    >
-      <Check
-        className={cn(
-          "mr-2 h-4 w-4",
-          value === option.value ? "opacity-100" : "opacity-0"
-        )}
-      />
-      <div className={cn("mr-2 w-3 h-3 rounded-full opacity-70", colorClass)} aria-hidden="true" />
-      {option.label}
-    </CommandItem>
-  );
-};
-
 export function Combobox({ options, value, onChange, placeholder = "Select an option...", disabled = false }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
   return (
@@ -65,18 +45,25 @@ export function Combobox({ options, value, onChange, placeholder = "Select an op
         <Command>
           <CommandInput placeholder="Buscar o crear..." />
           <CommandList>
-            <CommandEmpty>No se encontró la categoría.</CommandEmpty>
+            <CommandEmpty>No se encontr�� la categoría.</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
-                <ComboboxItem
+                <CommandItem
                   key={option.value}
-                  option={option}
-                  value={value}
+                  value={option.value}
                   onSelect={(currentValue) => {
-                    onChange(currentValue === value ? "" : currentValue);
-                    setOpen(false);
+                    onChange(currentValue === value ? "" : currentValue)
+                    setOpen(false)
                   }}
-                />
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === option.value ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {option.label}
+                </CommandItem>
               ))}
             </CommandGroup>
           </CommandList>

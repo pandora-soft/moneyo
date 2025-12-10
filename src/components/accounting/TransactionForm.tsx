@@ -14,8 +14,10 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Account, Transaction } from '@shared/types';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
+import { api } from '@/lib/api-client';
+import { Combobox } from '@/components/ui/combobox';
 const formSchema = z.object({
   id: z.string().optional(),
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
@@ -61,6 +63,19 @@ interface TransactionFormProps {
 }
 export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues }: TransactionFormProps) {
   const settings = useAppStore((state) => state.settings);
+  const refetchTrigger = useAppStore((state) => state.refetchData);
+  const [categories, setCategories] = useState<{ value: string; label: string }[]>([]);
+  useEffect(() => {
+    api<{ id: string; name: string }[]>('/api/finance/categories')
+      .then(cats => setCategories(cats.map(c => ({ value: c.name, label: c.name }))))
+      .catch(() => setCategories([
+        { value: 'Comida', label: 'Comida' },
+        { value: 'Transporte', label: 'Transporte' },
+        { value: 'Alquiler', label: 'Alquiler' },
+        { value: 'Salario', label: 'Salario' },
+        { value: 'Otro', label: 'Otro' },
+      ]));
+  }, [refetchTrigger]);
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
@@ -177,9 +192,15 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
           control={form.control}
           name="category"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="flex flex-col">
               <FormLabel>Categoría</FormLabel>
-              <FormControl><Input placeholder="Ej: Supermercado" {...field} disabled={transactionType === 'transfer'} /></FormControl>
+              <Combobox
+                options={categories}
+                value={field.value}
+                onChange={field.onChange}
+                placeholder="Seleccione o escriba una categoría..."
+                disabled={transactionType === 'transfer'}
+              />
               <FormMessage />
             </FormItem>
           )}

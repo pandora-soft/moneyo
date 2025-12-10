@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, easeInOut } from 'framer-motion';
 import { PlusCircle, Repeat, PiggyBank } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,8 +19,8 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import t from '@/lib/i18n';
 const motionVariants = {
-  enter: { opacity: 1, height: 'auto', transition: { duration: 0.3, ease: 'easeInOut' } },
-  exit: { opacity: 0, height: 0, transition: { duration: 0.2, ease: 'easeInOut' } },
+  enter: { opacity: 1, height: 'auto', transition: { duration: 0.3, ease: easeInOut } },
+  exit: { opacity: 0, height: 0, transition: { duration: 0.2, ease: easeInOut } },
 };
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -200,7 +200,7 @@ export function AccountsPage() {
       </Sheet>
       <AlertDialog open={isAlertOpen} onOpenChange={setAlertOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Est��s seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente y se ajustará el balance de presupuestos relacionados.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>��Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente y se ajustará el balance de presupuestos relacionados.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
