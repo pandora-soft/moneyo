@@ -59,7 +59,7 @@ export function AccountsPage() {
     const currentMonthBudgets = budgets.filter(b => getMonth(new Date(b.month)) === getMonth(currentMonthStart) && getYear(new Date(b.month)) === getYear(currentMonthStart));
     return accounts.map(account => {
       const accountTransactions = transactions.filter(tx => tx.accountId === account.id);
-      const recurrentCount = accountTransactions.filter(tx => tx.recurrent || tx.parentId).length;
+      const recurrentCount = accountTransactions.filter(tx => tx.recurrent).length;
       const spendingByCategory = accountTransactions
         .filter(tx => tx.type === 'expense' && new Date(tx.ts) >= currentMonthStart)
         .reduce((acc, tx) => {
@@ -108,6 +108,8 @@ export function AccountsPage() {
       fetchData();
     } catch (error) {
       toast.error('Error al guardar la cuenta.');
+    } finally {
+      setSheetOpen(false);
     }
   };
   return (

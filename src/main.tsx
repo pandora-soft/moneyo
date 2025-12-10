@@ -43,7 +43,7 @@ const GlobalTransactionSheet = () => {
         .catch(() => toast.error('No se pudieron cargar las cuentas.'));
     }
   }, [isModalOpen]);
-  const handleFormSubmit = async (values: Omit<Transaction, 'currency'> & { id?: string }) => {
+  const handleFormSubmit = async (values: Partial<Transaction> & { id?: string }) => {
     try {
       const method = values.id ? 'PUT' : 'POST';
       const url = values.id ? `/api/finance/transactions/${values.id}` : '/api/finance/transactions';
@@ -82,8 +82,8 @@ export const AppRoot = () => (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
           <NavLink to="/" className="flex items-center gap-2 font-display text-lg font-semibold">
-            <PiggyBank className="size-6 text-orange-500" />
-            CasaConta
+            <Wallet className="size-6 text-orange-500" />
+            Moneyo
           </NavLink>
           <nav className="hidden md:flex items-center gap-4">
             {navItems.map(item => (
@@ -111,7 +111,7 @@ export const AppRoot = () => (
     <Toaster richColors position="top-right" />
     <footer className="border-t">
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-        Built with ❤️ at Cloudflare
+        Built with ❤️ at Cloudflare for Moneyo
       </div>
     </footer>
   </div>
@@ -131,10 +131,13 @@ const router = createBrowserRouter([
     ],
   },
 ]);
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <RouterProvider router={router} />
-    </ErrorBoundary>
-  </StrictMode>,
-);
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  createRoot(rootElement).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <RouterProvider router={router} />
+      </ErrorBoundary>
+    </StrictMode>,
+  );
+}

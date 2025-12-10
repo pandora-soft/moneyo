@@ -24,7 +24,10 @@ const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
-  amount: z.number().positive("El monto debe ser positivo."),
+  amount: z.preprocess(
+    (val) => (String(val).trim() === '' ? NaN : Number(val)),
+    z.number().positive("El monto debe ser positivo.")
+  ),
   category: z.string().min(2, "La categoría es requerida.").max(50),
   ts: z.date(),
   note: z.string().max(100).optional(),
@@ -83,18 +86,18 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       type: 'expense',
       accountId: '',
       accountToId: '',
-      amount: 0,
+      amount: undefined,
       category: '',
       ts: new Date(defaultValues?.ts || Date.now()),
       note: '',
-      recurrent: false,
-      frequency: settings.recurrentDefaultFrequency ?? 'monthly',
+      recurrent: defaultValues?.recurrent ?? false,
+      frequency: defaultValues?.frequency ?? settings.recurrentDefaultFrequency,
       ...defaultValues,
     }
   });
   const { isSubmitting } = form.formState;
   const transactionType = form.watch('type');
-  const isRecurrent = form.watch('recurrent') ?? false;
+  const isRecurrent = form.watch('recurrent');
   useEffect(() => {
     if (transactionType === 'transfer') {
       form.setValue('category', 'Transferencia');
@@ -125,16 +128,11 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6">
-        <FormField
-          control={form.control}
-          name="type"
-          render={({ field }) => (
+        <FormField control={form.control} name="type" render={({ field }) => (
             <FormItem>
               <FormLabel>Tipo</FormLabel>
               <Select value={field.value ?? ''} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                </FormControl>
+                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                 <SelectContent>
                   <SelectItem value="expense">Gasto</SelectItem>
                   <SelectItem value="income">Ingreso</SelectItem>
@@ -143,57 +141,37 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
               </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="accountId"
-          render={({ field }) => (
+        )} />
+        <FormField control={form.control} name="accountId" render={({ field }) => (
             <FormItem>
               <FormLabel>{transactionType === 'transfer' ? 'Cuenta de Origen' : 'Cuenta'}</FormLabel>
               <Select value={field.value ?? ''} onValueChange={field.onChange}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
-                <SelectContent>
-                  {accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
+        )} />
         {transactionType === 'transfer' && (
-          <FormField
-            control={form.control}
-            name="accountToId"
-            render={({ field }) => (
+          <FormField control={form.control} name="accountToId" render={({ field }) => (
               <FormItem>
                 <FormLabel>Cuenta de Destino</FormLabel>
                 <Select value={field.value ?? ''} onValueChange={field.onChange}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
+          )} />
         )}
-        <FormField
-          control={form.control}
-          name="amount"
-          render={({ field }) => (
+        <FormField control={form.control} name="amount" render={({ field }) => (
             <FormItem>
               <FormLabel>Monto</FormLabel>
-              <FormControl><Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(Number(e.target.value))} /></FormControl>
+              <FormControl><Input type="number" placeholder="0.00" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="category"
-          render={({ field }) => (
+        )} />
+        <FormField control={form.control} name="category" render={({ field }) => (
             <FormItem className="flex flex-col">
               <FormLabel>Categoría</FormLabel>
               <Combobox
@@ -205,12 +183,8 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
               />
               <FormMessage />
             </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="ts"
-          render={({ field }) => (
+        )} />
+        <FormField control={form.control} name="ts" render={({ field }) => (
             <FormItem className="flex flex-col">
               <FormLabel>Fecha</FormLabel>
               <Popover>
@@ -228,54 +202,33 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
               </Popover>
               <FormMessage />
             </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="note"
-          render={({ field }) => (
+        )} />
+        <FormField control={form.control} name="note" render={({ field }) => (
             <FormItem>
               <FormLabel>Nota (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Detalles adicionales..." {...field} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles adicionales..." {...field} value={field.value ?? ''} /></FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
+        )} />
         {transactionType !== 'transfer' && (
             <>
-                <FormField
-                    control={form.control}
-                    name="recurrent"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                            <div className="space-y-0.5">
-                                <FormLabel>Transacción Recurrente</FormLabel>
-                            </div>
-                            <FormControl>
-                                <Switch checked={field.value} onCheckedChange={field.onChange} />
-                            </FormControl>
-                        </FormItem>
-                    )}
-                />
+                <FormField control={form.control} name="recurrent" render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5"><FormLabel>Transacción Recurrente</FormLabel></div>
+                        <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                    </FormItem>
+                )} />
                 {isRecurrent && (
-                    <FormField
-                        control={form.control}
-                        name="frequency"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Frecuencia</FormLabel>
-                                <Select value={field.value ?? ''} onValueChange={field.onChange}>
-                                    <FormControl>
-                                        <SelectTrigger><SelectValue placeholder="Seleccione una frecuencia" /></SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                    <FormField control={form.control} name="frequency" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Frecuencia</FormLabel>
+                            <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una frecuencia" /></SelectTrigger></FormControl>
+                                <SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
                 )}
             </>
         )}

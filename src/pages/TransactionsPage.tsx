@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, AlertCircle, Download } from 'lucide-react';
+import { PlusCircle, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,6 +22,7 @@ import t from '@/lib/i18n';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 export function TransactionsPage() {
+  // Hooks must be called at the top level of the component
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +60,7 @@ export function TransactionsPage() {
   }, [fetchData, refetchTrigger]);
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
-      if (isRecurrentView && !tx.recurrent && !tx.parentId) {
+      if (isRecurrentView && !tx.recurrent) {
         return false;
       }
       const queryMatch = filters.query.length > 1 ?
@@ -129,11 +130,11 @@ export function TransactionsPage() {
         } else {
             toast.info('No hay nuevas transacciones recurrentes para generar.');
         }
+        fetchData();
     } catch (e: any) {
         toast.error(e.message || 'Error al generar transacciones recurrentes.');
     } finally {
         setIsGenerating(false);
-        fetchData();
     }
   };
   const exportCSV = () => {
@@ -148,7 +149,7 @@ export function TransactionsPage() {
         `"${format(new Date(tx.ts), 'dd/MM/yyyy')}"`,
         `"${account?.name || ''}"`,
         `"${tx.type}"`,
-        `"${tx.amount}"`, // Raw amount for easier processing in spreadsheets
+        `"${tx.amount}"`,
         `"${tx.category}"`,
         `"${tx.note || ''}"`,
         tx.recurrent || tx.parentId ? 'Sí' : 'No'
@@ -159,7 +160,7 @@ export function TransactionsPage() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.href = url;
-    link.download = `transacciones-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.download = `moneyo-transacciones-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -305,7 +306,7 @@ export function TransactionsPage() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent aria-describedby={deleteDescriptionId}>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogTitle>¿Est��s seguro?</AlertDialogTitle>
             <AlertDialogDescription id={deleteDescriptionId}>
               Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta. Si es una plantilla recurrente, se eliminarán también todas las transacciones generadas.
             </AlertDialogDescription>

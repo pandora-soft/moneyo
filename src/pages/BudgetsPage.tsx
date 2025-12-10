@@ -122,7 +122,7 @@ export function BudgetsPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `casaconta_presupuestos_${format(filterDate, 'yyyy-MM')}.csv`);
+    link.setAttribute("download", `moneyo_presupuestos_${format(filterDate, 'yyyy-MM')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
