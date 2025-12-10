@@ -10,7 +10,7 @@ import t from '@/lib/i18n';
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const schema = z.object({
   name: z.string().min(2, 'Mínimo 2 caracteres').max(50, 'Máximo 50 caracteres'),
-  interval: z.coerce.number({ invalid_type_error: "Debe ser un número" }).int().min(1, 'Mínimo 1').max(365, 'Máximo 365'),
+  interval: z.coerce.number().int().min(1, 'Mínimo 1').max(365, 'Máximo 365'),
   unit: z.enum(['days', 'weeks', 'months']),
 });
 type FormValues = z.infer<typeof schema>;
@@ -21,10 +21,11 @@ interface Props {
 export function FrequencyForm({ onSubmit, defaultValues }: Props) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onChange',
     defaultValues: {
       name: defaultValues?.name || '',
-      interval: defaultValues?.interval || 1,
-      unit: defaultValues?.unit || 'weeks',
+      interval: defaultValues?.interval ?? 1,
+      unit: defaultValues?.unit ?? 'weeks',
     },
   });
   const { isSubmitting } = form.formState;
@@ -66,7 +67,7 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>{t('settings.frequencies.unit')}</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value || 'weeks'} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccione una unidad" />
@@ -83,7 +84,7 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
           )}
         />
         <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={!form.formState.isValid || isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {defaultValues?.name ? 'Actualizar' : 'Crear'}
           </Button>

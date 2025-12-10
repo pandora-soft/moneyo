@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, AlertCircle } from 'lucide-react';
+import { PlusCircle, ArrowUpDown, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, AlertCircle, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -136,8 +136,39 @@ export function TransactionsPage() {
         fetchData();
     }
   };
+  const exportCSV = () => {
+    if (filteredTransactions.length === 0) {
+      toast.warning('No hay transacciones para exportar.');
+      return;
+    }
+    const headers = 'Fecha,Cuenta,Tipo,Monto,Categoría,Nota,Recurrente\n';
+    const csv = filteredTransactions.map(tx => {
+      const account = accountsById.get(tx.accountId);
+      const row = [
+        `"${format(new Date(tx.ts), 'dd/MM/yyyy')}"`,
+        `"${account?.name || ''}"`,
+        `"${tx.type}"`,
+        `"${tx.amount}"`, // Raw amount for easier processing in spreadsheets
+        `"${tx.category}"`,
+        `"${tx.note || ''}"`,
+        tx.recurrent || tx.parentId ? 'Sí' : 'No'
+      ];
+      return row.join(',');
+    }).join('\n');
+    const blob = new Blob([headers + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = `transacciones-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('CSV exportado correctamente.');
+  };
   const accountIcons = { cash: <Banknote className="size-4 text-muted-foreground" />, bank: <Landmark className="size-4 text-muted-foreground" />, credit_card: <CreditCard className="size-4 text-muted-foreground" /> };
   const isDefaultFilter = filters.query === '' && filters.accountId === 'all' && filters.type === 'all' && !filters.dateRange;
+  const deleteDescriptionId = 'delete-transaction-description';
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -160,12 +191,15 @@ export function TransactionsPage() {
                 Mostrando {filteredTransactions.length} de {transactions.length} transacciones.
             </p>
             <div className="flex items-center space-x-2">
+                <Button variant="outline" onClick={exportCSV} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> Exportar CSV</Button>
                 <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating}>
                     {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />}
                     Generar Todas
                 </Button>
-                <Switch id="recurrent-view" checked={isRecurrentView} onCheckedChange={setIsRecurrentView} />
-                <Label htmlFor="recurrent-view">Ver solo recurrentes</Label>
+                <div className="flex items-center space-x-2">
+                  <Switch id="recurrent-view" checked={isRecurrentView} onCheckedChange={setIsRecurrentView} />
+                  <Label htmlFor="recurrent-view">Ver solo recurrentes</Label>
+                </div>
             </div>
         </div>
         <Card>
@@ -255,7 +289,7 @@ export function TransactionsPage() {
                                 <TableRow key={i}>
                                     {Object.entries(row).filter(([k]) => k !== 'isDateValid').map(([key, val], j) => <TableCell key={j}>{val as string}</TableCell>)}
                                     <TableCell>
-                                        {!row.isDateValid && <Badge variant="destructive">Fecha Inv��lida</Badge>}
+                                        {!row.isDateValid && <Badge variant="destructive">Fecha Inválida</Badge>}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -269,10 +303,10 @@ export function TransactionsPage() {
         </SheetContent>
       </Sheet>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent aria-describedby="delete-transaction-description">
+        <AlertDialogContent aria-describedby={deleteDescriptionId}>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-            <AlertDialogDescription id="delete-transaction-description">
+            <AlertDialogDescription id={deleteDescriptionId}>
               Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta. Si es una plantilla recurrente, se eliminarán también todas las transacciones generadas.
             </AlertDialogDescription>
           </AlertDialogHeader>

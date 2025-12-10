@@ -94,7 +94,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   });
   const { isSubmitting } = form.formState;
   const transactionType = form.watch('type');
-  const isRecurrent = form.watch('recurrent') || false;
+  const isRecurrent = form.watch('recurrent') ?? false;
   useEffect(() => {
     if (transactionType === 'transfer') {
       form.setValue('category', 'Transferencia');
@@ -115,7 +115,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       ts: values.ts.getTime(),
       note: values.note,
       accountTo: values.accountToId,
-      recurrent: values.recurrent,
+      recurrent: values.recurrent ?? false,
       frequency: values.recurrent ? values.frequency : undefined,
       currency: accountFound?.currency,
     };
