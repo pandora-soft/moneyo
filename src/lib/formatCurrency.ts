@@ -2,8 +2,8 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useCallback } from 'react';
 export function formatCurrency(value: number, currencyCode?: string): string {
   const state = useAppStore.getState();
-  const effectiveCurrencyCode = currencyCode || state.currency || 'USD';
-  const currencyInfo = state.currencies[effectiveCurrencyCode] || { symbol: '$', suffix: false };
+  const effectiveCurrencyCode = currencyCode || state.currency || 'EUR';
+  const currencyInfo = state.currencies[effectiveCurrencyCode] || { symbol: '€', suffix: true };
   const { symbol, suffix } = currencyInfo;
   const formatter = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,

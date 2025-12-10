@@ -37,15 +37,15 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
     api<Currency[]>('/api/finance/currencies')
       .then(setCurrencies)
       .catch(() => setCurrencies([
-        { id: 'usd', code: 'USD', symbol: '$', suffix: false },
         { id: 'eur', code: 'EUR', symbol: '€', suffix: true },
+        { id: 'usd', code: 'USD', symbol: '$', suffix: false },
         { id: 'ars', code: 'ARS', symbol: '$', suffix: false },
       ]));
   }, []);
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
-      currency: 'USD',
+      currency: 'EUR',
       balance: 0,
       ...defaultValues,
     },
@@ -55,6 +55,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
     const payload: Omit<Account, 'id' | 'createdAt'> = {
       ...values,
       balance: values.balance ?? 0,
+      currency: values.currency || 'EUR',
     };
     await onSubmit(payload);
     onFinished();

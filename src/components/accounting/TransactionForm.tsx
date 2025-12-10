@@ -24,10 +24,7 @@ const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
-  amount: z.preprocess(
-    (val) => (String(val).trim() === '' ? NaN : Number(val)),
-    z.number().positive("El monto debe ser un número positivo.")
-  ),
+  amount: z.number().positive("El monto debe ser un número positivo."),
   category: z.string().min(2, "La categoría es requerida.").max(50),
   ts: z.date(),
   note: z.string().max(100).optional(),
@@ -86,7 +83,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       type: 'expense',
       accountId: '',
       accountToId: '',
-      amount: defaultValues?.amount ?? undefined,
+      amount: defaultValues?.amount ?? 0,
       category: '',
       ts: new Date(defaultValues?.ts || Date.now()),
       note: '',
@@ -120,7 +117,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       accountTo: values.accountToId,
       recurrent: values.recurrent ?? false,
       frequency: values.recurrent ? values.frequency : undefined,
-      currency: accountFound?.currency,
+      currency: accountFound?.currency || 'EUR',
     };
     await onSubmit(finalValues);
     onFinished();
@@ -167,7 +164,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         <FormField control={form.control} name="amount" render={({ field }) => (
             <FormItem>
               <FormLabel>Monto</FormLabel>
-              <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.value)} /></FormControl>
+              <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))} /></FormControl>
               <FormMessage />
             </FormItem>
         )} />

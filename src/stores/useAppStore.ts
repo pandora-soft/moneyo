@@ -27,15 +27,20 @@ export const useAppStore = create<AppState>()(
       openModal: (initialValues = {}) => set({ isModalOpen: true, modalInitialValues: initialValues }),
       closeModal: () => set({ isModalOpen: false, modalInitialValues: {} }),
       // App State
-      currency: 'USD',
+      currency: 'EUR',
       settings: {},
       currencies: {
-        USD: { symbol: '$', suffix: false },
         EUR: { symbol: '€', suffix: true },
+        USD: { symbol: '$', suffix: false },
         ARS: { symbol: '$', suffix: false },
       },
       setCurrency: (currency) => set({ currency }),
-      setSettings: (settings) => set((state) => ({ settings: { ...state.settings, ...settings } })),
+      setSettings: (settings) => set((state) => {
+        if (settings.currency && state.currency !== settings.currency) {
+          return { settings: { ...state.settings, ...settings }, currency: settings.currency };
+        }
+        return { settings: { ...state.settings, ...settings } };
+      }),
       setCurrencies: (currencies) => {
         const currencyMap = currencies.reduce((acc, cur) => {
           acc[cur.code] = { symbol: cur.symbol, suffix: cur.suffix };

@@ -5,7 +5,7 @@ import { addDays, addMonths, addWeeks, isBefore, startOfToday } from 'date-fns';
 export class AccountEntity extends IndexedEntity<Account> {
   static readonly entityName = "account";
   static readonly indexName = "accounts";
-  static readonly initialState: Account = { id: "", name: "", type: 'bank', currency: 'USD', balance: 0, createdAt: 0 };
+  static readonly initialState: Account = { id: "", name: "", type: 'bank', currency: 'EUR', balance: 0, createdAt: 0 };
   static seedData = MOCK_ACCOUNTS;
 }
 export type LedgerState = {
@@ -183,7 +183,7 @@ export class CurrencyEntity extends IndexedEntity<Currency> {
 }
 export class SettingsEntity extends Entity<Settings> {
   static readonly entityName = "settings";
-  static readonly initialState: Settings = { currency: 'USD', fiscalMonthStart: 1, recurrentDefaultFrequency: 'monthly' };
+  static readonly initialState: Settings = { currency: 'EUR', fiscalMonthStart: 1, recurrentDefaultFrequency: 'monthly' };
   constructor(env: Env) {
     super(env, "global");
   }
