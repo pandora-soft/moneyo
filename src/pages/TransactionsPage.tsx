@@ -22,7 +22,6 @@ import t from '@/lib/i18n';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 export function TransactionsPage() {
-  // Hooks must be called at the top level of the component
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,11 +194,11 @@ export function TransactionsPage() {
                 <Button variant="outline" onClick={exportCSV} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> Exportar CSV</Button>
                 <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating}>
                     {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />}
-                    Generar Todas
+                    {t('common.generateAll')}
                 </Button>
                 <div className="flex items-center space-x-2">
                   <Switch id="recurrent-view" checked={isRecurrentView} onCheckedChange={setIsRecurrentView} />
-                  <Label htmlFor="recurrent-view">Ver solo recurrentes</Label>
+                  <Label htmlFor="recurrent-view">{t('transactions.recurrent.view')}</Label>
                 </div>
             </div>
         </div>
@@ -290,7 +289,7 @@ export function TransactionsPage() {
                                 <TableRow key={i}>
                                     {Object.entries(row).filter(([k]) => k !== 'isDateValid').map(([key, val], j) => <TableCell key={j}>{val as string}</TableCell>)}
                                     <TableCell>
-                                        {!row.isDateValid && <Badge variant="destructive">Fecha Inválida</Badge>}
+                                        {!row.isDateValid && <Badge variant="destructive">Fecha Inv��lida</Badge>}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -306,7 +305,7 @@ export function TransactionsPage() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent aria-describedby={deleteDescriptionId}>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Est��s seguro?</AlertDialogTitle>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription id={deleteDescriptionId}>
               Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta. Si es una plantilla recurrente, se eliminarán también todas las transacciones generadas.
             </AlertDialogDescription>

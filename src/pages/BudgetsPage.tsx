@@ -109,7 +109,7 @@ export function BudgetsPage() {
     while (existingBudgetsForCategory.includes(format(nextMonth, 'yyyy-MM'))) {
       nextMonth = addMonths(nextMonth, 1);
     }
-    setEditingBudget({ ...newBudget, month: nextMonth.getTime() });
+    setEditingBudget({ ...newBudget, month: nextMonth.getTime(), computedActual: undefined });
     setSheetOpen(true);
   };
   const exportFilteredBudgets = () => {
@@ -122,7 +122,7 @@ export function BudgetsPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `moneyo-presupuestos-${format(filterDate, 'yyyy-MM')}.csv`);
+    link.setAttribute("download", `moneyo_presupuestos_${format(filterDate, 'yyyy-MM')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -146,14 +146,14 @@ export function BudgetsPage() {
               <CardDescription>Planificado vs. Gasto real para el mes seleccionado.</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(`${val}-01T00:00:00`))}>
+              <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(`${val}-01T12:00:00Z`))}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Seleccionar mes" />
                 </SelectTrigger>
                 <SelectContent>
                   {uniqueMonths.map(monthKey => (
                     <SelectItem key={monthKey} value={monthKey}>
-                      {format(new Date(`${monthKey}-01T00:00:00`), 'MMMM yyyy', { locale: es })}
+                      {format(new Date(`${monthKey}-01T12:00:00Z`), 'MMMM yyyy', { locale: es })}
                     </SelectItem>
                   ))}
                 </SelectContent>

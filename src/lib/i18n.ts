@@ -1,5 +1,8 @@
 import { useCallback } from 'react';
 const translations = {
+  app: {
+    name: 'Moneyo',
+  },
   common: {
     add: 'Agregar',
     edit: 'Editar',
@@ -10,6 +13,7 @@ const translations = {
     emptyAccounts: 'No hay cuentas. ¡Crea tu primera!',
     noMatches: 'No hay coincidencias. Intenta ajustar los filtros.',
     exportBudgets: 'Exportar Presupuestos',
+    generateAll: 'Generar Todas',
     days: 'días',
     weeks: 'semanas',
     months: 'meses',
@@ -45,6 +49,11 @@ const translations = {
     over: 'Sobre Límite',
     duplicate: 'Duplicar',
   },
+  transactions: {
+    recurrent: {
+      view: 'Ver solo recurrentes',
+    }
+  },
   settings: {
     categories: {
       title: 'Categorías',
@@ -70,17 +79,19 @@ const translations = {
         edit: 'Editar Frecuencia',
         delete: 'Eliminar Frecuencia',
         name: 'Nombre (ej. Quincenal)',
-        interval: 'Intervalo (n��mero)',
+        interval: 'Intervalo (número)',
         unit: 'Unidad (días/semanas/meses)',
     }
   },
 } as const;
 type TranslationKey =
+  | `app.${keyof typeof translations.app}`
   | `common.${keyof typeof translations.common}`
   | `pages.${keyof typeof translations.pages}`
   | `finance.${keyof typeof translations.finance}`
   | `labels.${keyof typeof translations.labels}`
   | `budget.${keyof typeof translations.budget}`
+  | `transactions.recurrent.${keyof typeof translations.transactions.recurrent}`
   | `settings.categories.${keyof typeof translations.settings.categories}`
   | `settings.currencies.${keyof typeof translations.settings.currencies}`
   | `settings.frequencies.${keyof typeof translations.settings.frequencies}`;

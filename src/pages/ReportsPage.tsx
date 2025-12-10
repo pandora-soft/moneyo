@@ -125,7 +125,7 @@ export function ReportsPage() {
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", `moneyo-reporte-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        link.setAttribute("download", `moneyo_reporte_${format(new Date(), 'yyyy-MM-dd')}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

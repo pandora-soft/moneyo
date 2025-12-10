@@ -92,7 +92,7 @@ export function HomePage() {
             ) : (
               <>
                 <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Balance Total</CardTitle><Wallet className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(totalBalance)}</div><p className="text-xs text-muted-foreground">En todas tus cuentas</p></CardContent></Card></motion.div>
-                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Ingresos (Últ. 30 días)</CardTitle><TrendingUp className="h-4 w-4 text-emerald-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-500">{formatCurrency(totalIncome)}</div><p className="text-xs text-muted-foreground">Flujo de entrada</p></CardContent></Card></motion.div>
+                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Ingresos (Últ. 30 d��as)</CardTitle><TrendingUp className="h-4 w-4 text-emerald-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-500">{formatCurrency(totalIncome)}</div><p className="text-xs text-muted-foreground">Flujo de entrada</p></CardContent></Card></motion.div>
                 <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Gastos (Últ. 30 días)</CardTitle><TrendingDown className="h-4 w-4 text-red-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-red-500">{formatCurrency(totalExpenses)}</div><p className="text-xs text-muted-foreground">Flujo de salida</p></CardContent></Card></motion.div>
               </>
             )}
@@ -105,7 +105,7 @@ export function HomePage() {
                   Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)
                 ) : accounts.length > 0 ? (
                   accounts.map(acc => (
-                    <motion.div key={acc.id} variants={cardVariants}>
+                    <motion.div key={acc.id} variants={cardVariants} whileHover={{ y: -2, scale: 1.01 }}>
                       <Card className="hover:bg-muted/50 transition-colors">
                         <CardContent className="p-4 flex justify-between items-center">
                           <div><p className="font-semibold">{acc.name}</p><p className="text-sm text-muted-foreground">{formatCurrency(acc.balance, acc.currency)}</p></div>
@@ -118,9 +118,12 @@ export function HomePage() {
                   <motion.div variants={cardVariants} className="text-center p-6 border-2 border-dashed rounded-lg">
                     <Wallet className="mx-auto size-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-semibold">{t('common.emptyAccounts')}</h3>
-                    <Button asChild size="sm" className="mt-4">
-                      <Link to="/accounts">Crear Cuenta</Link>
-                    </Button>
+                    <p className="text-sm text-muted-foreground mt-1">¡Comienza a controlar tus finanzas hoy!</p>
+                    <motion.div whileHover={{ scale: 1.05 }}>
+                      <Button asChild size="sm" className="mt-4">
+                        <Link to="/accounts">Crear Cuenta</Link>
+                      </Button>
+                    </motion.div>
                   </motion.div>
                 )}
               </motion.div>

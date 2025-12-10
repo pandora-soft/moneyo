@@ -143,39 +143,45 @@ export function AccountsPage() {
                       <AccordionItem value="transactions">
                         <AccordionTrigger>Últimos Movimientos</AccordionTrigger>
                         <AccordionContent asChild>
-                          <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants}>
-                            {account.transactions.slice(0, 3).map(tx => (
-                              <div key={tx.id} className="flex justify-between items-center text-sm py-1">
-                                <span>{tx.category}</span>
-                                <span className={tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'}>{tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, account.currency)}</span>
-                              </div>
-                            ))}
-                            {account.transactions.length === 0 && <p className="text-sm text-muted-foreground">Sin movimientos.</p>}
-                          </motion.div>
+                          <AnimatePresence>
+                            <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants}>
+                              {account.transactions.slice(0, 3).map(tx => (
+                                <div key={tx.id} className="flex justify-between items-center text-sm py-1">
+                                  <span>{tx.category}</span>
+                                  <span className={tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'}>{tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, account.currency)}</span>
+                                </div>
+                              ))}
+                              {account.transactions.length === 0 && <p className="text-sm text-muted-foreground">Sin movimientos.</p>}
+                            </motion.div>
+                          </AnimatePresence>
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="recurrent">
                         <AccordionTrigger>Recurrentes</AccordionTrigger>
                         <AccordionContent asChild>
-                          <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants}>
-                            <Badge variant="outline"><Repeat className="mr-2 size-4" /> {account.recurrentCount} activas</Badge>
-                          </motion.div>
+                          <AnimatePresence>
+                            <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants}>
+                              <Badge variant="outline"><Repeat className="mr-2 size-4" /> {account.recurrentCount} activas</Badge>
+                            </motion.div>
+                          </AnimatePresence>
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="budgets">
                         <AccordionTrigger>Presupuestos (Este Mes)</AccordionTrigger>
                         <AccordionContent asChild>
-                          <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants} className="space-y-2">
-                            {account.relevantBudgets.length > 0 ? account.relevantBudgets.map(b => (
-                              <div key={b.id} className="text-sm">
-                                <div className="flex justify-between items-center">
-                                  <span>{b.category}</span>
-                                  <span className={cn(b.actual > b.limit && 'text-destructive')}>{formatCurrency(b.actual)} / {formatCurrency(b.limit)}</span>
+                          <AnimatePresence>
+                            <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants} className="space-y-2">
+                              {account.relevantBudgets.length > 0 ? account.relevantBudgets.map(b => (
+                                <div key={b.id} className="text-sm">
+                                  <div className="flex justify-between items-center">
+                                    <span>{b.category}</span>
+                                    <span className={cn(b.actual > b.limit && 'text-destructive')}>{formatCurrency(b.actual)} / {formatCurrency(b.limit)}</span>
+                                  </div>
+                                  <Progress value={(b.actual / b.limit) * 100} className={cn('h-1 mt-1', b.actual > b.limit && '[&>div]:bg-destructive')} />
                                 </div>
-                                <Progress value={(b.actual / b.limit) * 100} className={cn('h-1 mt-1', b.actual > b.limit && '[&>div]:bg-destructive')} />
-                              </div>
-                            )) : <p className="text-sm text-muted-foreground">Sin gastos contra presupuestos este mes.</p>}
-                          </motion.div>
+                              )) : <p className="text-sm text-muted-foreground">Sin gastos contra presupuestos este mes.</p>}
+                            </motion.div>
+                          </AnimatePresence>
                         </AccordionContent>
                       </AccordionItem>
                     </Accordion>
