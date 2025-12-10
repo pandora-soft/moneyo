@@ -24,15 +24,7 @@ const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
-  amount: z.preprocess(
-    (val: unknown) => {
-      if (val === null || val === undefined) return 0;
-      const strVal = String(val).trim();
-      if (strVal === '') return 0;
-      return Number(strVal);
-    },
-    z.number().positive("El monto debe ser positivo.")
-  ),
+  amount: z.coerce.number().positive("El monto debe ser positivo."),
   category: z.string().min(2, "La categoría es requerida.").max(50),
   ts: z.date(),
   note: z.string().max(100).optional(),
@@ -86,26 +78,28 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   }, [refetchTrigger]);
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(formSchema),
+    mode: 'onChange',
     defaultValues: {
       type: 'expense',
       accountId: '',
       accountToId: '',
       amount: 0,
       category: '',
-      ts: new Date(),
+      ts: new Date(defaultValues?.ts || Date.now()),
       note: '',
       recurrent: false,
-      frequency: String(settings.recurrentDefaultFrequency || 'Mensual'),
+      frequency: settings.recurrentDefaultFrequency as 'monthly' | 'weekly' || 'monthly',
       ...defaultValues,
     }
   });
   const { isSubmitting } = form.formState;
   const transactionType = form.watch('type');
-  const isRecurrent = form.watch('recurrent');
+  const isRecurrent = form.watch('recurrent') || false;
   useEffect(() => {
     if (transactionType === 'transfer') {
       form.setValue('category', 'Transferencia');
       form.setValue('recurrent', false);
+      form.setValue('frequency', undefined);
     } else if (form.getValues('category') === 'Transferencia') {
       form.setValue('category', '');
     }
@@ -205,7 +199,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
               <Combobox
                 options={categories}
                 value={field.value}
-                onChange={field.onChange}
+                onChange={(value) => field.onChange(value || '')}
                 placeholder="Seleccione o escriba una categoría..."
                 disabled={transactionType === 'transfer'}
               />
@@ -275,7 +269,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
                                         <SelectTrigger><SelectValue placeholder="Seleccione una frecuencia" /></SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        {frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name} (Cada {f.interval} {f.unit})</SelectItem>)}
+                                        {frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -286,7 +280,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
             </>
         )}
         <div className="flex justify-end pt-4 sticky bottom-0 z-10">
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" variant="default" disabled={!form.formState.isValid || isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {defaultValues?.id ? 'Actualizar Transacción' : 'Guardar Transacción'}
           </Button>

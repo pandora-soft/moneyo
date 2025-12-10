@@ -27,10 +27,7 @@ type Category = { id: string; name: string };
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const settingsSchema = z.object({
   currency: z.string().min(1, "Debe seleccionar una moneda."),
-  fiscalMonthStart: z.preprocess(
-    (val: unknown) => Number(val),
-    z.number().int().min(1, "Mínimo 1").max(28, "Máximo 28")
-  ),
+  fiscalMonthStart: z.coerce.number().int().min(1, "Mínimo 1").max(28, "Máximo 28"),
   recurrentDefaultFrequency: z.string().min(1, "Debe seleccionar una frecuencia."),
 });
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -38,11 +35,18 @@ const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 },
 };
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
 export function SettingsPage() {
   const { isDark } = useTheme();
-  const { setCurrency, setSettings, triggerRefetch, setCurrencies: setStoreCurrencies } = useAppStore.getState();
+  const { setSettings, triggerRefetch, setCurrencies: setStoreCurrencies } = useAppStore.getState();
   const form = useForm<SettingsFormValues>({
-    resolver: zodResolver(settingsSchema) as any,
+    resolver: zodResolver(settingsSchema),
   });
   const { isSubmitting, isDirty } = form.formState;
   const [loading, setLoading] = useState(true);
@@ -91,7 +95,7 @@ export function SettingsPage() {
       });
       toast.success('Ajustes guardados correctamente.');
       form.reset(updatedSettings);
-      setCurrency(updatedSettings.currency);
+      useAppStore.getState().setCurrency(updatedSettings.currency);
       setSettings(updatedSettings);
       triggerRefetch();
     } catch (error) {
@@ -192,9 +196,14 @@ export function SettingsPage() {
           <h1 className="text-4xl font-display font-bold">{t('pages.settings')}</h1>
           <p className="text-muted-foreground mt-1">Configura tus preferencias de la aplicación.</p>
         </header>
-        <div className="grid gap-8 md:grid-cols-2">
+        <motion.div
+          className="grid gap-8 md:grid-cols-2"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
           <div className="space-y-8">
-            <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>
+            <motion.div variants={cardVariants}>
               <Card>
                 <CardHeader><CardTitle>Visual</CardTitle><CardDescription>Personaliza la apariencia de CasaConta.</CardDescription></CardHeader>
                 <CardContent>
@@ -210,7 +219,7 @@ export function SettingsPage() {
                 </CardContent>
               </Card>
             </motion.div>
-            <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
+            <motion.div variants={cardVariants}>
               {loading ? (
                 <Card>
                   <CardHeader><CardTitle>Finanzas</CardTitle><CardDescription>Ajustes relacionados con la moneda y fechas.</CardDescription></CardHeader>
@@ -238,7 +247,7 @@ export function SettingsPage() {
                 </Form>
               )}
             </motion.div>
-            <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.5 }}>
+            <motion.div variants={cardVariants}>
               <Card>
                 <CardHeader><CardTitle>{t('settings.frequencies.title')}</CardTitle><CardDescription>{t('settings.frequencies.description')}</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
@@ -263,7 +272,7 @@ export function SettingsPage() {
             </motion.div>
           </div>
           <div className="space-y-8">
-            <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.3 }}>
+            <motion.div variants={cardVariants}>
               <Card>
                 <CardHeader><CardTitle>{t('settings.categories.title')}</CardTitle><CardDescription>{t('settings.categories.description')}</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
@@ -286,7 +295,7 @@ export function SettingsPage() {
                 </CardContent>
               </Card>
             </motion.div>
-            <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.4 }}>
+            <motion.div variants={cardVariants}>
               <Card>
                 <CardHeader><CardTitle>{t('settings.currencies.title')}</CardTitle><CardDescription>{t('settings.currencies.description')}</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
@@ -310,7 +319,7 @@ export function SettingsPage() {
               </Card>
             </motion.div>
           </div>
-        </div>
+        </motion.div>
       </div>
       <Sheet open={isCategorySheetOpen} onOpenChange={setCategorySheetOpen}>
         <SheetContent aria-describedby="category-sheet-desc">

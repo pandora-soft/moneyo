@@ -7,17 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import t from '@/lib/i18n';
+type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const schema = z.object({
   name: z.string().min(2, 'Mínimo 2 caracteres').max(50, 'Máximo 50 caracteres'),
-  interval: z.preprocess(
-    (val) => Number(String(val).trim()),
-    z.number().int().min(1, 'Mínimo 1').max(365, 'Máximo 365')
-  ),
+  interval: z.coerce.number({ invalid_type_error: "Debe ser un número" }).int().min(1, 'Mínimo 1').max(365, 'Máximo 365'),
   unit: z.enum(['days', 'weeks', 'months']),
 });
 type FormValues = z.infer<typeof schema>;
 interface Props {
-  onSubmit: (values: FormValues) => Promise<void>;
+  onSubmit: (values: Omit<Frequency, 'id'>) => Promise<void>;
   defaultValues?: Partial<FormValues>;
 }
 export function FrequencyForm({ onSubmit, defaultValues }: Props) {
@@ -56,7 +54,7 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
             <FormItem>
               <FormLabel>{t('settings.frequencies.interval')}</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="15" {...field} />
+                <Input type="number" placeholder="15" {...field} step="1" min="1" max="365" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -68,7 +66,7 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>{t('settings.frequencies.unit')}</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccione una unidad" />
