@@ -24,7 +24,7 @@ const formSchema = z.object({
   accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
-  amount: z.coerce.number().positive("El monto debe ser positivo."),
+  amount: z.number().positive("El monto debe ser positivo."),
   category: z.string().min(2, "La categoría es requerida.").max(50),
   ts: z.date(),
   note: z.string().max(100).optional(),
@@ -88,7 +88,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       ts: new Date(defaultValues?.ts || Date.now()),
       note: '',
       recurrent: false,
-      frequency: settings.recurrentDefaultFrequency as 'monthly' | 'weekly' || 'monthly',
+      frequency: settings.recurrentDefaultFrequency ?? 'monthly',
       ...defaultValues,
     }
   });
@@ -185,7 +185,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Monto</FormLabel>
-              <FormControl><Input type="number" placeholder="0.00" {...field} /></FormControl>
+              <FormControl><Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(Number(e.target.value))} /></FormControl>
               <FormMessage />
             </FormItem>
           )}

@@ -27,7 +27,7 @@ type Category = { id: string; name: string };
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const settingsSchema = z.object({
   currency: z.string().min(1, "Debe seleccionar una moneda."),
-  fiscalMonthStart: z.coerce.number().int().min(1, "Mínimo 1").max(28, "Máximo 28"),
+  fiscalMonthStart: z.number().int().min(1, "Mínimo 1").max(28, "Máximo 28").optional(),
   recurrentDefaultFrequency: z.string().min(1, "Debe seleccionar una frecuencia."),
 });
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -71,7 +71,10 @@ export function SettingsPage() {
         api<Currency[]>('/api/finance/currencies'),
         api<Frequency[]>('/api/finance/frequencies'),
       ]);
-      form.reset(settings);
+      form.reset({
+        ...settings,
+        fiscalMonthStart: settings.fiscalMonthStart ?? 1,
+      });
       setSettings(settings);
       setCategories(cats);
       setCurrencies(currs);
@@ -106,7 +109,7 @@ export function SettingsPage() {
     try {
       if (editingCategory) {
         await api(`/api/finance/categories/${editingCategory.id}`, { method: 'PUT', body: JSON.stringify(values) });
-        toast.success('Categoría actualizada.');
+        toast.success('Categor��a actualizada.');
       } else {
         await api('/api/finance/categories', { method: 'POST', body: JSON.stringify(values) });
         toast.success('Categoría creada.');
@@ -232,9 +235,9 @@ export function SettingsPage() {
                     <Card>
                       <CardHeader><CardTitle>Finanzas</CardTitle><CardDescription>Ajustes relacionados con la moneda y fechas.</CardDescription></CardHeader>
                       <CardContent className="space-y-6">
-                        <FormField control={form.control} name="currency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('finance.mainCurrency')}</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar moneda" /></SelectTrigger></FormControl><SelectContent>{currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Inicio del Mes Fiscal</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={field.value ? String(field.value) : undefined}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Frecuencia Recurrente</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="currency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('finance.mainCurrency')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar moneda" /></SelectTrigger></FormControl><SelectContent>{currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Inicio del Mes Fiscal</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value) || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Frecuencia Recurrente</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                       </CardContent>
                       <div className="flex justify-end p-6 border-t">
                         <Button type="submit" disabled={isSubmitting || !isDirty}>

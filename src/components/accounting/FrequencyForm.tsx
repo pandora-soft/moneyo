@@ -10,8 +10,8 @@ import t from '@/lib/i18n';
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const schema = z.object({
   name: z.string().min(2, 'Mínimo 2 caracteres').max(50, 'Máximo 50 caracteres'),
-  interval: z.coerce.number().int().min(1, 'Mínimo 1').max(365, 'Máximo 365'),
-  unit: z.enum(['days', 'weeks', 'months']),
+  interval: z.number().int().min(1, 'Mínimo 1').max(365, 'Máximo 365').optional(),
+  unit: z.enum(['days', 'weeks', 'months']).optional(),
 });
 type FormValues = z.infer<typeof schema>;
 interface Props {
@@ -30,7 +30,12 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
   });
   const { isSubmitting } = form.formState;
   const handleSubmit: SubmitHandler<FormValues> = async (values) => {
-    await onSubmit(values);
+    const payload: Omit<Frequency, 'id'> = {
+      name: values.name.trim(),
+      interval: values.interval ?? 1,
+      unit: values.unit ?? 'weeks',
+    };
+    await onSubmit(payload);
   };
   return (
     <Form {...form}>
@@ -55,7 +60,12 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
             <FormItem>
               <FormLabel>{t('settings.frequencies.interval')}</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="15" {...field} step="1" min="1" max="365" />
+                <Input
+                  type="number"
+                  placeholder="15"
+                  {...field}
+                  onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -67,14 +77,14 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>{t('settings.frequencies.unit')}</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value || 'weeks'} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value || 'weeks'}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccione una unidad" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="days">Días</SelectItem>
+                  <SelectItem value="days">D��as</SelectItem>
                   <SelectItem value="weeks">Semanas</SelectItem>
                   <SelectItem value="months">Meses</SelectItem>
                 </SelectContent>
