@@ -7,16 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import type { Account, AccountType, Currency } from '@shared/types';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api-client';
 const formSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres.").max(50),
   type: z.enum(['cash', 'bank', 'credit_card']),
-  currency: z.enum(['USD', 'EUR', 'ARS']),
+  currency: z.string().min(1, "Debe seleccionar una moneda."),
   balance: z.preprocess(
     (val: unknown) => (val === '' || val === undefined ? 0 : Number(val)),
     z.number().default(0)
   ),
 }).refine((data) => {
-  // Allow negative balances only for credit_card accounts
   if (data.type === 'credit_card') return true;
   return data.balance >= 0;
 }, {
@@ -31,6 +32,16 @@ interface AccountFormProps {
   isEditing?: boolean;
 }
 export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = false }: AccountFormProps) {
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  useEffect(() => {
+    api<Currency[]>('/api/finance/currencies')
+      .then(setCurrencies)
+      .catch(() => setCurrencies([
+        { id: 'usd', code: 'USD', symbol: '$', suffix: false },
+        { id: 'eur', code: 'EUR', symbol: '€', suffix: true },
+        { id: 'ars', code: 'ARS', symbol: '$', suffix: false },
+      ]));
+  }, []);
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
@@ -99,9 +110,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="USD">USD - Dólar Americano</SelectItem>
-                  <SelectItem value="EUR">EUR - Euro</SelectItem>
-                  <SelectItem value="ARS">ARS - Peso Argentino</SelectItem>
+                  {currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}
                 </SelectContent>
               </Select>
               <FormMessage />

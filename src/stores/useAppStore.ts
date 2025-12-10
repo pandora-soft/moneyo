@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Transaction, Currency, Settings } from '@shared/types';
+import type { Transaction, Settings, Currency } from '@shared/types';
+export type CurrencyMap = { [code: string]: { symbol: string; suffix: boolean } };
 export type ModalState = {
   isModalOpen: boolean;
   modalInitialValues: Partial<Transaction>;
@@ -8,11 +9,13 @@ export type ModalState = {
   closeModal: () => void;
 };
 export type AppState = ModalState & {
-  currency: Currency;
+  currency: string; // code
   settings: Partial<Settings>;
-  setCurrency: (currency: Currency) => void;
+  currencies: CurrencyMap;
+  setCurrency: (currency: string) => void;
   setSettings: (settings: Partial<Settings>) => void;
-  refetchData: () => void; // Dummy function to trigger refetches
+  setCurrencies: (currencies: Currency[]) => void;
+  refetchData: number;
   triggerRefetch: () => void;
 };
 export const useAppStore = create<AppState>()(
@@ -26,16 +29,28 @@ export const useAppStore = create<AppState>()(
       // App State
       currency: 'USD',
       settings: {},
+      currencies: {
+        USD: { symbol: '$', suffix: false },
+        EUR: { symbol: '€', suffix: true },
+        ARS: { symbol: '$', suffix: false },
+      },
       setCurrency: (currency) => set({ currency }),
       setSettings: (settings) => set((state) => ({ settings: { ...state.settings, ...settings } })),
+      setCurrencies: (currencies) => {
+        const currencyMap = currencies.reduce((acc, cur) => {
+          acc[cur.code] = { symbol: cur.symbol, suffix: cur.suffix };
+          return acc;
+        }, {} as CurrencyMap);
+        set({ currencies: currencyMap });
+      },
       // Refetch trigger
-      refetchData: () => {}, // Initial no-op
-      triggerRefetch: () => set(state => ({ refetchData: () => {} })), // This will change identity and trigger effects
+      refetchData: 0,
+      triggerRefetch: () => set(state => ({ refetchData: state.refetchData + 1 })),
     }),
     {
       name: 'casaconta-app-storage',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ currency: state.currency, settings: state.settings }),
+      partialize: (state) => ({ currency: state.currency, settings: state.settings, currencies: state.currencies }),
     }
   )
 );

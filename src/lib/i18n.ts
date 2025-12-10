@@ -50,6 +50,16 @@ const translations = {
       delete: 'Eliminar Categoría',
       description: 'Gestiona categorías para transacciones y presupuestos.',
     },
+    currencies: {
+        title: 'Monedas',
+        description: 'Gestiona las monedas para tus cuentas.',
+        add: 'Agregar Moneda',
+        edit: 'Editar Moneda',
+        delete: 'Eliminar Moneda',
+        code: 'Código (ej. USD)',
+        symbol: 'Símbolo (ej. $)',
+        suffix: 'Símbolo al final (ej. 100 €)',
+    }
   },
 } as const;
 type TranslationKey =
@@ -58,7 +68,8 @@ type TranslationKey =
   | `finance.${keyof typeof translations.finance}`
   | `labels.${keyof typeof translations.labels}`
   | `budget.${keyof typeof translations.budget}`
-  | `settings.categories.${keyof typeof translations.settings.categories}`;
+  | `settings.categories.${keyof typeof translations.settings.categories}`
+  | `settings.currencies.${keyof typeof translations.settings.currencies}`;
 // A simple t function for demonstration. In a real app, this would be more robust.
 const t = (key: TranslationKey, fallback?: string): string => {
   const parts = key.split('.');

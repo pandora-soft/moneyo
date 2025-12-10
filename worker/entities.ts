@@ -1,5 +1,5 @@
 import { IndexedEntity, Entity, Env } from "./core-utils";
-import type { Account, Transaction, Budget, Settings } from "@shared/types";
+import type { Account, Transaction, Budget, Settings, Currency } from "@shared/types";
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@shared/mock-data";
 import { addMonths, addWeeks, isBefore, startOfToday } from 'date-fns';
 export class AccountEntity extends IndexedEntity<Account> {
@@ -144,6 +144,16 @@ export class CategoryEntity extends IndexedEntity<{id: string, name: string}> {
     {id: 'cat_salary', name: 'Salario'},
     {id: 'cat_other', name: 'Otro'}
   ];
+}
+export class CurrencyEntity extends IndexedEntity<Currency> {
+    static readonly entityName = "currency";
+    static readonly indexName = "currencies";
+    static readonly initialState: Currency = { id: "", code: "", symbol: "", suffix: false };
+    static seedData = [
+        { id: 'usd', code: 'USD', symbol: '$', suffix: false },
+        { id: 'eur', code: 'EUR', symbol: '€', suffix: true },
+        { id: 'ars', code: 'ARS', symbol: '$', suffix: false },
+    ];
 }
 export class SettingsEntity extends Entity<Settings> {
   static readonly entityName = "settings";

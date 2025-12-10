@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -8,9 +8,9 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import t from '@/lib/i18n';
 const schema = z.object({
-  code: z.string().min(3, t('form.minChars', 3)).max(5, t('form.maxChars', 5)).transform(v => v.toUpperCase()),
-  symbol: z.string().min(1, t('form.required')).max(5, t('form.maxChars', 5)),
-  suffix: z.boolean().optional(),
+  code: z.string().min(3, 'Mínimo 3 caracteres').max(5, 'Máximo 5 caracteres').transform(v => v.toUpperCase()),
+  symbol: z.string().min(1, 'Requerido').max(5, 'Máximo 5 caracteres'),
+  suffix: z.boolean().default(false),
 });
 type FormValues = z.infer<typeof schema>;
 interface Props {
@@ -20,14 +20,10 @@ interface Props {
 export function CurrencyForm({ onSubmit, defaultValues }: Props) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      code: defaultValues?.code || '',
-      symbol: defaultValues?.symbol || '',
-      suffix: defaultValues?.suffix ?? false,
-    },
+    defaultValues: defaultValues || { code: '', symbol: '', suffix: false },
   });
   const { isSubmitting } = form.formState;
-  const handleSubmit: SubmitHandler<FormValues> = async (values) => {
+  const handleSubmit = async (values: FormValues) => {
     await onSubmit(values);
   };
   return (
@@ -76,7 +72,7 @@ export function CurrencyForm({ onSubmit, defaultValues }: Props) {
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {defaultValues?.code ? t('common.save') : t('common.add')}
+            {defaultValues?.code ? 'Actualizar' : 'Crear'}
           </Button>
         </div>
       </form>

@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, easeInOut } from 'framer-motion';
-import { PlusCircle, Repeat, PiggyBank } from 'lucide-react';
+import { PlusCircle, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountCard } from '@/components/accounting/AccountCard';
 import { api } from '@/lib/api-client';
 import type { Account, Transaction, Budget } from '@shared/types';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { AccountForm } from '@/components/accounting/AccountForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
@@ -193,14 +193,14 @@ export function AccountsPage() {
         )}
       </div>
       <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="sm:max-w-lg w-full p-0">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{selectedAccount ? 'Editar Cuenta' : 'Nueva Cuenta'}</SheetTitle></SheetHeader>
+        <SheetContent className="sm:max-w-lg w-full p-0" aria-describedby="account-sheet-desc">
+          <SheetHeader className="p-6 border-b"><SheetTitle>{selectedAccount ? 'Editar Cuenta' : 'Nueva Cuenta'}</SheetTitle><SheetDescription id="account-sheet-desc">Crea o modifica los detalles de tu cuenta.</SheetDescription></SheetHeader>
           <AccountForm onSubmit={handleFormSubmit} onFinished={() => setSheetOpen(false)} defaultValues={selectedAccount || {}} isEditing={!!selectedAccount} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={isAlertOpen} onOpenChange={setAlertOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>��Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente y se ajustará el balance de presupuestos relacionados.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente y se ajustará el balance de presupuestos relacionados.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

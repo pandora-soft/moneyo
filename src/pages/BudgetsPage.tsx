@@ -9,7 +9,7 @@ import { format, getMonth, getYear, startOfMonth, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreVertical, Pencil, Trash2, Copy, Download } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
@@ -233,8 +233,8 @@ export function BudgetsPage() {
         )}
       </div>
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) { setSheetOpen(false); setEditingBudget(null); } else { setSheetOpen(true); } }}>
-        <SheetContent className="sm:max-w-lg w-full p-0">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingBudget?.id ? 'Editar' : 'Nuevo'} Presupuesto</SheetTitle></SheetHeader>
+        <SheetContent className="sm:max-w-lg w-full p-0" aria-describedby="budget-sheet-desc">
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingBudget?.id ? 'Editar' : 'Nuevo'} Presupuesto</SheetTitle><SheetDescription id="budget-sheet-desc">Define un límite de gasto para una categoría en un mes específico.</SheetDescription></SheetHeader>
           <BudgetForm
             categories={uniqueCategories}
             onSubmit={handleFormSubmit}

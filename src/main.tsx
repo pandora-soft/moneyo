@@ -48,7 +48,7 @@ const GlobalTransactionSheet = () => {
       const method = values.id ? 'PUT' : 'POST';
       const url = values.id ? `/api/finance/transactions/${values.id}` : '/api/finance/transactions';
       await api(url, { method, body: JSON.stringify(values) });
-      toast.success(values.id ? 'Transacci��n actualizada.' : 'Transacción creada.');
+      toast.success(values.id ? 'Transacción actualizada.' : 'Transacción creada.');
       useAppStore.getState().triggerRefetch(); // Trigger global refetch
       closeModal();
     } catch (e) {
@@ -57,7 +57,7 @@ const GlobalTransactionSheet = () => {
   };
   return (
     <Sheet open={isModalOpen} onOpenChange={(open) => !open && closeModal()}>
-      <SheetContent className="sm:max-w-lg w-full p-0">
+      <SheetContent className="sm:max-w-lg w-full p-0" aria-describedby="global-transaction-sheet-desc">
         <SheetHeader className="p-6 border-b">
           <SheetTitle>{modalInitialValues?.id ? 'Editar Transacción' : 'Nueva Transacción'}</SheetTitle>
           <SheetDescription id="global-transaction-sheet-desc">

@@ -6,13 +6,18 @@ export interface ApiResponse<T = unknown> {
 // CasaConta specific types
 export type AccountType = 'cash' | 'bank' | 'credit_card';
 export type TransactionType = 'expense' | 'income' | 'transfer';
-export type Currency = 'USD' | 'EUR' | 'ARS';
 export type BudgetCategory = 'food' | 'transport' | 'rent' | 'salary' | 'other';
+export interface Currency {
+  id: string;
+  code: string;
+  symbol: string;
+  suffix: boolean;
+}
 export interface Account {
   id: string;
   name: string;
   type: AccountType;
-  currency: Currency;
+  currency: string; // Currency code, e.g., 'USD'
   balance: number;
   createdAt: number;
 }
@@ -22,7 +27,7 @@ export interface Transaction {
   accountTo?: string; // For transfers
   type: TransactionType;
   amount: number; // Can be positive or negative
-  currency: Currency;
+  currency: string; // Currency code
   category: string;
   note?: string;
   ts: number; // epoch millis
@@ -38,7 +43,7 @@ export interface Budget {
   computedActual?: number; // Optional field for frontend-computed values
 }
 export interface Settings {
-  currency: Currency;
+  currency: string; // Currency code
   fiscalMonthStart: number; // Day of the month (1-28)
   recurrentDefaultFrequency: 'monthly' | 'weekly';
 }

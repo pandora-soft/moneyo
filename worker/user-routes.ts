@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
-import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity } from "./entities";
+import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity, CurrencyEntity } from "./entities";
 import { ok, bad, notFound, isStr } from './core-utils';
-import type { Account, Transaction, Budget, Settings, Currency, TransactionType } from "@shared/types";
+import type { Account, Transaction, Budget, Settings, TransactionType, Currency } from "@shared/types";
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
   const finance = new Hono<{ Bindings: Env }>();
   finance.use('*', async (c, next) => {
@@ -11,6 +11,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
       LedgerEntity.ensureSeed(c.env),
       BudgetEntity.ensureSeed(c.env),
       CategoryEntity.ensureSeed(c.env),
+      CurrencyEntity.ensureSeed(c.env),
     ]);
     await next();
   });
@@ -55,7 +56,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     return ok(c, page);
   });
   finance.post('/transactions', async (c) => {
-    const body = await c.req.json<Omit<Transaction, 'id' | 'currency'> & { currency?: Currency }>();
+    const body = await c.req.json<Omit<Transaction, 'id'>>();
     if (!isStr(body.accountId) || !body.amount || !isStr(body.category)) {
       return bad(c, 'accountId, amount, and category are required');
     }
@@ -211,6 +212,50 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'ID inválido');
     const deleted = await CategoryEntity.delete(c.env, id);
+    return deleted ? ok(c, { id, deleted: true }) : notFound(c);
+  });
+  // CURRENCIES API
+  finance.get('/currencies', async (c) => {
+    const { items } = await CurrencyEntity.list(c.env);
+    return ok(c, items.sort((a, b) => a.code.localeCompare(b.code)));
+  });
+  finance.post('/currencies', async (c) => {
+    const { code, symbol, suffix } = await c.req.json<{code: string, symbol: string, suffix: boolean}>();
+    if (!isStr(code) || !isStr(symbol)) return bad(c, 'Código y símbolo requeridos');
+    const trimmed = { code: code.trim().toUpperCase(), symbol: symbol.trim(), suffix: !!suffix };
+    const { items } = await CurrencyEntity.list(c.env);
+    if (items.some(cur => cur.code === trimmed.code || cur.symbol === trimmed.symbol)) return bad(c, 'Código o símbolo ya existe');
+    const newCur = { id: crypto.randomUUID(), ...trimmed };
+    await CurrencyEntity.create(c.env, newCur);
+    return ok(c, newCur);
+  });
+  finance.put('/currencies/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'ID inválido');
+    const { code, symbol, suffix } = await c.req.json<{code?: string, symbol?: string, suffix?: boolean}>();
+    if (!code && !symbol && suffix === undefined) return bad(c, 'Al menos un campo requerido');
+    const cur = new CurrencyEntity(c.env, id);
+    if (!await cur.exists()) return notFound(c);
+    const { items } = await CurrencyEntity.list(c.env);
+    const updates: Partial<Currency> = {};
+    if (code) {
+      const trimmedCode = code.trim().toUpperCase();
+      if (items.some(o => o.id !== id && o.code === trimmedCode)) return bad(c, 'Código ya en uso');
+      updates.code = trimmedCode;
+    }
+    if (symbol !== undefined) {
+      const trimmedSymbol = symbol.trim();
+      if (items.some(o => o.id !== id && o.symbol === trimmedSymbol)) return bad(c, 'Símbolo ya en uso');
+      updates.symbol = trimmedSymbol;
+    }
+    if (suffix !== undefined) updates.suffix = !!suffix;
+    const updated = await cur.mutate(cu => ({ ...cu, ...updates }));
+    return ok(c, updated);
+  });
+  finance.delete('/currencies/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isStr(id)) return bad(c, 'ID inválido');
+    const deleted = await CurrencyEntity.delete(c.env, id);
     return deleted ? ok(c, { id, deleted: true }) : notFound(c);
   });
   // SETTINGS API
