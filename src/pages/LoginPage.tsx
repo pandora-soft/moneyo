@@ -12,6 +12,7 @@ import { Loader2, Wallet } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import t from '@/lib/i18n';
 import { useAppStore } from '@/stores/useAppStore';
+import type { User } from '@shared/types';
 const loginSchema = z.object({
   username: z.string().min(1, 'El nombre de usuario es requerido.'),
   password: z.string().min(1, 'La contraseña es requerida.'),
@@ -27,7 +28,7 @@ export default function LoginPage() {
   const { isSubmitting } = form.formState;
   const onSubmit: SubmitHandler<LoginFormValues> = async (values) => {
     try {
-      const { token, user } = await api<{ token: string; user: { id: string; username: string; role: 'admin' | 'user' } }>('/api/auth/login', {
+      const { token, user } = await api<{ token: string; user: Omit<User, 'passwordHash'> }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(values),
       });

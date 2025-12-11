@@ -42,12 +42,6 @@ export interface Budget {
   limit: number;
   computedActual?: number; // Optional field for frontend-computed values
 }
-export interface Settings {
-  currency: string; // Currency code
-  fiscalMonthStart: number; // Day of the month (1-28)
-  recurrentDefaultFrequency: string;
-}
-export type SettingsUpdate = Partial<Settings>;
 // Auth types
 export interface User {
   id: string;
@@ -57,6 +51,13 @@ export interface User {
   email?: string;
 }
 export type SessionToken = string;
+export interface Settings {
+  currency: string; // Currency code
+  fiscalMonthStart: number; // Day of the month (1-28)
+  recurrentDefaultFrequency: string;
+  user?: Omit<User, 'passwordHash'>;
+}
+export type SettingsUpdate = Partial<Settings>;
 // Demo types from template (can be removed later)
 export interface Chat {
   id: string;

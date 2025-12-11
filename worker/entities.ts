@@ -1,9 +1,9 @@
-import { IndexedEntity, Entity, Env } from "./core-utils";
+import { IndexedEntity, Entity, Env, Index } from "./core-utils";
 import type { Account, Transaction, Budget, Settings, Currency, User } from "@shared/types";
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@shared/mock-data";
 import { addDays, addMonths, addWeeks, isBefore, startOfToday } from 'date-fns';
 // --- UTILITY FUNCTIONS FOR HASHING ---
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   return btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
@@ -19,7 +19,7 @@ export class UserEntity extends IndexedEntity<User> {
   static readonly initialState: User = { id: "", username: "", passwordHash: "", role: 'user' };
   static seedData = [];
   static async ensureSeed(env: Env): Promise<void> {
-    const idx = new (this.indexClass())(env, this.indexName);
+    const idx = new Index<string>(env, this.indexName);
     const ids = await idx.list();
     if (ids.length === 0) {
       const adminPasswordHash = await hashPassword('admin');

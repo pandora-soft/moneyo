@@ -22,9 +22,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CategoryForm } from '@/components/accounting/CategoryForm';
 import { CurrencyForm } from '@/components/accounting/CurrencyForm';
 import { FrequencyForm } from '@/components/accounting/FrequencyForm';
+import { UserForm } from '@/components/accounting/UserForm';
 import { Badge } from '@/components/ui/badge';
 type Category = { id: string; name: string };
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
+type SafeUser = Omit<User, 'passwordHash'>;
 const settingsSchema = z.object({
   currency: z.string().min(1, "Debe seleccionar una moneda."),
   fiscalMonthStart: z.number().int().min(1, "Mínimo 1").max(28, "Máximo 28").optional(),
@@ -45,7 +47,7 @@ const containerVariants: Variants = {
 export function SettingsPage() {
   const { isDark } = useTheme();
   const { setSettings, triggerRefetch, setCurrencies: setStoreCurrencies } = useAppStore.getState();
-  const currentUser = useAppStore(s => s.settings.user) as User | undefined;
+  const currentUser = useAppStore(s => s.settings.user);
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
   });
@@ -54,29 +56,32 @@ export function SettingsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [frequencies, setFrequencies] = useState<Frequency[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<SafeUser[]>([]);
   const [isCategorySheetOpen, setCategorySheetOpen] = useState(false);
   const [isCurrencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [isFrequencySheetOpen, setFrequencySheetOpen] = useState(false);
+  const [isUserSheetOpen, setUserSheetOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingCurrency, setEditingCurrency] = useState<Currency | null>(null);
   const [editingFrequency, setEditingFrequency] = useState<Frequency | null>(null);
+  const [editingUser, setEditingUser] = useState<SafeUser | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [deletingCurrency, setDeletingCurrency] = useState<Currency | null>(null);
   const [deletingFrequency, setDeletingFrequency] = useState<Frequency | null>(null);
+  const [deletingUser, setDeletingUser] = useState<SafeUser | null>(null);
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      const promises = [
+      const [settings, cats, currs, freqs] = await Promise.all([
         api<Settings>('/api/finance/settings'),
         api<Category[]>('/api/finance/categories'),
         api<Currency[]>('/api/finance/currencies'),
         api<Frequency[]>('/api/finance/frequencies'),
-      ];
+      ]);
       if (currentUser?.role === 'admin') {
-        promises.push(api<User[]>('/api/finance/users'));
+        const fetchedUsers = await api<SafeUser[]>('/api/finance/users');
+        setUsers(fetchedUsers);
       }
-      const [settings, cats, currs, freqs, fetchedUsers] = await Promise.all(promises);
       form.reset({
         ...settings,
         fiscalMonthStart: settings.fiscalMonthStart ?? 1,
@@ -86,9 +91,6 @@ export function SettingsPage() {
       setCurrencies(currs);
       setFrequencies(freqs);
       setStoreCurrencies(currs);
-      if (fetchedUsers) {
-        setUsers(fetchedUsers as User[]);
-      }
     } catch (error) {
       toast.error('No se pudieron cargar los datos de configuración.');
       console.error(error);
@@ -199,6 +201,33 @@ export function SettingsPage() {
       triggerRefetch();
     } catch (e: any) {
       toast.error(e.message || 'Error al eliminar la frecuencia.');
+    }
+  };
+  const handleUserSubmit = async (values: Partial<User> & { password?: string }) => {
+    try {
+      if (editingUser) {
+        await api(`/api/finance/users/${editingUser.id}`, { method: 'PUT', body: JSON.stringify(values) });
+        toast.success('Usuario actualizado.');
+      } else {
+        await api('/api/finance/users', { method: 'POST', body: JSON.stringify(values) });
+        toast.success('Usuario creado.');
+      }
+      setUserSheetOpen(false);
+      setEditingUser(null);
+      fetchAllData();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al guardar el usuario.');
+    }
+  };
+  const handleUserDelete = async () => {
+    if (!deletingUser) return;
+    try {
+      await api(`/api/finance/users/${deletingUser.id}`, { method: 'DELETE' });
+      toast.success('Usuario eliminado.');
+      setDeletingUser(null);
+      fetchAllData();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar el usuario.');
     }
   };
   return (
@@ -333,25 +362,24 @@ export function SettingsPage() {
              {currentUser?.role === 'admin' && (
               <motion.div variants={cardVariants}>
                 <Card>
-                  <CardHeader>
-                    <CardTitle>{t('settings.users.title')}</CardTitle>
-                    <CardDescription>{t('settings.users.description')}</CardDescription>
-                  </CardHeader>
+                  <CardHeader><CardTitle>{t('settings.users.title')}</CardTitle><CardDescription>{t('settings.users.description')}</CardDescription></CardHeader>
                   <CardContent className="space-y-4">
                     {loading ? <Skeleton className="h-20 w-full" /> : users.length > 0 ? (
                       <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                         {users.map(user => (
                           <div key={user.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-md">
-                            <div>
-                              <span className="font-medium">{user.username}</span>
-                              <Badge variant="outline" className="ml-2">{user.role}</Badge>
+                            <div><span className="font-medium">{user.username}</span><Badge variant="outline" className="ml-2">{user.role}</Badge></div>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingUser(user); setUserSheetOpen(true); }}><Edit className="h-4 w-4" /></Button>
+                              {user.id !== currentUser.id && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingUser(user)}><Trash2 className="h-4 w-4" /></Button>}
                             </div>
-                            {/* Add edit/delete for users later */}
                           </div>
                         ))}
                       </div>
                     ) : <p className="text-muted-foreground text-sm text-center py-4">No hay otros usuarios.</p>}
-                    {/* Add user button later */}
+                    <Button variant="outline" onClick={() => { setEditingUser(null); setUserSheetOpen(true); }} className="w-full">
+                      <Plus className="mr-2 h-4 w-4" /> {t('settings.users.add')}
+                    </Button>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -393,6 +421,18 @@ export function SettingsPage() {
         <AlertDialogContent aria-describedby="delete-frequency-desc">
           <AlertDialogHeader><AlertDialogTitle>Eliminar Frecuencia</AlertDialogTitle><AlertDialogDescription id="delete-frequency-desc">¿Estás seguro de que quieres eliminar la frecuencia '{deletingFrequency?.name}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleFrequencyDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <Sheet open={isUserSheetOpen} onOpenChange={setUserSheetOpen}>
+        <SheetContent aria-describedby="user-sheet-desc">
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingUser ? t('settings.users.edit') : t('settings.users.add')}</SheetTitle><SheetDescription id="user-sheet-desc">Gestiona los detalles y permisos del usuario.</SheetDescription></SheetHeader>
+          <UserForm onSubmit={handleUserSubmit} defaultValues={editingUser || {}} isEditing={!!editingUser} />
+        </SheetContent>
+      </Sheet>
+      <AlertDialog open={!!deletingUser} onOpenChange={() => setDeletingUser(null)}>
+        <AlertDialogContent aria-describedby="delete-user-desc">
+          <AlertDialogHeader><AlertDialogTitle>Eliminar Usuario</AlertDialogTitle><AlertDialogDescription id="delete-user-desc">¿Estás seguro de que quieres eliminar al usuario '{deletingUser?.username}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleUserDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

@@ -2,17 +2,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import t from '@/lib/i18n';
 import type { User } from '@shared/types';
 const userSchema = z.object({
-  username: z.string().min(3, t('form.minChars', 3)).max(20, t('form.maxChars', 20)),
-  password: z.string().optional(),
+  username: z.string().min(3, 'Mínimo 3 caracteres').max(20, 'Máximo 20 caracteres'),
+  password: z.string().min(5, 'Mínimo 5 caracteres').optional().or(z.literal('')),
   role: z.enum(['user', 'admin']),
-  email: z.string().email(t('form.email')).optional().or(z.literal('')),
+  email: z.string().email('Email inválido').optional().or(z.literal('')),
 });
 type UserFormValues = z.infer<typeof userSchema>;
 interface UserFormProps {
@@ -32,21 +32,12 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
   });
   const { isSubmitting } = form.formState;
   const handleSubmit: SubmitHandler<UserFormValues> = async (values) => {
-    // Manual validation logic based on editing state
-    if (!isEditing && (!values.password || values.password.length < 5)) {
-      form.setError('password', { message: t('form.minChars', 5) });
-      return;
-    }
-    if (isEditing && values.password && values.password.length > 0 && values.password.length < 5) {
-      form.setError('password', { message: t('form.minChars', 5) });
-      return;
-    }
     const payload: Partial<User> & { password?: string } = {
-      username: values.username.trim(),
+      username: values.username,
       role: values.role,
-      email: values.email ? values.email.trim() : undefined,
+      email: values.email || undefined,
     };
-    if (values.password && values.password.length >= 5) {
+    if (values.password) {
       payload.password = values.password;
     }
     await onSubmit(payload);
@@ -61,7 +52,7 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
             <FormItem>
               <FormLabel>{t('settings.users.username')}</FormLabel>
               <FormControl>
-                <Input placeholder="usuario123" {...field} />
+                <Input placeholder="juanperez" {...field} disabled={isEditing} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -76,11 +67,6 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
               <FormControl>
                 <Input type="password" placeholder="••••••••" {...field} />
               </FormControl>
-              <FormDescription>
-                {isEditing
-                  ? "Deja en blanco para mantener la contraseña actual (mín. 5 caracteres)."
-                  : "Mínimo 5 caracteres."}
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -90,7 +76,7 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('settings.users.email')}</FormLabel>
+              <FormLabel>Email (Opcional)</FormLabel>
               <FormControl>
                 <Input type="email" placeholder="usuario@ejemplo.com" {...field} />
               </FormControl>
@@ -111,8 +97,8 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="user">{t('settings.users.roleUser')}</SelectItem>
-                  <SelectItem value="admin">{t('settings.users.roleAdmin')}</SelectItem>
+                  <SelectItem value="user">Usuario</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -122,7 +108,7 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? t('common.save') : t('common.add')}
+            {isEditing ? 'Actualizar Usuario' : 'Crear Usuario'}
           </Button>
         </div>
       </form>
