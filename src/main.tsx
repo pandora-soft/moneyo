@@ -3,7 +3,7 @@ import { enableMapSet } from "immer";
 enableMapSet();
 import React, { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider, Outlet, NavLink } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css';
@@ -13,16 +13,19 @@ import { TransactionsPage } from '@/pages/TransactionsPage';
 import { BudgetsPage } from '@/pages/BudgetsPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import LoginPage from '@/pages/LoginPage';
 import { Toaster } from '@/components/ui/sonner';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Home, Wallet, List, BarChart, Settings, PiggyBank } from 'lucide-react';
+import { Home, Wallet, List, BarChart, Settings, PiggyBank, LogOut } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useAppStore } from './stores/useAppStore';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './components/ui/sheet';
 import { TransactionForm } from './components/accounting/TransactionForm';
-import { api } from './lib/api-client';
+import { api, verifyAuth, clearToken } from './lib/api-client';
 import type { Account, Transaction } from '@shared/types';
 import { toast } from 'sonner';
+import { Button } from './components/ui/button';
+import { Skeleton } from './components/ui/skeleton';
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
   { href: '/accounts', label: 'Cuentas', icon: Wallet },
@@ -49,7 +52,7 @@ const GlobalTransactionSheet = () => {
       const url = values.id ? `/api/finance/transactions/${values.id}` : '/api/finance/transactions';
       await api(url, { method, body: JSON.stringify(values) });
       toast.success(values.id ? 'Transacción actualizada.' : 'Transacción creada.');
-      useAppStore.getState().triggerRefetch(); // Trigger global refetch
+      useAppStore.getState().triggerRefetch();
       closeModal();
     } catch (e) {
       toast.error('Error al guardar la transacción.');
@@ -76,50 +79,92 @@ const GlobalTransactionSheet = () => {
     </Sheet>
   );
 };
-export const AppRoot = () => (
-  <div className="min-h-screen bg-background font-sans antialiased">
-    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
-        <div className="flex items-center gap-6">
-          <NavLink to="/" className="flex items-center gap-2 font-display text-lg font-semibold">
-            <Wallet className="size-6 text-orange-500" />
-            Moneyo
-          </NavLink>
-          <nav className="hidden md:flex items-center gap-4">
-            {navItems.map(item => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                className={({ isActive }) => cn(
-                  "flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary",
-                  isActive ? "text-primary" : "text-muted-foreground"
-                )}
-              >
-                <item.icon className="size-4" />
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+const AuthGuard = ({ children }: { children: React.ReactNode }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  useEffect(() => {
+    const check = async () => {
+      const authStatus = await verifyAuth();
+      setIsAuthenticated(authStatus);
+      if (!authStatus) {
+        navigate('/login', { replace: true, state: { from: location } });
+      }
+    };
+    check();
+  }, [navigate, location]);
+  if (isAuthenticated === null) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="space-y-4 w-full max-w-md p-8">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-96 w-full" />
         </div>
-        <ThemeToggle className="relative top-0 right-0" />
       </div>
-    </header>
-    <main>
-      <Outlet />
-    </main>
-    <GlobalTransactionSheet />
-    <Toaster richColors position="top-right" />
-    <footer className="border-t">
-      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-        Built with ❤️ at Cloudflare for Moneyo
-      </div>
-    </footer>
-  </div>
-);
+    );
+  }
+  return isAuthenticated ? <>{children}</> : null;
+};
+export const AppRoot = () => {
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    clearToken();
+    toast.info('Sesión cerrada.');
+    navigate('/login');
+  };
+  return (
+    <div className="min-h-screen bg-background font-sans antialiased">
+      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
+          <div className="flex items-center gap-6">
+            <NavLink to="/" className="flex items-center gap-2 font-display text-lg font-semibold">
+              <Wallet className="size-6 text-orange-500" />
+              Moneyo
+            </NavLink>
+            <nav className="hidden md:flex items-center gap-4">
+              {navItems.map(item => (
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  className={({ isActive }) => cn(
+                    "flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary",
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  )}
+                >
+                  <item.icon className="size-4" />
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handleLogout}><LogOut className="size-4" /></Button>
+            <ThemeToggle className="relative top-0 right-0" />
+          </div>
+        </div>
+      </header>
+      <main>
+        <Outlet />
+      </main>
+      <GlobalTransactionSheet />
+      <Toaster richColors position="top-right" />
+      <footer className="border-t">
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
+          Built with ❤️ at Cloudflare for Moneyo
+        </div>
+      </footer>
+    </div>
+  );
+};
 const router = createBrowserRouter([
   {
+    path: "/login",
+    element: <LoginPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     path: "/",
-    element: <AppRoot />,
+    element: <AuthGuard><AppRoot /></AuthGuard>,
     errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <HomePage /> },
@@ -133,7 +178,7 @@ const router = createBrowserRouter([
 ]);
 const rootElement = document.getElementById('root');
 if (rootElement) {
-  if (!rootElement.innerHTML) { // Ensure we only render once.
+  if (!rootElement.innerHTML) {
     const root = createRoot(rootElement);
     root.render(
       <StrictMode>

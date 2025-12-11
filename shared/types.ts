@@ -32,7 +32,7 @@ export interface Transaction {
   note?: string;
   ts: number; // epoch millis
   recurrent?: boolean;
-  frequency?: 'monthly' | 'weekly';
+  frequency?: string;
   parentId?: string; // To link generated transactions to their recurrent template
 }
 export interface Budget {
@@ -45,14 +45,19 @@ export interface Budget {
 export interface Settings {
   currency: string; // Currency code
   fiscalMonthStart: number; // Day of the month (1-28)
-  recurrentDefaultFrequency: 'monthly' | 'weekly';
+  recurrentDefaultFrequency: string;
 }
 export type SettingsUpdate = Partial<Settings>;
-// Demo types from template (can be removed later)
+// Auth types
 export interface User {
   id: string;
-  name: string;
+  username: string;
+  passwordHash: string;
+  role: 'user' | 'admin';
+  email?: string;
 }
+export type SessionToken = string;
+// Demo types from template (can be removed later)
 export interface Chat {
   id: string;
   title: string;

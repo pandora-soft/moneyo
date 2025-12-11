@@ -1,7 +1,39 @@
 import { IndexedEntity, Entity, Env } from "./core-utils";
-import type { Account, Transaction, Budget, Settings, Currency } from "@shared/types";
+import type { Account, Transaction, Budget, Settings, Currency, User } from "@shared/types";
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@shared/mock-data";
 import { addDays, addMonths, addWeeks, isBefore, startOfToday } from 'date-fns';
+// --- UTILITY FUNCTIONS FOR HASHING ---
+async function hashPassword(password: string): Promise<string> {
+  const data = new TextEncoder().encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+}
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const newHash = await hashPassword(password);
+  return newHash === hash;
+}
+// --- ENTITIES ---
+export class UserEntity extends IndexedEntity<User> {
+  static readonly entityName = "user";
+  static readonly indexName = "users";
+  static readonly initialState: User = { id: "", username: "", passwordHash: "", role: 'user' };
+  static seedData = [];
+  static async ensureSeed(env: Env): Promise<void> {
+    const idx = new (this.indexClass())(env, this.indexName);
+    const ids = await idx.list();
+    if (ids.length === 0) {
+      const adminPasswordHash = await hashPassword('admin');
+      const adminUser: User = {
+        id: crypto.randomUUID(),
+        username: 'admin',
+        passwordHash: adminPasswordHash,
+        role: 'admin',
+        email: 'admin@example.com'
+      };
+      await this.create(env, adminUser);
+    }
+  }
+}
 export class AccountEntity extends IndexedEntity<Account> {
   static readonly entityName = "account";
   static readonly indexName = "accounts";

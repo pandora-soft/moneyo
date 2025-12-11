@@ -1,12 +1,16 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
-import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity, CurrencyEntity, FrequencyEntity } from "./entities";
+import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity, CurrencyEntity, FrequencyEntity, UserEntity, verifyPassword } from "./entities";
 import { ok, bad, notFound, isStr } from './core-utils';
-import type { Account, Transaction, Budget, Settings, TransactionType, Currency } from "@shared/types";
-export function userRoutes(app: Hono<{ Bindings: Env }>) {
-  const finance = new Hono<{ Bindings: Env }>();
-  finance.use('*', async (c, next) => {
+import type { Account, Transaction, Budget, Settings, TransactionType, Currency, User } from "@shared/types";
+// In-memory session store (for this simple example)
+const sessions = new Map<string, { userId: string; expires: number }>();
+const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User } }>) {
+  // --- SEEDING MIDDLEWARE ---
+  app.use('/api/*', async (c, next) => {
     await Promise.all([
+      UserEntity.ensureSeed(c.env),
       AccountEntity.ensureSeed(c.env),
       LedgerEntity.ensureSeed(c.env),
       BudgetEntity.ensureSeed(c.env),
@@ -16,6 +20,50 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     ]);
     await next();
   });
+  // --- AUTH MIDDLEWARE ---
+  const authGuard = async (c: any, next: any) => {
+    const authHeader = c.req.header('Authorization');
+    const token = authHeader?.split(' ')[1];
+    if (!token) return bad(c, 'Unauthorized', 401);
+    const session = sessions.get(token);
+    if (!session || session.expires < Date.now()) {
+      sessions.delete(token);
+      return bad(c, 'Unauthorized', 401);
+    }
+    const user = await new UserEntity(c.env, session.userId).getState();
+    if (!user) return bad(c, 'Unauthorized', 401);
+    c.set('user', user);
+    await next();
+  };
+  const adminGuard = async (c: any, next: any) => {
+    const user = c.get('user');
+    if (user?.role !== 'admin') {
+      return bad(c, 'Forbidden', 403);
+    }
+    await next();
+  };
+  // --- AUTH ROUTES ---
+  const auth = new Hono<{ Bindings: Env, Variables: { user?: User } }>();
+  auth.post('/login', async (c) => {
+    const { username, password } = await c.req.json<{username: string, password: string}>();
+    if (!isStr(username) || !isStr(password)) return bad(c, 'Username and password required');
+    const { items: users } = await UserEntity.list(c.env);
+    const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (!user || !await verifyPassword(password, user.passwordHash)) {
+      return bad(c, 'Invalid credentials', 401);
+    }
+    const token = crypto.randomUUID();
+    sessions.set(token, { userId: user.id, expires: Date.now() + SESSION_DURATION });
+    return ok(c, { token, user: { id: user.id, username: user.username, role: user.role } });
+  });
+  auth.get('/verify', authGuard, (c) => {
+    const user = c.get('user');
+    return ok(c, { user: { id: user.id, username: user.username, role: user.role } });
+  });
+  app.route('/api/auth', auth);
+  // --- FINANCE ROUTES (PROTECTED) ---
+  const finance = new Hono<{ Bindings: Env, Variables: { user?: User } }>();
+  finance.use('*', authGuard);
   // ACCOUNTS API
   finance.get('/accounts', async (c) => {
     const { items } = await AccountEntity.list(c.env);
@@ -186,9 +234,9 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const { items } = await CategoryEntity.list(c.env);
     return ok(c, items.sort((a, b) => a.name.localeCompare(b.name)));
   });
-  finance.post('/categories', async (c) => {
+  finance.post('/categories', adminGuard, async (c) => {
     const { name } = await c.req.json<{name: string}>();
-    if (!isStr(name) || name.length < 2) return bad(c, 'Nombre requerido (mín. 2 chars)');
+    if (!isStr(name) || name.length < 2) return bad(c, 'Nombre requerido (m��n. 2 chars)');
     const { items } = await CategoryEntity.list(c.env);
     const existing = items.find(cat => cat.name.toLowerCase() === name.toLowerCase());
     if (existing) return bad(c, 'Categoría ya existe');
@@ -196,7 +244,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     await CategoryEntity.create(c.env, newCat);
     return ok(c, newCat);
   });
-  finance.put('/categories/:id', async (c) => {
+  finance.put('/categories/:id', adminGuard, async (c) => {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'ID inválido');
     const { name } = await c.req.json<{name: string}>();
@@ -209,7 +257,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const updated = await cat.mutate(c => ({ ...c, name: name.trim() }));
     return ok(c, updated);
   });
-  finance.delete('/categories/:id', async (c) => {
+  finance.delete('/categories/:id', adminGuard, async (c) => {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'ID inválido');
     const deleted = await CategoryEntity.delete(c.env, id);
@@ -220,7 +268,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const { items } = await FrequencyEntity.list(c.env);
     return ok(c, items.sort((a, b) => a.name.localeCompare(b.name)));
   });
-  finance.post('/frequencies', async (c) => {
+  finance.post('/frequencies', adminGuard, async (c) => {
     const { name, interval, unit } = await c.req.json<{ name: string; interval: number; unit: 'days' | 'weeks' | 'months' }>();
     if (!isStr(name) || interval < 1 || interval > 365 || !['days', 'weeks', 'months'].includes(unit)) {
       return bad(c, 'Invalid data');
@@ -233,7 +281,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     await FrequencyEntity.create(c.env, newFreq);
     return ok(c, newFreq);
   });
-  finance.put('/frequencies/:id', async (c) => {
+  finance.put('/frequencies/:id', adminGuard, async (c) => {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'Invalid ID');
     const updates = await c.req.json<Partial<{ name: string; interval: number; unit: 'days' | 'weeks' | 'months' }>>();
@@ -248,7 +296,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const updated = await freq.getState();
     return ok(c, updated);
   });
-  finance.delete('/frequencies/:id', async (c) => {
+  finance.delete('/frequencies/:id', adminGuard, async (c) => {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'Invalid ID');
     const deleted = await FrequencyEntity.delete(c.env, id);
@@ -259,7 +307,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const { items } = await CurrencyEntity.list(c.env);
     return ok(c, items.sort((a, b) => a.code.localeCompare(b.code)));
   });
-  finance.post('/currencies', async (c) => {
+  finance.post('/currencies', adminGuard, async (c) => {
     const { code, symbol, suffix } = await c.req.json<{code: string, symbol: string, suffix: boolean}>();
     if (!isStr(code) || !isStr(symbol)) return bad(c, 'Código y símbolo requeridos');
     const trimmed = { code: code.trim().toUpperCase(), symbol: symbol.trim(), suffix: !!suffix };
@@ -269,7 +317,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     await CurrencyEntity.create(c.env, newCur);
     return ok(c, newCur);
   });
-  finance.put('/currencies/:id', async (c) => {
+  finance.put('/currencies/:id', adminGuard, async (c) => {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'ID inválido');
     const { code, symbol, suffix } = await c.req.json<{code?: string, symbol?: string, suffix?: boolean}>();
@@ -292,7 +340,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const updated = await cur.mutate(cu => ({ ...cu, ...updates }));
     return ok(c, updated);
   });
-  finance.delete('/currencies/:id', async (c) => {
+  finance.delete('/currencies/:id', adminGuard, async (c) => {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'ID inválido');
     const deleted = await CurrencyEntity.delete(c.env, id);
@@ -303,7 +351,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const settings = await new SettingsEntity(c.env).getState();
     return ok(c, settings);
   });
-  finance.post('/settings', async (c) => {
+  finance.post('/settings', adminGuard, async (c) => {
     const body = await c.req.json<Partial<Settings>>();
     const settingsEntity = new SettingsEntity(c.env);
     await settingsEntity.patch(body);

@@ -1,10 +1,10 @@
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,6 @@ import { Loader2, Wallet } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import t from '@/lib/i18n';
 import { useAppStore } from '@/stores/useAppStore';
-import type { User } from '@shared/types';
 const loginSchema = z.object({
   username: z.string().min(1, 'El nombre de usuario es requerido.'),
   password: z.string().min(1, 'La contraseña es requerida.'),
@@ -20,7 +19,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const navigate = useNavigate();
-  const setSettings = useAppStore(s => s.setSettings);
+  const { setSettings } = useAppStore.getState();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { username: '', password: '' },
@@ -28,18 +27,16 @@ export default function LoginPage() {
   const { isSubmitting } = form.formState;
   const onSubmit: SubmitHandler<LoginFormValues> = async (values) => {
     try {
-      const { token, user } = await api<{ token: string; user: Omit<User, 'passwordHash'> }>('/api/auth/login', {
+      const { token, user } = await api<{ token: string; user: { id: string; username: string; role: 'admin' | 'user' } }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(values),
       });
-      localStorage.setItem('moneyo_token', token);
+      localStorage.setItem('casaconta_token', token);
       setSettings({ user }); // Store user info in settings
       toast.success(t('auth.loginSuccess'));
       navigate('/');
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : t('auth.loginError');
-      form.setError('root', { message: errMsg });
-      toast.error(errMsg);
+      toast.error(t('auth.loginError'));
     }
   };
   return (
@@ -53,7 +50,7 @@ export default function LoginPage() {
           <CardHeader className="text-center">
             <Wallet className="mx-auto size-10 text-orange-500" />
             <CardTitle className="text-2xl font-bold">{t('app.name')}</CardTitle>
-            <CardDescription>{t('auth.loginPrompt')}</CardDescription>
+            <CardDescription>Ingresa a tu cuenta para continuar.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -65,7 +62,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>{t('auth.username')}</FormLabel>
                       <FormControl>
-                        <Input autoComplete="username" placeholder="" {...field} />
+                        <Input placeholder="admin" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -78,17 +75,12 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>{t('auth.password')}</FormLabel>
                       <FormControl>
-                        <Input autoComplete="current-password" type="password" placeholder="••••••••" {...field} />
+                        <Input type="password" placeholder="••••••••" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {form.formState.errors.root && (
-                  <div className="border bg-destructive/5 border-destructive/30 text-destructive rounded-md p-3 text-sm">
-                    {form.formState.errors.root.message}
-                  </div>
-                )}
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {t('auth.login')}
@@ -96,6 +88,11 @@ export default function LoginPage() {
               </form>
             </Form>
           </CardContent>
+          <CardFooter className="text-center text-sm">
+            <p className="w-full">
+              ¿No tienes cuenta? <Link to="/register" className="text-primary hover:underline"> {t('auth.register')}</Link>
+            </p>
+          </CardFooter>
         </Card>
       </motion.div>
     </div>

@@ -29,7 +29,7 @@ const formSchema = z.object({
   ts: z.date(),
   note: z.string().max(100).optional(),
   recurrent: z.boolean().optional(),
-  frequency: z.string().optional(), // Changed from enum to string to fix TS error
+  frequency: z.string().optional(),
 }).refine((data) => {
   if (data.type === 'transfer') {
     return !!data.accountToId && data.accountToId !== data.accountId;

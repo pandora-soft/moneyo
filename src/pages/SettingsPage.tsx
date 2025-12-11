@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api-client';
-import type { Settings, Currency } from '@shared/types';
+import type { Settings, Currency, User } from '@shared/types';
 import { toast } from 'sonner';
 import { Loader2, Plus, Edit, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
@@ -45,6 +45,7 @@ const containerVariants: Variants = {
 export function SettingsPage() {
   const { isDark } = useTheme();
   const { setSettings, triggerRefetch, setCurrencies: setStoreCurrencies } = useAppStore.getState();
+  const currentUser = useAppStore(s => s.settings.user) as User | undefined;
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
   });
@@ -53,6 +54,7 @@ export function SettingsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [frequencies, setFrequencies] = useState<Frequency[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isCategorySheetOpen, setCategorySheetOpen] = useState(false);
   const [isCurrencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [isFrequencySheetOpen, setFrequencySheetOpen] = useState(false);
@@ -65,12 +67,16 @@ export function SettingsPage() {
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      const [settings, cats, currs, freqs] = await Promise.all([
+      const promises = [
         api<Settings>('/api/finance/settings'),
         api<Category[]>('/api/finance/categories'),
         api<Currency[]>('/api/finance/currencies'),
         api<Frequency[]>('/api/finance/frequencies'),
-      ]);
+      ];
+      if (currentUser?.role === 'admin') {
+        promises.push(api<User[]>('/api/finance/users'));
+      }
+      const [settings, cats, currs, freqs, fetchedUsers] = await Promise.all(promises);
       form.reset({
         ...settings,
         fiscalMonthStart: settings.fiscalMonthStart ?? 1,
@@ -80,13 +86,16 @@ export function SettingsPage() {
       setCurrencies(currs);
       setFrequencies(freqs);
       setStoreCurrencies(currs);
+      if (fetchedUsers) {
+        setUsers(fetchedUsers as User[]);
+      }
     } catch (error) {
       toast.error('No se pudieron cargar los datos de configuración.');
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [form, setSettings, setStoreCurrencies]);
+  }, [form, setSettings, setStoreCurrencies, currentUser?.role]);
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
@@ -109,7 +118,7 @@ export function SettingsPage() {
     try {
       if (editingCategory) {
         await api(`/api/finance/categories/${editingCategory.id}`, { method: 'PUT', body: JSON.stringify(values) });
-        toast.success('Categor��a actualizada.');
+        toast.success('Categoría actualizada.');
       } else {
         await api('/api/finance/categories', { method: 'POST', body: JSON.stringify(values) });
         toast.success('Categoría creada.');
@@ -321,6 +330,32 @@ export function SettingsPage() {
                 </CardContent>
               </Card>
             </motion.div>
+             {currentUser?.role === 'admin' && (
+              <motion.div variants={cardVariants}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t('settings.users.title')}</CardTitle>
+                    <CardDescription>{t('settings.users.description')}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {loading ? <Skeleton className="h-20 w-full" /> : users.length > 0 ? (
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        {users.map(user => (
+                          <div key={user.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-md">
+                            <div>
+                              <span className="font-medium">{user.username}</span>
+                              <Badge variant="outline" className="ml-2">{user.role}</Badge>
+                            </div>
+                            {/* Add edit/delete for users later */}
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-muted-foreground text-sm text-center py-4">No hay otros usuarios.</p>}
+                    {/* Add user button later */}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
           </div>
         </motion.div>
       </div>

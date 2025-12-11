@@ -54,7 +54,27 @@ const translations = {
       view: 'Ver solo recurrentes',
     }
   },
+  auth: {
+    login: 'Iniciar Sesión',
+    username: 'Usuario',
+    password: 'Contraseña',
+    loginSuccess: 'Sesión iniciada correctamente. ¡Bienvenido!',
+    loginError: 'Credenciales inválidas. Por favor, inténtalo de nuevo.',
+    register: 'Registrarse',
+    logout: 'Cerrar Sesión',
+  },
   settings: {
+    users: {
+      title: 'Usuarios',
+      description: 'Gestiona los usuarios y sus permisos en la aplicación.',
+      add: 'Agregar Usuario',
+      edit: 'Editar Usuario',
+      delete: 'Eliminar Usuario',
+      username: 'Nombre de Usuario',
+      password: 'Contraseña (dejar en blanco para no cambiar)',
+      role: 'Rol',
+      confirmDelete: '¿Estás seguro de que quieres eliminar a este usuario?',
+    },
     categories: {
       title: 'Categorías',
       add: 'Agregar Categoría',
@@ -84,18 +104,13 @@ const translations = {
     }
   },
 } as const;
-type TranslationKey =
-  | `app.${keyof typeof translations.app}`
-  | `common.${keyof typeof translations.common}`
-  | `pages.${keyof typeof translations.pages}`
-  | `finance.${keyof typeof translations.finance}`
-  | `labels.${keyof typeof translations.labels}`
-  | `budget.${keyof typeof translations.budget}`
-  | `transactions.recurrent.${keyof typeof translations.transactions.recurrent}`
-  | `settings.categories.${keyof typeof translations.settings.categories}`
-  | `settings.currencies.${keyof typeof translations.settings.currencies}`
-  | `settings.frequencies.${keyof typeof translations.settings.frequencies}`;
-// A simple t function for demonstration. In a real app, this would be more robust.
+type PathImpl<T, K extends keyof T> =
+  K extends string
+  ? T[K] extends Record<string, any>
+    ? `${K}.${PathImpl<T[K], keyof T[K]>}`
+    : K
+  : never;
+type TranslationKey = PathImpl<typeof translations, keyof typeof translations>;
 const t = (key: TranslationKey, fallback?: string): string => {
   const parts = key.split('.');
   let current: any = translations;
@@ -109,8 +124,6 @@ const t = (key: TranslationKey, fallback?: string): string => {
   return typeof current === 'string' ? current : fallback || key;
 };
 export const useTranslations = () => {
-  // In a real app, this would be connected to a context provider.
-  // For this stub, we return the simple t function.
   return useCallback(t, []);
 };
 export default t;
