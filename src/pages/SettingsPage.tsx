@@ -235,7 +235,7 @@ export function SettingsPage() {
       <div className="py-8 md:py-10 lg:py-12">
         <header className="mb-10">
           <h1 className="text-4xl font-display font-bold">{t('pages.settings')}</h1>
-          <p className="text-muted-foreground mt-1">Configura tus preferencias de la aplicación.</p>
+          <p className="text-muted-foreground mt-1">{t('settings.description')}</p>
         </header>
         <motion.div
           className="grid gap-8 md:grid-cols-2"
@@ -246,12 +246,12 @@ export function SettingsPage() {
           <div className="space-y-8">
             <motion.div variants={cardVariants}>
               <Card>
-                <CardHeader><CardTitle>Visual</CardTitle><CardDescription>Personaliza la apariencia de CasaConta.</CardDescription></CardHeader>
+                <CardHeader><CardTitle>{t('settings.visual')}</CardTitle><CardDescription>{t('settings.visualDesc')}</CardDescription></CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
-                    <Label>Tema</Label>
+                    <Label>{t('settings.theme')}</Label>
                     <div className="flex items-center gap-2">
-                      <span>{isDark ? 'Oscuro' : 'Claro'}</span>
+                      <span>{isDark ? t('settings.themeDark') : t('settings.themeLight')}</span>
                       <motion.div key={isDark ? 'dark' : 'light'} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
                         <ThemeToggle className="relative top-0 right-0" />
                       </motion.div>
@@ -263,24 +263,24 @@ export function SettingsPage() {
             <motion.div variants={cardVariants}>
               {loading ? (
                 <Card>
-                  <CardHeader><CardTitle>Finanzas</CardTitle><CardDescription>Ajustes relacionados con la moneda y fechas.</CardDescription></CardHeader>
+                  <CardHeader><CardTitle>{t('settings.finances')}</CardTitle><CardDescription>{t('settings.financesDesc')}</CardDescription></CardHeader>
                   <CardContent className="space-y-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent>
-                  <div className="flex justify-end p-6 border-t"><Button disabled>{t('common.save')} Cambios</Button></div>
+                  <div className="flex justify-end p-6 border-t"><Button disabled>{t('common.save')}</Button></div>
                 </Card>
               ) : (
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)}>
                     <Card>
-                      <CardHeader><CardTitle>Finanzas</CardTitle><CardDescription>Ajustes relacionados con la moneda y fechas.</CardDescription></CardHeader>
+                      <CardHeader><CardTitle>{t('settings.finances')}</CardTitle><CardDescription>{t('settings.financesDesc')}</CardDescription></CardHeader>
                       <CardContent className="space-y-6">
                         <FormField control={form.control} name="currency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('finance.mainCurrency')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar moneda" /></SelectTrigger></FormControl><SelectContent>{currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Inicio del Mes Fiscal</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value) || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Frecuencia Recurrente</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.fiscalMonthStart')}</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value) || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.recurrentDefaultFreq')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                       </CardContent>
                       <div className="flex justify-end p-6 border-t">
                         <Button type="submit" disabled={isSubmitting || !isDirty}>
                           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                          {t('common.save')} Cambios
+                          {t('common.save')}
                         </Button>
                       </div>
                     </Card>
@@ -344,7 +344,7 @@ export function SettingsPage() {
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                       {currencies.map(cur => (
                         <div key={cur.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-md">
-                          <div><span className="font-medium">{cur.code}</span><span className="ml-2 text-sm text-muted-foreground">({cur.symbol})</span><Badge variant={cur.suffix ? 'secondary' : 'outline'} className="ml-2">{cur.suffix ? 'Sufijo' : 'Prefijo'}</Badge></div>
+                          <div><span className="font-medium">{cur.code}</span><span className="ml-2 text-sm text-muted-foreground">({cur.symbol})</span><Badge variant={cur.suffix ? 'secondary' : 'outline'} className="ml-2">{cur.suffix ? t('settings.currencies.suffix') : t('settings.currencies.prefix')}</Badge></div>
                           <div className="flex gap-2">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingCurrency(cur); setCurrencySheetOpen(true); }}><Edit className="h-4 w-4" /></Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingCurrency(cur)}><Trash2 className="h-4 w-4" /></Button>
@@ -389,50 +389,50 @@ export function SettingsPage() {
       </div>
       <Sheet open={isCategorySheetOpen} onOpenChange={setCategorySheetOpen}>
         <SheetContent aria-describedby="category-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingCategory ? t('settings.categories.edit') : t('settings.categories.add')}</SheetTitle><SheetDescription id="category-sheet-desc">Crea o modifica una categoría para tus transacciones.</SheetDescription></SheetHeader>
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingCategory ? t('settings.categories.edit') : t('settings.categories.add')}</SheetTitle><SheetDescription id="category-sheet-desc">{t('settings.categories.sheet.description')}</SheetDescription></SheetHeader>
           <CategoryForm onSubmit={handleCategorySubmit} defaultValues={editingCategory ? { name: editingCategory.name } : {}} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingCategory} onOpenChange={() => setDeletingCategory(null)}>
         <AlertDialogContent aria-describedby="delete-category-desc">
-          <AlertDialogHeader><AlertDialogTitle>Eliminar Categoría</AlertDialogTitle><AlertDialogDescription id="delete-category-desc">¿Estás seguro de que quieres eliminar la categoría '{deletingCategory?.name}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleCategoryDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{t('settings.categories.delete')}</AlertDialogTitle><AlertDialogDescription id="delete-category-desc">{t('settings.categories.confirmDelete', deletingCategory?.name || '')}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleCategoryDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <Sheet open={isCurrencySheetOpen} onOpenChange={setCurrencySheetOpen}>
         <SheetContent aria-describedby="currency-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingCurrency ? t('settings.currencies.edit') : t('settings.currencies.add')}</SheetTitle><SheetDescription id="currency-sheet-desc">Define una nueva moneda para usar en tus cuentas.</SheetDescription></SheetHeader>
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingCurrency ? t('settings.currencies.edit') : t('settings.currencies.add')}</SheetTitle><SheetDescription id="currency-sheet-desc">{t('settings.currencies.sheet.description')}</SheetDescription></SheetHeader>
           <CurrencyForm onSubmit={handleCurrencySubmit} defaultValues={editingCurrency || {}} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingCurrency} onOpenChange={() => setDeletingCurrency(null)}>
         <AlertDialogContent aria-describedby="delete-currency-desc">
-          <AlertDialogHeader><AlertDialogTitle>Eliminar Moneda</AlertDialogTitle><AlertDialogDescription id="delete-currency-desc">¿Estás seguro de que quieres eliminar la moneda '{deletingCurrency?.code}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleCurrencyDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{t('settings.currencies.delete')}</AlertDialogTitle><AlertDialogDescription id="delete-currency-desc">{t('settings.currencies.confirmDelete', deletingCurrency?.code || '')}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleCurrencyDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <Sheet open={isFrequencySheetOpen} onOpenChange={setFrequencySheetOpen}>
         <SheetContent aria-describedby="frequency-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingFrequency ? t('settings.frequencies.edit') : t('settings.frequencies.add')}</SheetTitle><SheetDescription id="frequency-sheet-desc">Define una nueva frecuencia para transacciones recurrentes.</SheetDescription></SheetHeader>
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingFrequency ? t('settings.frequencies.edit') : t('settings.frequencies.add')}</SheetTitle><SheetDescription id="frequency-sheet-desc">{t('settings.frequencies.sheet.description')}</SheetDescription></SheetHeader>
           <FrequencyForm onSubmit={handleFrequencySubmit} defaultValues={editingFrequency || {}} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingFrequency} onOpenChange={() => setDeletingFrequency(null)}>
         <AlertDialogContent aria-describedby="delete-frequency-desc">
-          <AlertDialogHeader><AlertDialogTitle>Eliminar Frecuencia</AlertDialogTitle><AlertDialogDescription id="delete-frequency-desc">¿Estás seguro de que quieres eliminar la frecuencia '{deletingFrequency?.name}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleFrequencyDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{t('settings.frequencies.delete')}</AlertDialogTitle><AlertDialogDescription id="delete-frequency-desc">{t('settings.frequencies.confirmDelete', deletingFrequency?.name || '')}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleFrequencyDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <Sheet open={isUserSheetOpen} onOpenChange={setUserSheetOpen}>
         <SheetContent aria-describedby="user-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingUser ? t('settings.users.edit') : t('settings.users.add')}</SheetTitle><SheetDescription id="user-sheet-desc">Gestiona los detalles y permisos del usuario.</SheetDescription></SheetHeader>
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingUser ? t('settings.users.sheet.titleEdit') : t('settings.users.sheet.titleNew')}</SheetTitle><SheetDescription id="user-sheet-desc">{t('settings.users.sheet.description')}</SheetDescription></SheetHeader>
           <UserForm onSubmit={handleUserSubmit} defaultValues={editingUser || {}} isEditing={!!editingUser} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingUser} onOpenChange={() => setDeletingUser(null)}>
         <AlertDialogContent aria-describedby="delete-user-desc">
-          <AlertDialogHeader><AlertDialogTitle>Eliminar Usuario</AlertDialogTitle><AlertDialogDescription id="delete-user-desc">¿Estás seguro de que quieres eliminar al usuario '{deletingUser?.username}'? Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleUserDelete}>Eliminar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{t('settings.users.delete')}</AlertDialogTitle><AlertDialogDescription id="delete-user-desc">{t('settings.users.confirmDelete', deletingUser?.username || '')}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleUserDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

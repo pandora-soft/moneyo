@@ -9,10 +9,11 @@ import { Loader2 } from 'lucide-react';
 import type { Account, AccountType, Currency } from '@shared/types';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api-client';
+import t from '@/lib/i18n';
 const formSchema = z.object({
-  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres.").max(50),
+  name: z.string().min(2, t('form.minChars', 2)).max(50),
   type: z.enum(['cash', 'bank', 'credit_card']),
-  currency: z.string().min(1, "Debe seleccionar una moneda."),
+  currency: z.string().min(1, t('form.required')),
   balance: z.preprocess(
     (val: unknown) => (val === '' || val === undefined ? 0 : Number(val)),
     z.number().default(0)
@@ -22,7 +23,7 @@ const formSchema = z.object({
   return data.balance >= 0;
 }, {
   path: ['balance'],
-  message: "El saldo no puede ser negativo.",
+  message: t('form.account.negativeBalanceError'),
 });
 type AccountFormValues = z.infer<typeof formSchema>;
 interface AccountFormProps {
@@ -68,7 +69,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre de la Cuenta</FormLabel>
+              <FormLabel>{t('form.account.name')}</FormLabel>
               <FormControl>
                 <Input placeholder="Ej: Ahorros" {...field} />
               </FormControl>
@@ -81,7 +82,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
           name="type"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Tipo</FormLabel>
+              <FormLabel>{t('form.account.type')}</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -89,9 +90,9 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="bank">Cuenta Bancaria</SelectItem>
-                  <SelectItem value="cash">Efectivo</SelectItem>
-                  <SelectItem value="credit_card">Tarjeta de Crédito</SelectItem>
+                  <SelectItem value="bank">{t('form.account.bank')}</SelectItem>
+                  <SelectItem value="cash">{t('form.account.cash')}</SelectItem>
+                  <SelectItem value="credit_card">{t('form.account.credit_card')}</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -103,7 +104,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
           name="currency"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Moneda</FormLabel>
+              <FormLabel>{t('form.account.currency')}</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -123,7 +124,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
           name="balance"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Saldo Inicial</FormLabel>
+              <FormLabel>{t('form.account.initialBalance')}</FormLabel>
               <FormControl>
                 <Input type="number" placeholder="0.00" {...field} disabled={isEditing} />
               </FormControl>
@@ -134,7 +135,7 @@ export function AccountForm({ onSubmit, onFinished, defaultValues, isEditing = f
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? 'Guardar Cambios' : 'Crear Cuenta'}
+            {isEditing ? t('common.save') : t('common.createAccount')}
           </Button>
         </div>
       </form>

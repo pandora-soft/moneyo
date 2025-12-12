@@ -18,14 +18,15 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { api } from '@/lib/api-client';
 import { Combobox } from '@/components/ui/combobox';
+import t from '@/lib/i18n';
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const formSchema = z.object({
   id: z.string().optional(),
-  accountId: z.string().min(1, "Debe seleccionar una cuenta de origen."),
+  accountId: z.string().min(1, t('form.requiredAccount')),
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
-  amount: z.number().positive("El monto debe ser un número positivo."),
-  category: z.string().min(2, "La categoría es requerida.").max(50),
+  amount: z.number().positive(t('form.positive')),
+  category: z.string().min(2, t('form.requiredCategory')).max(50),
   ts: z.date(),
   note: z.string().max(100).optional(),
   recurrent: z.boolean().optional(),
@@ -36,7 +37,7 @@ const formSchema = z.object({
   }
   return true;
 }, {
-  message: "Debe seleccionar una cuenta de destino diferente a la de origen.",
+  message: t('form.transferAccountError'),
   path: ["accountToId"]
 }).refine((data) => {
     if (data.recurrent) {
@@ -44,7 +45,7 @@ const formSchema = z.object({
     }
     return true;
 }, {
-    message: "Debe seleccionar una frecuencia para transacciones recurrentes.",
+    message: t('form.recurrentFreqError'),
     path: ["frequency"],
 });
 type TransactionFormValues = z.infer<typeof formSchema>;
@@ -127,13 +128,13 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6">
         <FormField control={form.control} name="type" render={({ field }) => (
             <FormItem>
-              <FormLabel>Tipo</FormLabel>
+              <FormLabel>{t('form.transaction.type')}</FormLabel>
               <Select value={field.value ?? ''} onValueChange={field.onChange}>
                 <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                 <SelectContent>
-                  <SelectItem value="expense">Gasto</SelectItem>
-                  <SelectItem value="income">Ingreso</SelectItem>
-                  <SelectItem value="transfer">Transferencia</SelectItem>
+                  <SelectItem value="expense">{t('finance.expense')}</SelectItem>
+                  <SelectItem value="income">{t('finance.income')}</SelectItem>
+                  <SelectItem value="transfer">{t('finance.transfer')}</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -141,7 +142,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         )} />
         <FormField control={form.control} name="accountId" render={({ field }) => (
             <FormItem>
-              <FormLabel>{transactionType === 'transfer' ? 'Cuenta de Origen' : 'Cuenta'}</FormLabel>
+              <FormLabel>{transactionType === 'transfer' ? t('form.transaction.originAccount') : t('form.transaction.account')}</FormLabel>
               <Select value={field.value ?? ''} onValueChange={field.onChange}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
                 <SelectContent>{accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
@@ -152,7 +153,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         {transactionType === 'transfer' && (
           <FormField control={form.control} name="accountToId" render={({ field }) => (
               <FormItem>
-                <FormLabel>Cuenta de Destino</FormLabel>
+                <FormLabel>{t('form.transaction.destinationAccount')}</FormLabel>
                 <Select value={field.value ?? ''} onValueChange={field.onChange}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl>
                   <SelectContent>{accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
@@ -163,14 +164,14 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         )}
         <FormField control={form.control} name="amount" render={({ field }) => (
             <FormItem>
-              <FormLabel>Monto</FormLabel>
+              <FormLabel>{t('form.transaction.amount')}</FormLabel>
               <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))} /></FormControl>
               <FormMessage />
             </FormItem>
         )} />
         <FormField control={form.control} name="category" render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormLabel>Categoría</FormLabel>
+              <FormLabel>{t('form.transaction.category')}</FormLabel>
               <Combobox
                 options={categories}
                 value={field.value}
@@ -183,7 +184,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         )} />
         <FormField control={form.control} name="ts" render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormLabel>Fecha</FormLabel>
+              <FormLabel>{t('form.transaction.date')}</FormLabel>
               <Popover>
                 <PopoverTrigger asChild>
                   <FormControl>
@@ -194,7 +195,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
                   </FormControl>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
+                  <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus locale={es} />
                 </PopoverContent>
               </Popover>
               <FormMessage />
@@ -202,7 +203,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         )} />
         <FormField control={form.control} name="note" render={({ field }) => (
             <FormItem>
-              <FormLabel>Nota (Opcional)</FormLabel>
+              <FormLabel>{t('form.transaction.note')}</FormLabel>
               <FormControl><Textarea placeholder="Detalles adicionales..." {...field} value={field.value ?? ''} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -211,14 +212,14 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
             <>
                 <FormField control={form.control} name="recurrent" render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <div className="space-y-0.5"><FormLabel>Transacción Recurrente</FormLabel></div>
+                        <div className="space-y-0.5"><FormLabel>{t('form.transaction.recurrent')}</FormLabel></div>
                         <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                     </FormItem>
                 )} />
                 {isRecurrent && (
                     <FormField control={form.control} name="frequency" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Frecuencia</FormLabel>
+                            <FormLabel>{t('form.transaction.frequency')}</FormLabel>
                             <Select value={field.value ?? ''} onValueChange={field.onChange}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una frecuencia" /></SelectTrigger></FormControl>
                                 <SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent>
@@ -232,7 +233,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         <div className="flex justify-end pt-4 sticky bottom-0 z-10">
           <Button type="submit" variant="default" disabled={!form.formState.isValid || isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {defaultValues?.id ? 'Actualizar Transacción' : 'Guardar Transacción'}
+            {defaultValues?.id ? t('common.save') : t('common.add')}
           </Button>
         </div>
       </form>

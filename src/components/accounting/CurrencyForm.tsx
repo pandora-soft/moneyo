@@ -8,8 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import t from '@/lib/i18n';
 const schema = z.object({
-  code: z.string().min(3, 'Mínimo 3 caracteres').max(5, 'Máximo 5 caracteres').transform(v => v.toUpperCase()),
-  symbol: z.string().min(1, 'Requerido').max(5, 'Máximo 5 caracteres'),
+  code: z.string().min(3, t('form.minChars', 3)).max(5, t('form.maxChars', 5)).transform(v => v.toUpperCase()),
+  symbol: z.string().min(1, t('form.required')).max(5, t('form.maxChars', 5)),
   suffix: z.boolean().optional(),
 });
 type FormValues = z.infer<typeof schema>;
@@ -76,7 +76,7 @@ export function CurrencyForm({ onSubmit, defaultValues }: Props) {
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {defaultValues?.code ? 'Actualizar' : 'Crear'}
+            {defaultValues?.code ? t('common.save') : t('common.add')}
           </Button>
         </div>
       </form>

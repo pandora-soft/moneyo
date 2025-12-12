@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react';
 import t from '@/lib/i18n';
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const schema = z.object({
-  name: z.string().min(2, 'Mínimo 2 caracteres').max(50, 'Máximo 50 caracteres'),
+  name: z.string().min(2, t('form.minChars', 2)).max(50, t('form.maxChars', 50)),
   interval: z.number().int().min(1, 'Mínimo 1').max(365, 'Máximo 365').optional(),
   unit: z.enum(['days', 'weeks', 'months']).optional(),
 });
@@ -84,9 +84,9 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="days">D��as</SelectItem>
-                  <SelectItem value="weeks">Semanas</SelectItem>
-                  <SelectItem value="months">Meses</SelectItem>
+                  <SelectItem value="days">{t('common.days')}</SelectItem>
+                  <SelectItem value="weeks">{t('common.weeks')}</SelectItem>
+                  <SelectItem value="months">{t('common.months')}</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -96,7 +96,7 @@ export function FrequencyForm({ onSubmit, defaultValues }: Props) {
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={!form.formState.isValid || isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {defaultValues?.name ? 'Actualizar' : 'Crear'}
+            {defaultValues?.name ? t('common.save') : t('common.add')}
           </Button>
         </div>
       </form>

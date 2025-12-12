@@ -9,6 +9,7 @@ import { format, startOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
 import type { Account } from '@shared/types';
+import t from '@/lib/i18n';
 export interface Filters {
   query: string;
   accountId: string;
@@ -42,16 +43,16 @@ export function TransactionFilters({ filters, setFilters, accounts, focus = 'ful
       {focus === 'full' && (
         <>
           <Input
-            placeholder="Buscar por categoría o nota..."
+            placeholder={t('filters.search')}
             value={filters.query}
             onChange={(e) => setFilters(prev => ({ ...prev, query: e.target.value }))}
           />
           <Select value={filters.accountId} onValueChange={(value) => setFilters(prev => ({ ...prev, accountId: value }))}>
             <SelectTrigger>
-              <SelectValue placeholder="Todas las cuentas" />
+              <SelectValue placeholder={t('filters.allAccounts')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas las Cuentas</SelectItem>
+              <SelectItem value="all">{t('filters.allAccounts')}</SelectItem>
               {accounts.map(acc => (
                 <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
               ))}
@@ -59,13 +60,13 @@ export function TransactionFilters({ filters, setFilters, accounts, focus = 'ful
           </Select>
           <Select value={filters.type} onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}>
             <SelectTrigger>
-              <SelectValue placeholder="Todos los tipos" />
+              <SelectValue placeholder={t('filters.allTypes')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los Tipos</SelectItem>
-              <SelectItem value="income">Ingreso</SelectItem>
-              <SelectItem value="expense">Gasto</SelectItem>
-              <SelectItem value="transfer">Transferencia</SelectItem>
+              <SelectItem value="all">{t('filters.allTypes')}</SelectItem>
+              <SelectItem value="income">{t('finance.income')}</SelectItem>
+              <SelectItem value="expense">{t('finance.expense')}</SelectItem>
+              <SelectItem value="transfer">{t('finance.transfer')}</SelectItem>
             </SelectContent>
           </Select>
         </>
@@ -76,9 +77,9 @@ export function TransactionFilters({ filters, setFilters, accounts, focus = 'ful
             <SelectValue placeholder="Seleccionar periodo" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todo el tiempo</SelectItem>
-            <SelectItem value="this_month">Este Mes</SelectItem>
-            <SelectItem value="last_3_months">��ltimos 3 Meses</SelectItem>
+            <SelectItem value="all">{t('filters.allTime')}</SelectItem>
+            <SelectItem value="this_month">{t('filters.thisMonth')}</SelectItem>
+            <SelectItem value="last_3_months">{t('filters.last3Months')}</SelectItem>
           </SelectContent>
         </Select>
       )}
@@ -89,12 +90,12 @@ export function TransactionFilters({ filters, setFilters, accounts, focus = 'ful
               <CalendarIcon className="mr-2 h-4 w-4" />
               {filters.dateRange?.from ? (
                 filters.dateRange.to ? (
-                  `${format(filters.dateRange.from, "LLL dd, y")} - ${format(filters.dateRange.to, "LLL dd, y")}`
+                  `${format(filters.dateRange.from, "LLL dd, y", { locale: es })} - ${format(filters.dateRange.to, "LLL dd, y", { locale: es })}`
                 ) : (
-                  format(filters.dateRange.from, "LLL dd, y")
+                  format(filters.dateRange.from, "LLL dd, y", { locale: es })
                 )
               ) : (
-                <span>Rango de Fechas</span>
+                <span>{t('filters.dateRange')}</span>
               )}
             </Button>
           </PopoverTrigger>

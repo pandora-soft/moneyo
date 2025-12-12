@@ -12,6 +12,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useFormatCurrency } from '@/lib/formatCurrency';
 import { toast } from 'sonner';
 import t from '@/lib/i18n';
+import { es } from 'date-fns/locale';
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 },
@@ -64,7 +65,7 @@ export function HomePage() {
         }
     }
     const trendData = recentTransactions.sort((a,b) => a.ts - b.ts).map(tx => {
-        return { date: new Date(tx.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), balance: historicalBalances[tx.ts] || 0 };
+        return { date: new Date(tx.ts).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }), balance: historicalBalances[tx.ts] || 0 };
     });
     return { totalBalance: balance, totalIncome: income, totalExpenses: expenses, balanceTrend: trendData };
   }, [accounts, transactions]);
@@ -73,11 +74,11 @@ export function HomePage() {
       <div className="py-8 md:py-10 lg:py-12">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <div>
-            <h1 className="text-4xl font-display font-bold">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Resumen de tus finanzas.</p>
+            <h1 className="text-4xl font-display font-bold">{t('pages.dashboard')}</h1>
+            <p className="text-muted-foreground mt-1">{t('dashboard.summary')}</p>
           </div>
           <Button onClick={() => openModal()} size="lg" className="bg-orange-500 hover:bg-orange-600 text-white">
-            <PlusCircle className="mr-2 size-5" /> Agregar Transacción
+            <PlusCircle className="mr-2 size-5" /> {t('common.addTransaction')}
           </Button>
         </header>
         <main className="space-y-8">
@@ -91,15 +92,15 @@ export function HomePage() {
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-36" />)
             ) : (
               <>
-                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Balance Total</CardTitle><Wallet className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(totalBalance)}</div><p className="text-xs text-muted-foreground">En todas tus cuentas</p></CardContent></Card></motion.div>
-                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Ingresos (Últ. 30 d��as)</CardTitle><TrendingUp className="h-4 w-4 text-emerald-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-500">{formatCurrency(totalIncome)}</div><p className="text-xs text-muted-foreground">Flujo de entrada</p></CardContent></Card></motion.div>
-                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Gastos (Últ. 30 días)</CardTitle><TrendingDown className="h-4 w-4 text-red-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-red-500">{formatCurrency(totalExpenses)}</div><p className="text-xs text-muted-foreground">Flujo de salida</p></CardContent></Card></motion.div>
+                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t('dashboard.totalBalance')}</CardTitle><Wallet className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(totalBalance)}</div><p className="text-xs text-muted-foreground">{t('dashboard.allAccounts')}</p></CardContent></Card></motion.div>
+                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t('dashboard.incomeLast30')}</CardTitle><TrendingUp className="h-4 w-4 text-emerald-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-500">{formatCurrency(totalIncome)}</div><p className="text-xs text-muted-foreground">{t('dashboard.inflow')}</p></CardContent></Card></motion.div>
+                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t('dashboard.expensesLast30')}</CardTitle><TrendingDown className="h-4 w-4 text-red-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-red-500">{formatCurrency(totalExpenses)}</div><p className="text-xs text-muted-foreground">{t('dashboard.outflow')}</p></CardContent></Card></motion.div>
               </>
             )}
           </motion.div>
           <div className="grid gap-8 lg:grid-cols-5">
             <div className="lg:col-span-2">
-              <h2 className="text-2xl font-semibold mb-4">Cuentas</h2>
+              <h2 className="text-2xl font-semibold mb-4">{t('dashboard.accounts')}</h2>
               <motion.div className="space-y-4" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }}>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)
@@ -109,7 +110,7 @@ export function HomePage() {
                       <Card className="hover:bg-muted/50 transition-colors">
                         <CardContent className="p-4 flex justify-between items-center">
                           <div><p className="font-semibold">{acc.name}</p><p className="text-sm text-muted-foreground">{formatCurrency(acc.balance, acc.currency)}</p></div>
-                          <Button variant="ghost" size="sm" asChild><Link to="/accounts">Ver <ArrowRight className="ml-2 size-4" /></Link></Button>
+                          <Button variant="ghost" size="sm" asChild><Link to="/accounts">{t('dashboard.view')} <ArrowRight className="ml-2 size-4" /></Link></Button>
                         </CardContent>
                       </Card>
                     </motion.div>
@@ -118,10 +119,10 @@ export function HomePage() {
                   <motion.div variants={cardVariants} className="text-center p-6 border-2 border-dashed rounded-lg">
                     <Wallet className="mx-auto size-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-semibold">{t('common.emptyAccounts')}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">¡Comienza a controlar tus finanzas hoy!</p>
+                    <p className="text-sm text-muted-foreground mt-1">{t('dashboard.emptyAccountsCTA')}</p>
                     <motion.div whileHover={{ scale: 1.05 }}>
                       <Button asChild size="sm" className="mt-4">
-                        <Link to="/accounts">Crear Cuenta</Link>
+                        <Link to="/accounts">{t('common.createAccount')}</Link>
                       </Button>
                     </motion.div>
                   </motion.div>
@@ -129,7 +130,7 @@ export function HomePage() {
               </motion.div>
             </div>
             <div className="lg:col-span-3">
-              <h2 className="text-2xl font-semibold mb-4">Tendencia del Balance</h2>
+              <h2 className="text-2xl font-semibold mb-4">{t('dashboard.balanceTrend')}</h2>
               <Card>
                 <CardContent className="pt-6">
                   {loading ? <Skeleton className="h-[250px]" /> : (
@@ -137,7 +138,7 @@ export function HomePage() {
                       <LineChart data={balanceTrend}>
                         <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                         <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value)} domain={['dataMin', 'dataMax']} />
-                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 2 }} formatter={(value: number) => [formatCurrency(value), 'Balance']} />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 2 }} formatter={(value: number) => [formatCurrency(value), t('finance.balance')]} />
                         <Line type="monotone" dataKey="balance" stroke="#F97316" strokeWidth={2} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>

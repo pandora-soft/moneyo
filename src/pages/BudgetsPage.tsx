@@ -133,17 +133,17 @@ export function BudgetsPage() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <div>
             <h1 className="text-4xl font-display font-bold">{t('budget.list')}</h1>
-            <p className="text-muted-foreground mt-1">Define y sigue tus límites de gasto mensuales.</p>
+            <p className="text-muted-foreground mt-1">{t('budget.description')}</p>
           </div>
           <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingBudget(null); setSheetOpen(true); }}>
-            <PlusCircle className="mr-2 size-5" /> Crear Presupuesto
+            <PlusCircle className="mr-2 size-5" /> {t('budget.create')}
           </Button>
         </header>
         <Card className="mb-8">
           <CardHeader className="flex-row items-center justify-between">
             <div>
-              <CardTitle>Resumen de Presupuestos</CardTitle>
-              <CardDescription>Planificado vs. Gasto real para el mes seleccionado.</CardDescription>
+              <CardTitle>{t('budget.summary')}</CardTitle>
+              <CardDescription>{t('budget.summaryDesc')}</CardDescription>
             </div>
             <div className="flex gap-2">
               <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(`${val}-01T12:00:00Z`))}>
@@ -159,7 +159,7 @@ export function BudgetsPage() {
                 </SelectContent>
               </Select>
               <Button variant="outline" onClick={exportFilteredBudgets} disabled={filteredBudgetsWithActuals.length === 0}>
-                <Download className="mr-2 size-4" /> Exportar CSV
+                <Download className="mr-2 size-4" /> {t('common.exportBudgets')}
               </Button>
             </div>
           </CardHeader>
@@ -227,14 +227,14 @@ export function BudgetsPage() {
             <h3 className="text-xl font-semibold">{t('labels.emptyBudgets')}</h3>
             <p className="text-muted-foreground mt-2 mb-4">Crea un presupuesto para empezar a controlar tus gastos.</p>
             <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingBudget(null); setSheetOpen(true); }}>
-              <PlusCircle className="mr-2 size-5" /> Crear Presupuesto
+              <PlusCircle className="mr-2 size-5" /> {t('budget.create')}
             </Button>
           </div>
         )}
       </div>
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) { setSheetOpen(false); setEditingBudget(null); } else { setSheetOpen(true); } }}>
         <SheetContent className="sm:max-w-lg w-full p-0" aria-describedby="budget-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingBudget?.id ? 'Editar' : 'Nuevo'} Presupuesto</SheetTitle><SheetDescription id="budget-sheet-desc">Define un límite de gasto para una categoría en un mes específico.</SheetDescription></SheetHeader>
+          <SheetHeader className="p-6 border-b"><SheetTitle>{editingBudget?.id ? t('budget.sheet.editTitle') : t('budget.sheet.newTitle')}</SheetTitle><SheetDescription id="budget-sheet-desc">{t('budget.sheet.description')}</SheetDescription></SheetHeader>
           <BudgetForm
             categories={uniqueCategories}
             onSubmit={handleFormSubmit}
@@ -245,8 +245,8 @@ export function BudgetsPage() {
       </Sheet>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent aria-describedby="delete-budget-desc">
-          <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription id="delete-budget-desc">Esta acción no se puede deshacer. Se eliminará el presupuesto permanentemente.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteBudget}>Eliminar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{t('budget.deleteConfirm')}</AlertDialogTitle><AlertDialogDescription id="delete-budget-desc">{t('budget.deleteWarning')}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDeleteBudget}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

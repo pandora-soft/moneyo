@@ -117,11 +117,11 @@ export function AccountsPage() {
       <div className="py-8 md:py-10 lg:py-12">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <div>
-            <h1 className="text-4xl font-display font-bold">Cuentas</h1>
-            <p className="text-muted-foreground mt-1">Administra tus cuentas de efectivo, banco y tarjetas.</p>
+            <h1 className="text-4xl font-display font-bold">{t('pages.accounts')}</h1>
+            <p className="text-muted-foreground mt-1">{t('accounts.description')}</p>
           </div>
           <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={handleCreateClick}>
-            <PlusCircle className="mr-2 size-5" /> Crear Cuenta
+            <PlusCircle className="mr-2 size-5" /> {t('common.createAccount')}
           </Button>
         </header>
         {loading ? (
@@ -141,7 +141,7 @@ export function AccountsPage() {
                   <AccountCard account={account} onDelete={handleDeleteClick} onEdit={handleEditClick}>
                     <Accordion type="single" collapsible className="w-full">
                       <AccordionItem value="transactions">
-                        <AccordionTrigger>Últimos Movimientos</AccordionTrigger>
+                        <AccordionTrigger>{t('accounts.lastTransactions')}</AccordionTrigger>
                         <AccordionContent asChild>
                           <AnimatePresence>
                             <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants}>
@@ -151,23 +151,23 @@ export function AccountsPage() {
                                   <span className={tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'}>{tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, account.currency)}</span>
                                 </div>
                               ))}
-                              {account.transactions.length === 0 && <p className="text-sm text-muted-foreground">Sin movimientos.</p>}
+                              {account.transactions.length === 0 && <p className="text-sm text-muted-foreground">{t('accounts.noTransactions')}</p>}
                             </motion.div>
                           </AnimatePresence>
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="recurrent">
-                        <AccordionTrigger>Recurrentes</AccordionTrigger>
+                        <AccordionTrigger>{t('accounts.recurrent')}</AccordionTrigger>
                         <AccordionContent asChild>
                           <AnimatePresence>
                             <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants}>
-                              <Badge variant="outline"><Repeat className="mr-2 size-4" /> {account.recurrentCount} activas</Badge>
+                              <Badge variant="outline"><Repeat className="mr-2 size-4" /> {t('accounts.activeRecurrent', account.recurrentCount)}</Badge>
                             </motion.div>
                           </AnimatePresence>
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="budgets">
-                        <AccordionTrigger>Presupuestos (Este Mes)</AccordionTrigger>
+                        <AccordionTrigger>{t('accounts.budgetsThisMonth')}</AccordionTrigger>
                         <AccordionContent asChild>
                           <AnimatePresence>
                             <motion.div initial="exit" animate="enter" exit="exit" variants={motionVariants} className="space-y-2">
@@ -179,7 +179,7 @@ export function AccountsPage() {
                                   </div>
                                   <Progress value={(b.actual / b.limit) * 100} className={cn('h-1 mt-1', b.actual > b.limit && '[&>div]:bg-destructive')} />
                                 </div>
-                              )) : <p className="text-sm text-muted-foreground">Sin gastos contra presupuestos este mes.</p>}
+                              )) : <p className="text-sm text-muted-foreground">{t('accounts.noBudgetExpenses')}</p>}
                             </motion.div>
                           </AnimatePresence>
                         </AccordionContent>
@@ -195,21 +195,21 @@ export function AccountsPage() {
             <h3 className="text-xl font-semibold">{t('common.emptyAccounts')}</h3>
             <p className="text-muted-foreground mt-2 mb-4">¡Empieza por agregar tu primera cuenta para llevar el control!</p>
             <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={handleCreateClick}>
-              <PlusCircle className="mr-2 size-5" /> Crear Primera Cuenta
+              <PlusCircle className="mr-2 size-5" /> {t('common.createAccount')}
             </Button>
           </div>
         )}
       </div>
       <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="sm:max-w-lg w-full p-0" aria-describedby="account-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{selectedAccount ? 'Editar Cuenta' : 'Nueva Cuenta'}</SheetTitle><SheetDescription id="account-sheet-desc">Crea o modifica los detalles de tu cuenta.</SheetDescription></SheetHeader>
+          <SheetHeader className="p-6 border-b"><SheetTitle>{selectedAccount ? t('accounts.sheet.editTitle') : t('accounts.sheet.newTitle')}</SheetTitle><SheetDescription id="account-sheet-desc">{t('accounts.sheet.description')}</SheetDescription></SheetHeader>
           <AccountForm onSubmit={handleFormSubmit} onFinished={() => setSheetOpen(false)} defaultValues={selectedAccount || {}} isEditing={!!selectedAccount} />
         </SheetContent>
       </Sheet>
       <AlertDialog open={isAlertOpen} onOpenChange={setAlertOpen}>
         <AlertDialogContent aria-describedby="delete-account-desc">
-          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription id="delete-account-desc">Esta acción no se puede deshacer. Se eliminará la cuenta permanentemente y se ajustará el balance de presupuestos relacionados.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle><AlertDialogDescription id="delete-account-desc">{t('accounts.deleteWarning')}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>Continuar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

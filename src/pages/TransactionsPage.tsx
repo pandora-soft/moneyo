@@ -145,13 +145,13 @@ export function TransactionsPage() {
     const csv = filteredTransactions.map(tx => {
       const account = accountsById.get(tx.accountId);
       const row = [
-        `"${format(new Date(tx.ts), 'dd/MM/yyyy')}"`,
+        `"${format(new Date(tx.ts), 'dd/MM/yyyy', { locale: es })}"`,
         `"${account?.name || ''}"`,
         `"${tx.type}"`,
         `"${tx.amount}"`,
         `"${tx.category}"`,
         `"${tx.note || ''}"`,
-        tx.recurrent || tx.parentId ? 'Sí' : 'No'
+        tx.recurrent || tx.parentId ? 'S��' : 'No'
       ];
       return row.join(',');
     }).join('\n');
@@ -175,23 +175,23 @@ export function TransactionsPage() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <div>
             <h1 className="text-4xl font-display font-bold">{t('pages.transactions')}</h1>
-            <p className="text-muted-foreground mt-1">Tu historial de ingresos y gastos.</p>
+            <p className="text-muted-foreground mt-1">{t('transactions.history')}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 size-4" /> Importar CSV</Button>
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 size-4" /> {t('transactions.importCSV')}</Button>
             <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => openModal()}>
-              <PlusCircle className="mr-2 size-5" /> {t('common.add')} Transacción
+              <PlusCircle className="mr-2 size-5" /> {t('common.addTransaction')}
             </Button>
           </div>
         </header>
         <TransactionFilters filters={filters} setFilters={setFilters} accounts={accounts} />
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
             <p className="text-sm text-muted-foreground">
-                Mostrando {filteredTransactions.length} de {transactions.length} transacciones.
+                {t('common.filteredXOfY', filteredTransactions.length, transactions.length)}
             </p>
             <div className="flex items-center space-x-2">
-                <Button variant="outline" onClick={exportCSV} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> Exportar CSV</Button>
+                <Button variant="outline" onClick={exportCSV} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> {t('transactions.exportCSV')}</Button>
                 <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating}>
                     {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />}
                     {t('common.generateAll')}
@@ -207,10 +207,10 @@ export function TransactionsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Cuenta</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead>{t('table.account')}</TableHead>
+                  <TableHead>{t('table.category')}</TableHead>
+                  <TableHead>{t('table.date')}</TableHead>
+                  <TableHead className="text-right">{t('table.amount')}</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -228,8 +228,8 @@ export function TransactionsPage() {
                         <TableCell>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
-                                {tx.recurrent && <Badge variant="secondary">Plantilla</Badge>}
-                                {tx.parentId && <Badge variant="secondary" className="text-xs">Generada</Badge>}
+                                {tx.recurrent && <Badge variant="secondary">{t('transactions.recurrent.template')}</Badge>}
+                                {tx.parentId && <Badge variant="secondary" className="text-xs">{t('transactions.recurrent.generated')}</Badge>}
                             </div>
                         </TableCell>
                         <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>
@@ -239,7 +239,7 @@ export function TransactionsPage() {
                             <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-transparent hover:border-input hover:bg-accent"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => openModal(tx)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, frequency: undefined, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, frequency: undefined, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -255,7 +255,7 @@ export function TransactionsPage() {
                           <>
                             <p>{t('common.noMatches')}</p>
                             <Button variant="link" onClick={() => setFilters({ query: '', accountId: 'all', type: 'all', dateRange: undefined })}>
-                              Limpiar filtros
+                              {t('filters.clear')}
                             </Button>
                           </>
                         ) : (
@@ -272,16 +272,17 @@ export function TransactionsPage() {
       </div>
       <Sheet open={isImportSheetOpen} onOpenChange={setImportSheetOpen}>
             <SheetContent className="sm:max-w-2xl w-full" aria-describedby="import-sheet-desc">
-            <SheetHeader><SheetTitle>Importar Transacciones</SheetTitle></SheetHeader>
-            <SheetDescription id="import-sheet-desc">Sube un archivo CSV para previsualizar y confirmar la importación de transacciones.</SheetDescription>
+            <SheetHeader><SheetTitle>{t('transactions.importSheet.title')}</SheetTitle></SheetHeader>
+            <SheetDescription id="import-sheet-desc">{t('transactions.importSheet.description')}</SheetDescription>
             <div className="py-4">
-                <p className="text-sm text-muted-foreground mb-4">Previsualización de las transacciones a importar. Columnas requeridas: date, accountName, type, amount, category, note.</p>
+                <p className="text-sm text-muted-foreground mb-2">{t('transactions.importSheet.preview')}</p>
+                <p className="text-xs text-muted-foreground mb-4">{t('transactions.importSheet.columns')}</p>
                 <div className="max-h-96 overflow-auto border rounded-md">
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 {importPreview[0] && Object.keys(importPreview[0]).filter(k => k !== 'isDateValid').map(key => <TableHead key={key}>{key}</TableHead>)}
-                                <TableHead>Validación</TableHead>
+                                <TableHead>{t('transactions.importSheet.validation')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -289,7 +290,7 @@ export function TransactionsPage() {
                                 <TableRow key={i}>
                                     {Object.entries(row).filter(([k]) => k !== 'isDateValid').map(([key, val], j) => <TableCell key={j}>{val as string}</TableCell>)}
                                     <TableCell>
-                                        {!row.isDateValid && <Badge variant="destructive">Fecha Inv��lida</Badge>}
+                                        {!row.isDateValid && <Badge variant="destructive">{t('transactions.importSheet.invalidDate')}</Badge>}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -297,7 +298,7 @@ export function TransactionsPage() {
                     </Table>
                 </div>
                 <div className="mt-6 flex justify-end">
-                    <Button onClick={handleImport}>Confirmar Importación</Button>
+                    <Button onClick={handleImport}>{t('transactions.importSheet.confirm')}</Button>
                 </div>
             </div>
         </SheetContent>
@@ -305,9 +306,9 @@ export function TransactionsPage() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent aria-describedby={deleteDescriptionId}>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription id={deleteDescriptionId}>
-              Esta acción no se puede deshacer. Se eliminará la transacción permanentemente y se ajustará el saldo de la cuenta. Si es una plantilla recurrente, se eliminarán también todas las transacciones generadas.
+              {t('transactions.deleteWarning')} {t('transactions.deleteCascade')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

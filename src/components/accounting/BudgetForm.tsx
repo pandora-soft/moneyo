@@ -12,11 +12,12 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Budget } from '@shared/types';
+import t from '@/lib/i18n';
 const formSchema = z.object({
-  category: z.string().min(2, "La categoría es requerida.").max(50),
+  category: z.string().min(2, t('form.requiredCategory')).max(50),
   limit: z.preprocess(
     (val: unknown) => (val === '' ? 0 : Number(val)),
-    z.number().positive("El límite debe ser positivo.")
+    z.number().positive(t('form.positive'))
   ),
   month: z.date(),
 });
@@ -55,7 +56,7 @@ export function BudgetForm({ onSubmit, onFinished, defaultValues, categories = [
           name="category"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Categoría</FormLabel>
+              <FormLabel>{t('budget.category')}</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger><SelectValue placeholder="Seleccione una categoría" /></SelectTrigger>
@@ -73,7 +74,7 @@ export function BudgetForm({ onSubmit, onFinished, defaultValues, categories = [
           name="limit"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Límite de Gasto</FormLabel>
+              <FormLabel>{t('budget.spendingLimit')}</FormLabel>
               <FormControl><Input type="number" placeholder="500.00" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -84,7 +85,7 @@ export function BudgetForm({ onSubmit, onFinished, defaultValues, categories = [
           name="month"
           render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormLabel>Mes</FormLabel>
+              <FormLabel>{t('budget.month')}</FormLabel>
               <Popover>
                 <PopoverTrigger asChild>
                   <FormControl>
@@ -101,6 +102,7 @@ export function BudgetForm({ onSubmit, onFinished, defaultValues, categories = [
                     onSelect={field.onChange}
                     disabled={(date) => date < new Date("2000-01-01")}
                     initialFocus
+                    locale={es}
                   />
                 </PopoverContent>
               </Popover>
@@ -111,7 +113,7 @@ export function BudgetForm({ onSubmit, onFinished, defaultValues, categories = [
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar Presupuesto
+            {t('budget.save')}
           </Button>
         </div>
       </form>

@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
+import t from '@/lib/i18n';
 const schema = z.object({
-  name: z.string().min(2, 'Mínimo 2 caracteres').max(50, 'Máximo 50 caracteres')
+  name: z.string().min(2, t('form.minChars', 2)).max(50, t('form.maxChars', 50))
 });
 type FormValues = z.infer<typeof schema>;
 interface Props {
@@ -30,7 +31,7 @@ export function CategoryForm({ onSubmit, defaultValues }: Props) {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre de Categoría</FormLabel>
+              <FormLabel>{t('settings.categories.name')}</FormLabel>
               <FormControl>
                 <Input placeholder="Ej: Entretenimiento" {...field} />
               </FormControl>
@@ -41,7 +42,7 @@ export function CategoryForm({ onSubmit, defaultValues }: Props) {
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {defaultValues?.name ? 'Actualizar' : 'Crear'}
+            {defaultValues?.name ? t('common.save') : t('common.add')}
           </Button>
         </div>
       </form>

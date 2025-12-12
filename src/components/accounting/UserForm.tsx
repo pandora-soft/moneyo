@@ -9,10 +9,10 @@ import { Loader2 } from 'lucide-react';
 import t from '@/lib/i18n';
 import type { User } from '@shared/types';
 const userSchema = z.object({
-  username: z.string().min(3, 'Mínimo 3 caracteres').max(20, 'Máximo 20 caracteres'),
-  password: z.string().min(5, 'Mínimo 5 caracteres').optional().or(z.literal('')),
+  username: z.string().min(3, t('form.minChars', 3)).max(20, t('form.maxChars', 20)),
+  password: z.string().min(5, t('form.minChars', 5)).optional().or(z.literal('')),
   role: z.enum(['user', 'admin']),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  email: z.string().email(t('form.email')).optional().or(z.literal('')),
 });
 type UserFormValues = z.infer<typeof userSchema>;
 interface UserFormProps {
@@ -76,7 +76,7 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email (Opcional)</FormLabel>
+              <FormLabel>{t('settings.users.email')}</FormLabel>
               <FormControl>
                 <Input type="email" placeholder="usuario@ejemplo.com" {...field} />
               </FormControl>
@@ -97,8 +97,8 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="user">Usuario</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="user">{t('settings.users.roleUser')}</SelectItem>
+                  <SelectItem value="admin">{t('settings.users.roleAdmin')}</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -108,7 +108,7 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? 'Actualizar Usuario' : 'Crear Usuario'}
+            {isEditing ? t('common.save') : t('common.add')}
           </Button>
         </div>
       </form>

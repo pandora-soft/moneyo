@@ -1,228 +1,197 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
-import { Textarea } from '@/components/ui/textarea'
-import type { Chat, ChatMessage, User } from '@shared/types'
-import { api } from '@/lib/api-client'
-
-export const HAS_TEMPLATE_DEMO = true
-
-const glassCard = 'backdrop-blur-xl bg-white/10 dark:bg-black/20 border-white/20 shadow-2xl'
-
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { api } from '@/lib/api-client';
+import type { Chat, ChatMessage, User } from '@shared/types';
+import { toast } from 'sonner';
+import { useAppStore } from '../stores/useAppStore';
+import { Skeleton } from './ui/skeleton';
 export function TemplateDemo() {
-  const [users, setUsers] = useState<User[]>([])
-  const [chats, setChats] = useState<Chat[]>([])
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-
-  const [selectedUserId, setSelectedUserId] = useState<string>('')
-  const [selectedChatId, setSelectedChatId] = useState<string>('')
-
-  const [newUserName, setNewUserName] = useState('')
-  const [newChatTitle, setNewChatTitle] = useState('')
-  const [text, setText] = useState('')
-
-  const [loadingMessages, setLoadingMessages] = useState(false)
-
-  const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users])
-
-  const load = useCallback(async () => {
-    const [uPage, cPage] = await Promise.all([
-      api<{ items: User[]; next: string | null }>('/api/users'),
-      api<{ items: Chat[]; next: string | null }>('/api/chats'),
-    ])
-    setUsers(uPage.items)
-    setChats(cPage.items)
-
-    setSelectedUserId((prev) => prev || uPage.items[0]?.id || '')
-    setSelectedChatId((prev) => prev || cPage.items[0]?.id || '')
-  }, [])
-
-  const loadMessages = useCallback(async (chatId: string) => {
-    setLoadingMessages(true)
-    try {
-      const list = await api<ChatMessage[]>(`/api/chats/${chatId}/messages`)
-      setMessages(list)
-    } finally {
-      setLoadingMessages(false)
+  const [count, setCount] = useState(0);
+  const [users, setUsers] = useState<User[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newUserName, setNewUserName] = useState('');
+  const [newChatTitle, setNewChatTitle] = useState('');
+  const [newMessageText, setNewMessageText] = useState('');
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const refetchTrigger = useAppStore((state) => state.refetchData);
+  const triggerRefetch = useAppStore((state) => state.triggerRefetch);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [counterRes, usersRes, chatsRes] = await Promise.all([
+          api<{ count: number }>('/api/counter'),
+          api<User[]>('/api/demo/users'),
+          api<Chat[]>('/api/demo/chats'),
+        ]);
+        setCount(counterRes.count);
+        setUsers(usersRes);
+        setChats(chatsRes);
+        if (usersRes.length > 0 && !selectedUserId) {
+          setSelectedUserId(usersRes[0].id);
+        }
+        if (chatsRes.length > 0 && !selectedChatId) {
+          setSelectedChatId(chatsRes[0].id);
+        }
+      } catch (error) {
+        toast.error('Failed to fetch initial data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [refetchTrigger, selectedUserId, selectedChatId]);
+  useEffect(() => {
+    if (selectedChatId) {
+      api<ChatMessage[]>(`/api/demo/chats/${selectedChatId}/messages`)
+        .then(setMessages)
+        .catch(() => toast.error('Failed to fetch messages.'));
     }
-  }, [])
-
-  useEffect(() => {
-    load().catch(() => {})
-  }, [load])
-
-  useEffect(() => {
-    if (!selectedChatId) return
-    loadMessages(selectedChatId).catch(() => {})
-  }, [selectedChatId, loadMessages])
-
-  const createUser = async () => {
-    const name = newUserName.trim()
-    if (!name) return
-    const u = await api<User>('/api/users', { method: 'POST', body: JSON.stringify({ name }) })
-    setUsers((prev) => [...prev, u])
-    setNewUserName('')
-    setSelectedUserId((prev) => prev || u.id)
+  }, [selectedChatId, refetchTrigger]);
+  const handleIncrement = async () => {
+    try {
+      const res = await api<{ count: number }>('/api/counter/increment', { method: 'POST' });
+      setCount(res.count);
+    } catch (error) {
+      toast.error('Failed to increment counter.');
+    }
+  };
+  const handleAddUser = async () => {
+    if (!newUserName.trim()) return;
+    try {
+      await api('/api/demo/users', { method: 'POST', body: JSON.stringify({ name: newUserName }) });
+      setNewUserName('');
+      triggerRefetch();
+      toast.success('User added!');
+    } catch (error) {
+      toast.error('Failed to add user.');
+    }
+  };
+  const handleAddChat = async () => {
+    if (!newChatTitle.trim()) return;
+    try {
+      await api('/api/demo/chats', { method: 'POST', body: JSON.stringify({ title: newChatTitle }) });
+      setNewChatTitle('');
+      triggerRefetch();
+      toast.success('Chat created!');
+    } catch (error) {
+      toast.error('Failed to create chat.');
+    }
+  };
+  const handleSendMessage = async () => {
+    if (!newMessageText.trim() || !selectedChatId || !selectedUserId) return;
+    try {
+      await api(`/api/demo/chats/${selectedChatId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ userId: selectedUserId, text: newMessageText }),
+      });
+      setNewMessageText('');
+      triggerRefetch();
+    } catch (error) {
+      toast.error('Failed to send message.');
+    }
+  };
+  const getUserById = (id: string) => users.find((u) => u.id === id);
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-8">
+        <Skeleton className="h-64" />
+        <Skeleton className="h-64" />
+        <Skeleton className="h-64" />
+      </div>
+    );
   }
-
-  const createChat = async () => {
-    const title = newChatTitle.trim()
-    if (!title) return
-    const c = await api<Chat>('/api/chats', { method: 'POST', body: JSON.stringify({ title }) })
-    setChats((prev) => [...prev, c])
-    setNewChatTitle('')
-    setSelectedChatId((prev) => prev || c.id)
-  }
-
-  const send = async () => {
-    const msg = text.trim()
-    if (!selectedUserId || !selectedChatId || !msg) return
-
-    const created = await api<ChatMessage>(`/api/chats/${selectedChatId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({ userId: selectedUserId, text: msg }),
-    })
-
-    setMessages((prev) => [...prev, created])
-    setText('')
-  }
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <Card className={glassCard}>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-4 md:p-8">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-base">Entities</CardTitle>
+          <CardTitle>DO Counter</CardTitle>
+          <CardDescription>A simple counter stored in a Durable Object.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-4xl font-bold text-center">{count}</p>
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleIncrement} className="w-full">
+            Increment
+          </Button>
+        </CardFooter>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Users & Chats</CardTitle>
+          <CardDescription>Manage users and chat rooms.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Users</div>
-            <div className="flex gap-2">
-              <Input placeholder="New user name" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} />
-              <Button onClick={createUser} variant="outline">Add</Button>
-            </div>
-            <div className="space-y-2">
-              {users.length ? users.slice(0, 6).map((u) => (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => setSelectedUserId(u.id)}
-                  className={`w-full text-left flex items-center justify-between border rounded px-3 py-2 transition-colors ${selectedUserId === u.id ? 'bg-white/10 dark:bg-white/5' : 'hover:bg-white/5 dark:hover:bg-white/5'}`}
-                >
-                  <span className="font-medium">{u.name}</span>
-                  <span className="text-xs text-muted-foreground">{u.id.slice(0, 6)}…</span>
-                </button>
-              )) : (
-                <div className="text-sm text-muted-foreground">No users yet.</div>
-              )}
+          <div>
+            <Label>Users</Label>
+            <ScrollArea className="h-24 border rounded-md p-2">
+              {users.map((user) => (
+                <div key={user.id} className={`p-1 rounded ${selectedUserId === user.id ? 'bg-accent' : ''}`} onClick={() => setSelectedUserId(user.id)}>
+                  {user.username}
+                </div>
+              ))}
+            </ScrollArea>
+            <div className="flex gap-2 mt-2">
+              <Input value={newUserName} onChange={(e) => setNewUserName(e.target.value)} placeholder="New user name" />
+              <Button onClick={handleAddUser}>Add</Button>
             </div>
           </div>
-
-          <Separator className="bg-white/10" />
-
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Chats</div>
-            <div className="flex gap-2">
-              <Input placeholder="New chat title" value={newChatTitle} onChange={(e) => setNewChatTitle(e.target.value)} />
-              <Button onClick={createChat} variant="outline">Add</Button>
-            </div>
-            <div className="space-y-2">
-              {chats.length ? chats.slice(0, 6).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setSelectedChatId(c.id)}
-                  className={`w-full text-left flex items-center justify-between border rounded px-3 py-2 transition-colors ${selectedChatId === c.id ? 'bg-white/10 dark:bg-white/5' : 'hover:bg-white/5 dark:hover:bg-white/5'}`}
-                >
-                  <span className="font-medium">{c.title}</span>
-                  <span className="text-xs text-muted-foreground">{c.id.slice(0, 6)}…</span>
-                </button>
-              )) : (
-                <div className="text-sm text-muted-foreground">No chats yet.</div>
-              )}
+          <Separator />
+          <div>
+            <Label>Chats</Label>
+            <ScrollArea className="h-24 border rounded-md p-2">
+              {chats.map((chat) => (
+                <div key={chat.id} className={`p-1 rounded ${selectedChatId === chat.id ? 'bg-accent' : ''}`} onClick={() => setSelectedChatId(chat.id)}>
+                  {chat.title}
+                </div>
+              ))}
+            </ScrollArea>
+            <div className="flex gap-2 mt-2">
+              <Input value={newChatTitle} onChange={(e) => setNewChatTitle(e.target.value)} placeholder="New chat title" />
+              <Button onClick={handleAddChat}>Add</Button>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      <Card className={`${glassCard} lg:col-span-2 flex flex-col`}>
+      <Card className="flex flex-col">
         <CardHeader>
-          <CardTitle className="text-base">Chat</CardTitle>
+          <CardTitle>Chat: {chats.find((c) => c.id === selectedChatId)?.title || 'Select a chat'}</CardTitle>
+          <CardDescription>Messages will appear here.</CardDescription>
         </CardHeader>
-        <CardContent className="flex-1 flex flex-col gap-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select user" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedChatId} onValueChange={setSelectedChatId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select chat" />
-              </SelectTrigger>
-              <SelectContent>
-                {chats.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex-1 rounded-lg border bg-white/5 dark:bg-white/5 p-3 overflow-y-auto">
-            {loadingMessages ? (
-              <div className="text-sm text-muted-foreground">Loading messages…</div>
-            ) : messages.length ? (
-              <div className="space-y-2">
-                {messages.map((m) => (
-                  <div key={m.id} className="text-sm">
-                    <span className="font-medium">
-                      {usersById.get(m.userId)?.name ?? 'Unknown'}:
-                    </span>{' '}
-                    <span>{m.text}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {new Date(m.ts).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))}
+        <CardContent className="flex-grow overflow-hidden">
+          <ScrollArea className="h-64 p-4 border rounded-md">
+            {messages.map((msg) => (
+              <div key={msg.id} className="mb-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <span className="font-bold">{getUserById(msg.userId)?.username || '?'}</span>:
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{new Date(msg.ts).toLocaleString()}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>{' '}
+                {msg.text}
               </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">No messages yet.</div>
-            )}
-          </div>
-
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              send().catch(() => {})
-            }}
-          >
-            <Textarea
-              placeholder={selectedUserId && selectedChatId ? 'Write a message…' : 'Select a user and chat first'}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={!selectedUserId || !selectedChatId}
-              className="min-h-[44px] max-h-28"
-            />
-            <Button type="submit" className="shrink-0" disabled={!selectedUserId || !selectedChatId || !text.trim()}>
-              Send
-            </Button>
-          </form>
+            ))}
+          </ScrollArea>
         </CardContent>
+        <CardFooter className="flex gap-2">
+          <Input value={newMessageText} onChange={(e) => setNewMessageText(e.target.value)} placeholder="Type a message..." onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} />
+          <Button onClick={handleSendMessage}>Send</Button>
+        </CardFooter>
       </Card>
     </div>
-  )
+  );
 }

@@ -226,17 +226,17 @@ export function ReportsPage() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <div>
             <h1 className="text-4xl font-display font-bold">{t('pages.reports')}</h1>
-            <p className="text-muted-foreground mt-1">Visualiza tus patrones de ingresos y gastos.</p>
+            <p className="text-muted-foreground mt-1">{t('reports.description')}</p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => handleExport('csv')} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> Transacciones CSV</Button>
+            <Button onClick={() => handleExport('csv')} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> {t('reports.exportTransactionsCSV')}</Button>
             <Button onClick={() => handleExport('pdf')} disabled={generatingPDF || loading}>
-                {generatingPDF ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />} Reporte PDF</Button>
+                {generatingPDF ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />} {t('reports.exportPDF')}</Button>
           </div>
         </header>
         <TransactionFilters filters={filters} setFilters={setFilters} accounts={[]} focus="date" />
         <p className="text-sm text-muted-foreground mb-4">
-          Mostrando {filteredTransactions.length} de {transactions.length} transacciones.
+          {t('common.filteredXOfY', filteredTransactions.length, transactions.length)}
         </p>
         <div className="space-y-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid gap-8 lg:grid-cols-2">
@@ -279,8 +279,8 @@ export function ReportsPage() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle>{t('budget.list')} Overview</CardTitle>
-                    <CardDescription>Un vistazo rápido a tus presupuestos activos.</CardDescription>
+                    <CardTitle>{t('budget.overview')}</CardTitle>
+                    <CardDescription>{t('budget.overviewDesc')}</CardDescription>
                   </div>
                   <Button variant="outline" onClick={exportBudgets} disabled={budgetsWithActuals.length === 0}>
                     <Download className="mr-2 size-4" /> {t('common.exportBudgets')}
@@ -290,9 +290,9 @@ export function ReportsPage() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex text-sm font-medium text-muted-foreground px-2">
-                    <div className="w-1/4 cursor-pointer" onClick={() => handleSort('category')}>Categoría <ArrowUpDown className="inline-block ml-1 size-3" /></div>
-                    <div className="w-1/4 cursor-pointer" onClick={() => handleSort('month')}>Mes <ArrowUpDown className="inline-block ml-1 size-3" /></div>
-                    <div className="w-1/2">Progreso</div>
+                    <div className="w-1/4 cursor-pointer" onClick={() => handleSort('category')}>{t('budget.category')} <ArrowUpDown className="inline-block ml-1 size-3" /></div>
+                    <div className="w-1/4 cursor-pointer" onClick={() => handleSort('month')}>{t('budget.month')} <ArrowUpDown className="inline-block ml-1 size-3" /></div>
+                    <div className="w-1/2">{t('budget.progress')}</div>
                   </div>
                   {budgetsWithActuals.slice(0, 5).map(b => (
                     <div key={b.id} className="flex flex-col text-sm p-2 rounded-md hover:bg-muted/50">
@@ -311,7 +311,7 @@ export function ReportsPage() {
                   ))}
                    {budgetsWithActuals.length === 0 && !loading && <p className="text-center text-muted-foreground py-4">No hay presupuestos para mostrar.</p>}
                   <Button asChild variant="link" className="mt-4 w-full p-0 h-auto">
-                    <Link to="/budgets">Ver Todos los Presupuestos</Link>
+                    <Link to="/budgets">{t('budget.viewAll')}</Link>
                   </Button>
                 </div>
               </CardContent>
