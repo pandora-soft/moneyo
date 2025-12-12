@@ -208,7 +208,7 @@ const computedBudgets = budgets.map(b => {
       return 0;
     });
     return { monthlySummary: monthlyChartData, categorySpending: categoryChartData, budgetsWithActuals: computedBudgets };
-  }, [filteredTransactions, budgets, sortConfig]);
+  }, [filteredTransactions, budgets, sortConfig, transactions]);
   const handleSort = (key: 'category' | 'month') => {
     setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
   };
@@ -247,48 +247,47 @@ const computedBudgets = budgets.map(b => {
             doc.setFontSize(12);
             doc.text(t('labels.monthlySummary'), 40, 90);
             const [barImage, pieImage] = await Promise.all([svgToPngDataUrl(barChartRef.current), svgToPngDataUrl(pieChartRef.current)]);
-let currentY = 110;
+let chartY = 110;
 if (barImage) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const maxWidth = pageWidth - 80;
   const imgHeight = (300 * maxWidth) / 600;
-  doc.addImage(barImage, 'PNG', 40, currentY, maxWidth, imgHeight);
-  currentY += imgHeight + 10;
+  doc.addImage(barImage, 'PNG', 40, chartY, maxWidth, imgHeight);
+  chartY += imgHeight + 10;
 }
 const monthlyBody = monthlySummary.slice(0, 10).map(row => [row.name, formatCurrency(row.income), formatCurrency(row.expense)]);
 if (monthlyBody.length === 0) {
-  doc.text('No hay datos para este período.', 40, currentY, { maxWidth: 400 });
-  currentY += 40;
+  doc.text('No hay datos para este período.', 40, chartY, { maxWidth: 400 });
+  chartY += 40;
 } else {
   doc.setFont('helvetica');
   doc.setFontSize(11);
   (doc as any).autoTable({
-    startY: currentY,
+    startY: chartY,
     head: [['Mes', t('finance.income'), t('finance.expense')]],
     body: monthlyBody,
   });
-  currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 120);
+  chartY = (doc as any).lastAutoTable?.finalY ?? (chartY + 120);
 }
 doc.addPage();
 doc.text(t('labels.categorySpending'), 40, 40);
-let currentY = 70;
+let pieY = 70;
 if (pieImage) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const maxWidth = pageWidth - 80;
   const imgHeight = (300 * maxWidth) / 600;
-  doc.addImage(pieImage, 'PNG', 40, currentY, maxWidth, imgHeight);
-  currentY += imgHeight + 10;
+  doc.addImage(pieImage, 'PNG', 40, pieY, maxWidth, imgHeight);
+  pieY += imgHeight + 10;
 }
             const categoryBody = categorySpending.slice(0, 10);
-const categoryBody = categorySpending.slice(0, 10);
 if (categoryBody.length === 0) {
-  doc.text('No hay datos para este período.', 40, currentY, { maxWidth: 400 });
-  currentY += 40;
+  doc.text('No hay datos para este período.', 40, pieY, { maxWidth: 400 });
+  pieY += 40;
 } else {
   doc.setFont('helvetica');
   doc.setFontSize(11);
   (doc as any).autoTable({
-    startY: currentY,
+    startY: pieY,
     head: [['Categoría', 'Gasto', 'Límite']],
     body: categoryBody.map(row => [
       row.name,
@@ -304,7 +303,7 @@ if (categoryBody.length === 0) {
       }
     },
   });
-  currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 120);
+  pieY = (doc as any).lastAutoTable?.finalY ?? (pieY + 120);
 }
             // --- Budgets summary section ---
             doc.addPage();
