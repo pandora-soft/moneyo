@@ -193,13 +193,13 @@ export function ReportsPage() {
             return { name, value, limit: budget?.limit || 0, computedActual: value, color: getCategoryColor(name) };
           })
       .sort((a, b) => b.value - a.value);
-    const computedBudgets = budgets.map(b => {
-      const monthStart = new Date(b.month);
-      const actual = filteredTransactions
-        .filter(t => t.type === 'expense' && getMonth(new Date(t.ts)) === getMonth(monthStart) && getYear(new Date(t.ts)) === getYear(monthStart) && t.category === b.category)
-        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      return { ...b, computedActual: actual, color: getCategoryColor(b.category) };
-    });
+const computedBudgets = budgets.map(b => {
+  const monthStart = new Date(b.month);
+  const actual = transactions
+    .filter(t => t.type === 'expense' && getMonth(new Date(t.ts)) === getMonth(monthStart) && getYear(new Date(t.ts)) === getYear(monthStart) && t.category === b.category)
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  return { ...b, computedActual: actual, color: getCategoryColor(b.category) };
+});
     computedBudgets.sort((a, b) => {
       const key = sortConfig.key;
       const direction = sortConfig.direction === 'asc' ? 1 : -1;
@@ -247,69 +247,65 @@ export function ReportsPage() {
             doc.setFontSize(12);
             doc.text(t('labels.monthlySummary'), 40, 90);
             const [barImage, pieImage] = await Promise.all([svgToPngDataUrl(barChartRef.current), svgToPngDataUrl(pieChartRef.current)]);
-            let currentY = 100;
-            if (!barImage) {
-              doc.text('Gráfico de barras no disponible', 40, currentY, { maxWidth: 400 });
-              currentY += 40;
-            } else {
-              const pageWidth = doc.internal.pageSize.getWidth();
-              const maxWidth = pageWidth - 80;
-              const imgHeight = (300 * maxWidth) / 600;
-              doc.addImage(barImage, 'PNG', 40, currentY, maxWidth, imgHeight);
-              currentY += imgHeight + 10;
-            }
-            try {
-              doc.setFont('helvetica');
-              doc.setFontSize(11);
-              (doc as any).autoTable({
-                startY: currentY,
-                head: [['Mes', t('finance.income'), t('finance.expense')]],
-                body: monthlySummary.slice(0, 10).map(row => [row.name, formatCurrency(row.income), formatCurrency(row.expense)]),
-              });
-              currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 120);
-            } catch (e) {
-              doc.text('Error al generar tabla de resumen mensual', 40, currentY, { maxWidth: 400 });
-              currentY += 40;
-            }
-            doc.addPage();
-            doc.text(t('labels.categorySpending'), 40, 40);
-            currentY = 50;
-            if (!pieImage) {
-              doc.text('Gráfico de categorías no disponible', 40, currentY, { maxWidth: 400 });
-              currentY += 40;
-            } else {
-              const pageWidth = doc.internal.pageSize.getWidth();
-              const maxWidth = pageWidth - 80;
-              const imgHeight = (300 * maxWidth) / 600;
-              doc.addImage(pieImage, 'PNG', 40, currentY, maxWidth, imgHeight);
-              currentY += imgHeight + 10;
-            }
+let currentY = 110;
+if (barImage) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const maxWidth = pageWidth - 80;
+  const imgHeight = (300 * maxWidth) / 600;
+  doc.addImage(barImage, 'PNG', 40, currentY, maxWidth, imgHeight);
+  currentY += imgHeight + 10;
+}
+const monthlyBody = monthlySummary.slice(0, 10).map(row => [row.name, formatCurrency(row.income), formatCurrency(row.expense)]);
+if (monthlyBody.length === 0) {
+  doc.text('No hay datos para este período.', 40, currentY, { maxWidth: 400 });
+  currentY += 40;
+} else {
+  doc.setFont('helvetica');
+  doc.setFontSize(11);
+  (doc as any).autoTable({
+    startY: currentY,
+    head: [['Mes', t('finance.income'), t('finance.expense')]],
+    body: monthlyBody,
+  });
+  currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 120);
+}
+doc.addPage();
+doc.text(t('labels.categorySpending'), 40, 40);
+let currentY = 70;
+if (pieImage) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const maxWidth = pageWidth - 80;
+  const imgHeight = (300 * maxWidth) / 600;
+  doc.addImage(pieImage, 'PNG', 40, currentY, maxWidth, imgHeight);
+  currentY += imgHeight + 10;
+}
             const categoryBody = categorySpending.slice(0, 10);
-            try {
-              doc.setFont('helvetica');
-              doc.setFontSize(11);
-              (doc as any).autoTable({
-                startY: currentY,
-                head: [['Categoría', 'Gasto', 'Límite']],
-                body: categoryBody.map(row => [
-                  row.name,
-                  formatCurrency(row.value),
-                  row.limit > 0 ? formatCurrency(row.limit) : 'N/A',
-                ]),
-                didParseCell: (data: any) => {
-                  if (data.section === 'body') {
-                    const item = categoryBody[data.row.index];
-                    if (item && item.limit > 0 && item.computedActual > item.limit) {
-                      data.cell.styles.textColor = [255, 0, 0];
-                    }
-                  }
-                },
-              });
-              currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 120);
-            } catch (e) {
-              doc.text('Error al generar tabla de gastos por categoría', 40, currentY, { maxWidth: 400 });
-              currentY += 40;
-            }
+const categoryBody = categorySpending.slice(0, 10);
+if (categoryBody.length === 0) {
+  doc.text('No hay datos para este período.', 40, currentY, { maxWidth: 400 });
+  currentY += 40;
+} else {
+  doc.setFont('helvetica');
+  doc.setFontSize(11);
+  (doc as any).autoTable({
+    startY: currentY,
+    head: [['Categoría', 'Gasto', 'Límite']],
+    body: categoryBody.map(row => [
+      row.name,
+      formatCurrency(row.value),
+      row.limit > 0 ? formatCurrency(row.limit) : 'N/A',
+    ]),
+    didParseCell: (data: any) => {
+      if (data.section === 'body') {
+        const item = categoryBody[data.row.index];
+        if (item && item.limit > 0 && item.computedActual > item.limit) {
+          data.cell.styles.textColor = [255, 0, 0];
+        }
+      }
+    },
+  });
+  currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 120);
+}
             // --- Budgets summary section ---
             doc.addPage();
             doc.setFontSize(16);
@@ -323,7 +319,12 @@ const budgetsBody = budgetsWithActuals.slice(0, 10).map(b => [
   formatCurrency(b.computedActual),
   formatCurrency(b.limit),
 ]);
-try {
+if (budgetsBody.length === 0) {
+  doc.text('No hay datos para este período.', 40, budgetsY, { maxWidth: 400 });
+  budgetsY += 40;
+} else {
+  doc.setFont('helvetica');
+  doc.setFontSize(11);
   (doc as any).autoTable({
     startY: budgetsY,
     head: [['Categoría', 'Mes', 'Actual', 'Límite']],
@@ -338,10 +339,7 @@ try {
     },
   });
   budgetsY = (doc as any).lastAutoTable?.finalY ?? (budgetsY + 120);
-            } catch (e) {
-              doc.text('Error al generar tabla de presupuestos', 40, budgetsY, { maxWidth: 400 });
-              budgetsY += 40;
-            }
+}
 
             // --- Save PDF ---
             const pdfBlob = doc.output('blob');
@@ -417,7 +415,11 @@ try {
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie data={categorySpending} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                          {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={tailwindColorToHex[entry.color] || '#6b7280'} />))}
+                          {categorySpending.map((entry, index) => {
+  const colorKey = entry.color.split(' ')[0];
+  return <Cell key={`cell-${index}`} fill={tailwindColorToHex[colorKey] || '#6b7280'} />;
+})}
+```
                         </Pie>
                         <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.computedActual)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                       </PieChart>
@@ -463,3 +465,4 @@ try {
     </div>
   );
 }
+ 
