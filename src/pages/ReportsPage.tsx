@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { jsPDF } from 'jspdf';
-import { autoTable } from 'jspdf-autotable';
+import 'jspdf-autotable';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, Pie, PieChart, Cell } from 'recharts';
 import { api } from '@/lib/api-client';
 import type { Transaction, Budget } from '@shared/types';
-import { format, getMonth, getYear, startOfMonth } from 'date-fns';
+import { format, getMonth, getYear, startOfMonth, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Download, Loader2, ArrowUpDown } from 'lucide-react';
@@ -18,6 +18,8 @@ import { useFormatCurrency } from '@/lib/formatCurrency';
 import { useAppStore } from '@/stores/useAppStore';
 import t from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
+import type { DateRange } from 'react-day-picker';
 const COLORS = ['#0F172A', '#F97316', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
 export function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -25,6 +27,7 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: 'category' | 'month'; direction: 'asc' | 'desc' }>({ key: 'month', direction: 'desc' });
+  const [filters, setFilters] = useState<Filters>({ query: '', accountId: 'all', type: 'all', dateRange: undefined, preset: 'all' });
   const formatCurrency = useFormatCurrency();
   const barChartRef = useRef<HTMLDivElement | null>(null);
   const pieChartRef = useRef<HTMLDivElement | null>(null);
@@ -75,8 +78,15 @@ export function ReportsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData, refetchTrigger]);
+  const filteredTransactions = useMemo(() => {
+    if (!filters.dateRange?.from) return transactions;
+    return transactions.filter(t => isWithinInterval(new Date(t.ts), {
+      start: filters.dateRange!.from!,
+      end: filters.dateRange!.to ?? new Date(),
+    }));
+  }, [transactions, filters.dateRange]);
   const { monthlySummary, categorySpending, budgetsWithActuals } = useMemo(() => {
-    const summary = transactions.reduce((acc, tx) => {
+    const summary = filteredTransactions.reduce((acc, tx) => {
       const monthKey = format(new Date(tx.ts), 'yyyy-MM');
       if (!acc[monthKey]) acc[monthKey] = { income: 0, expense: 0, name: format(new Date(tx.ts), 'MMM yyyy', { locale: es }) };
       if (tx.type === 'income') acc[monthKey].income += tx.amount;
@@ -85,8 +95,8 @@ export function ReportsPage() {
     }, {} as Record<string, { income: number; expense: number; name: string }>);
     const monthlyChartData = Object.values(summary).reverse();
     const currentMonthStart = startOfMonth(new Date());
-    const spending = transactions
-      .filter(tx => tx.type === 'expense' && new Date(tx.ts) >= currentMonthStart)
+    const spending = filteredTransactions
+      .filter(tx => tx.type === 'expense')
       .reduce((acc, tx) => {
         if (!acc[tx.category]) acc[tx.category] = 0;
         acc[tx.category] += Math.abs(tx.amount);
@@ -100,7 +110,7 @@ export function ReportsPage() {
       .sort((a, b) => b.value - a.value);
     const computedBudgets = budgets.map(b => {
       const monthStart = new Date(b.month);
-      const actual = transactions
+      const actual = filteredTransactions
         .filter(t => t.type === 'expense' && getMonth(new Date(t.ts)) === getMonth(monthStart) && getYear(new Date(t.ts)) === getYear(monthStart) && t.category === b.category)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
       return { ...b, computedActual: actual };
@@ -113,19 +123,28 @@ export function ReportsPage() {
       return 0;
     });
     return { monthlySummary: monthlyChartData, categorySpending: categoryChartData, budgetsWithActuals: computedBudgets };
-  }, [transactions, budgets, sortConfig]);
+  }, [filteredTransactions, budgets, sortConfig]);
   const handleSort = (key: 'category' | 'month') => {
     setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
+  };
+  const getExportFilename = (extension: 'csv' | 'pdf') => {
+    const base = 'moneyo-reporte';
+    if (filters.dateRange?.from) {
+      const from = format(filters.dateRange.from, 'yyyy-MM-dd');
+      const to = format(filters.dateRange.to ?? new Date(), 'yyyy-MM-dd');
+      return `${base}-${from}-a-${to}.${extension}`;
+    }
+    return `${base}-completo.${extension}`;
   };
   const handleExport = async (type: 'csv' | 'pdf') => {
     if (type === 'csv') {
         const headers = "Fecha,Cuenta ID,Tipo,Monto,Moneda,Categoría,Nota,Recurrente\n";
-        const csvContent = transactions.map(tx => `${new Date(tx.ts).toISOString()},${tx.accountId},${tx.type},${tx.amount},${tx.currency},"${tx.category}","${tx.note || ''}",${tx.recurrent || false}`).join("\n");
+        const csvContent = filteredTransactions.map(tx => `${new Date(tx.ts).toISOString()},${tx.accountId},${tx.type},${tx.amount},${tx.currency},"${tx.category}","${tx.note || ''}",${tx.recurrent || false}`).join("\n");
         const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", `moneyo_reporte_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        link.setAttribute("download", getExportFilename('csv'));
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -134,7 +153,7 @@ export function ReportsPage() {
         toast.info('Generando reporte PDF...');
         try {
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-            if (!(doc as any).autoTable) (doc as any).autoTable = (opts: any) => (autoTable as any)(doc, opts);
+            (doc as any).autoTable = (await import('jspdf-autotable')).default;
             doc.setFontSize(18);
             doc.text('Reporte Financiero - Moneyo', 40, 40);
             doc.setFontSize(11);
@@ -155,8 +174,7 @@ export function ReportsPage() {
               head: [['Mes', t('finance.income'), t('finance.expense')]],
               body: monthlySummary.slice(0, 10).map(row => [row.name, formatCurrency(row.income), formatCurrency(row.expense)]),
             });
-            const lastY = (doc as any).lastAutoTable?.finalY ?? (currentY + 20);
-            currentY = lastY + 20;
+            currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 20);
             doc.addPage();
             doc.text(t('labels.categorySpending'), 40, 40);
             currentY = 50;
@@ -173,7 +191,6 @@ export function ReportsPage() {
               head: [['Categoría', 'Gasto', 'Límite']],
               body: categoryBody.map(row => [row.name, formatCurrency(row.value), row.limit > 0 ? formatCurrency(row.limit) : 'N/A']),
               didParseCell: (data: any) => {
-                // style body rows red when computedActual > limit for that category
                 if (data.section === 'body') {
                   const item = categoryBody[data.row.index];
                   if (item && item.limit > 0 && item.computedActual > item.limit) {
@@ -182,7 +199,7 @@ export function ReportsPage() {
                 }
               },
             });
-            doc.save(`moneyo-reporte.pdf`);
+            doc.save(getExportFilename('pdf'));
             toast.success('Reporte PDF generado.');
         } catch (e) {
             toast.error(`Error al generar el reporte: ${e instanceof Error ? e.message : String(e)}`);
@@ -212,11 +229,15 @@ export function ReportsPage() {
             <p className="text-muted-foreground mt-1">Visualiza tus patrones de ingresos y gastos.</p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => handleExport('csv')} disabled={loading || transactions.length === 0}><Download className="mr-2 size-4" /> Transacciones CSV</Button>
+            <Button onClick={() => handleExport('csv')} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> Transacciones CSV</Button>
             <Button onClick={() => handleExport('pdf')} disabled={generatingPDF || loading}>
                 {generatingPDF ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />} Reporte PDF</Button>
           </div>
         </header>
+        <TransactionFilters filters={filters} setFilters={setFilters} accounts={[]} focus="date" />
+        <p className="text-sm text-muted-foreground mb-4">
+          Mostrando {filteredTransactions.length} de {transactions.length} transacciones.
+        </p>
         <div className="space-y-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid gap-8 lg:grid-cols-2">
             <Card>
