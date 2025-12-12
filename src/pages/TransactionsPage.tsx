@@ -22,6 +22,7 @@ import t from '@/lib/i18n';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCategoryColor } from '@/hooks/useCategoryColor';
 export function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -165,7 +166,7 @@ export function TransactionsPage() {
         `"${tx.amount}"`,
         `"${tx.category}"`,
         `"${tx.note || ''}"`,
-        tx.recurrent || tx.parentId ? 'Sí' : 'No'
+        tx.recurrent || tx.parentId ? 'S��' : 'No'
       ];
       return row.join(',');
     }).join('\n');
@@ -202,6 +203,34 @@ export function TransactionsPage() {
   const deleteDescriptionId = 'delete-transaction-description';
   const pageStart = pagination.cursor + 1;
   const pageEnd = Math.min(pagination.cursor + pagination.rowsPerPage, pagination.totalCount);
+  const TransactionRow = ({ tx }: { tx: Transaction }) => {
+    const categoryColor = useCategoryColor(tx.category);
+    const account = accountsById.get(tx.accountId);
+    return (
+      <TableRow className={cn("hover:bg-muted/50 transition-colors duration-150", (tx.recurrent || tx.parentId) && 'bg-muted/30')}>
+        <TableCell><div className="flex items-center gap-2">{account && accountIcons[account.type]}<span className="font-medium">{account?.name || 'N/A'}</span></div></TableCell>
+        <TableCell>
+            <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className={cn(categoryColor, "text-white hover:scale-105 hover:shadow-md transition-all duration-200 font-medium border-transparent")}>{tx.category}</Badge>
+                {tx.recurrent && <Badge variant="secondary">{t('transactions.recurrent.template')}</Badge>}
+                {tx.parentId && <Badge variant="secondary" className="text-xs">{t('transactions.recurrent.generated')}</Badge>}
+            </div>
+        </TableCell>
+        <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>
+        <TableCell className={cn("text-right font-mono", tx.type === 'income' ? 'text-emerald-500' : 'text-foreground')}>{formatCurrency(tx.amount, tx.currency)}</TableCell>
+        <TableCell>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-transparent hover:border-input hover:bg-accent"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => openModal(tx)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, frequency: undefined, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+    );
+  };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -252,33 +281,7 @@ export function TransactionsPage() {
                         <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                       ))
                     ) : filteredTransactions.length > 0 ? (
-                      filteredTransactions.map((tx) => {
-                        const account = accountsById.get(tx.accountId);
-                        return (
-                          <TableRow key={tx.id} className={cn("hover:bg-muted/50 transition-colors duration-150", (tx.recurrent || tx.parentId) && 'bg-muted/30')}>
-                            <TableCell><div className="flex items-center gap-2">{account && accountIcons[account.type]}<span className="font-medium">{account?.name || 'N/A'}</span></div></TableCell>
-                            <TableCell>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
-                                    {tx.recurrent && <Badge variant="secondary">{t('transactions.recurrent.template')}</Badge>}
-                                    {tx.parentId && <Badge variant="secondary" className="text-xs">{t('transactions.recurrent.generated')}</Badge>}
-                                </div>
-                            </TableCell>
-                            <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>
-                            <TableCell className={cn("text-right font-mono", tx.type === 'income' ? 'text-emerald-500' : 'text-foreground')}>{formatCurrency(tx.amount, tx.currency)}</TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-transparent hover:border-input hover:bg-accent"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openModal(tx)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, frequency: undefined, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
-                                  <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
+                      filteredTransactions.map((tx) => <TransactionRow key={tx.id} tx={tx} />)
                     ) : (
                       <TableRow>
                         <TableCell colSpan={5} className="h-24 text-center">

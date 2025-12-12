@@ -24,19 +24,16 @@ const hashCategory = (category: string): number => {
   }
   return Math.abs(hash);
 };
-
-/* Export a pure helper that implements the exact same logic as the hook previously used */
-export const getCategoryColor = (category?: string): string => {
-  if (!category) {
-    return 'bg-gray-500';
-  }
-  const lowerCategory = category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
-  if (seededMap[lowerCategory]) {
-    return seededMap[lowerCategory];
-  }
-  const hash = hashCategory(category);
-  return palette[hash % palette.length];
-};
 export const useCategoryColor = (category?: string): string => {
-  return useMemo(() => getCategoryColor(category), [category]);
+  return useMemo(() => {
+    if (!category) {
+      return 'bg-gray-500';
+    }
+    const lowerCategory = category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
+    if (seededMap[lowerCategory]) {
+      return seededMap[lowerCategory];
+    }
+    const hash = hashCategory(category);
+    return palette[hash % palette.length];
+  }, [category]);
 };

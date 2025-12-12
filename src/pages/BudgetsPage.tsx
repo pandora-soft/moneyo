@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
 import { api } from '@/lib/api-client';
 import type { Transaction, Budget } from '@shared/types';
 import { format, getMonth, getYear, startOfMonth, addMonths } from 'date-fns';
@@ -21,6 +21,7 @@ import t from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { useCategoryColor } from '@/hooks/useCategoryColor';
 export function BudgetsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -113,7 +114,7 @@ export function BudgetsPage() {
     setSheetOpen(true);
   };
   const exportFilteredBudgets = () => {
-    const headers = "Mes,Categor��a,Límite,Gasto Real,Estado\n";
+    const headers = "Mes,Categoría,Límite,Gasto Real,Estado\n";
     const csvContent = filteredBudgetsWithActuals.map(b => {
       const status = b.computedActual > b.limit ? t('budget.over') : t('budget.under');
       return `${format(new Date(b.month), 'yyyy-MM')},"${b.category}",${b.limit},${b.computedActual},${status}`;
@@ -126,6 +127,37 @@ export function BudgetsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+  const BudgetCard = ({ budget }: { budget: Budget & { computedActual: number } }) => {
+    const categoryColor = useCategoryColor(budget.category);
+    const progressColor = categoryColor.replace('bg-', '');
+    return (
+      <Card className="hover:shadow-lg transition-shadow duration-200">
+        <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex-1 font-semibold">
+            <span className={cn(categoryColor, "text-white px-2 py-1 rounded-md text-sm")}>{budget.category}</span>
+          </div>
+          <div className="w-full sm:w-1/2">
+            <div className="flex justify-between text-sm mb-1">
+              <span className={cn(budget.computedActual > budget.limit && 'text-destructive font-bold')}>{formatCurrency(budget.computedActual)}</span>
+              <span className="text-muted-foreground">{t('budget.limit')}: {formatCurrency(budget.limit)}</span>
+            </div>
+            <Progress value={(budget.computedActual / budget.limit) * 100} className={cn('h-2', budget.computedActual > budget.limit ? '[&>div]:bg-destructive' : `[&>div]:${categoryColor}`)} />
+          </div>
+          <div className="flex gap-2 self-end sm:self-center items-center">
+            <Badge variant={budget.computedActual > budget.limit ? 'destructive' : 'default'}>{budget.computedActual > budget.limit ? t('budget.over') : t('budget.under')}</Badge>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => { setEditingBudget(budget); setSheetOpen(true); }}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDuplicate(budget)}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingBudget(budget.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -180,7 +212,12 @@ export function BudgetsPage() {
                     }}
                   />
                   <Legend />
-                  <Bar dataKey="limit" fill="#8884d8" name={t('budget.limit')} radius={[4, 4, 0, 0]} /><Bar dataKey="actual" fill="#82ca9d" name={t('budget.actual')} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="limit" fill="#8884d8" name={t('budget.limit')} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="actual" name={t('budget.actual')} radius={[4, 4, 0, 0]}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={useCategoryColor(entry.name).replace('bg-','').replace('-500','')} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -195,29 +232,7 @@ export function BudgetsPage() {
             <AnimatePresence>
               {filteredBudgetsWithActuals.map(budget => (
                 <motion.div key={budget.id} layout variants={{ hidden: { y: 20, opacity: 0 }, show: { y: 0, opacity: 1 } }} exit={{ opacity: 0, y: -20 }}>
-                  <Card className="hover:shadow-lg transition-shadow duration-200">
-                    <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex-1 font-semibold">{budget.category}</div>
-                      <div className="w-full sm:w-1/2">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className={cn(budget.computedActual > budget.limit && 'text-destructive font-bold')}>{formatCurrency(budget.computedActual)}</span>
-                          <span className="text-muted-foreground">{t('budget.limit')}: {formatCurrency(budget.limit)}</span>
-                        </div>
-                        <Progress value={(budget.computedActual / budget.limit) * 100} className={cn('h-2', budget.computedActual > budget.limit && '[&>div]:bg-destructive')} />
-                      </div>
-                      <div className="flex gap-2 self-end sm:self-center items-center">
-                        <Badge variant={budget.computedActual > budget.limit ? 'destructive' : 'default'}>{budget.computedActual > budget.limit ? t('budget.over') : t('budget.under')}</Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setEditingBudget(budget); setSheetOpen(true); }}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDuplicate(budget)}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingBudget(budget.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <BudgetCard budget={budget} />
                 </motion.div>
               ))}
             </AnimatePresence>

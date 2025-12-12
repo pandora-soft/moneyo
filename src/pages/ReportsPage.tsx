@@ -19,8 +19,13 @@ import { useAppStore } from '@/stores/useAppStore';
 import t from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
-import type { DateRange } from 'react-day-picker';
-const COLORS = ['#0F172A', '#F97316', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+import { useCategoryColor } from '@/hooks/useCategoryColor';
+const tailwindColorToHex: Record<string, string> = {
+  'bg-emerald-500': '#10b981', 'bg-orange-500': '#f97316', 'bg-blue-500': '#3b82f6',
+  'bg-purple-500': '#8b5cf6', 'bg-red-500': '#ef4444', 'bg-yellow-500': '#eab308',
+  'bg-green-500': '#22c55e', 'bg-indigo-500': '#6366f1', 'bg-rose-500': '#f43f5e',
+  'bg-slate-500': '#64748b', 'bg-gray-500': '#6b7280',
+};
 export function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -220,6 +225,26 @@ export function ReportsPage() {
     link.click();
     document.body.removeChild(link);
   };
+  const BudgetRow = ({ budget }: { budget: Budget & { computedActual: number } }) => {
+    const categoryColor = useCategoryColor(budget.category);
+    return (
+      <div className="flex flex-col text-sm p-2 rounded-md hover:bg-muted/50">
+        <div className="flex items-center">
+          <div className="w-1/4 font-semibold">
+            <span className={cn(categoryColor, "text-white px-2 py-1 rounded-md text-sm")}>{budget.category}</span>
+          </div>
+          <div className="w-1/4 text-muted-foreground">{format(new Date(budget.month), 'MMM yyyy', { locale: es })}</div>
+          <div className="w-1/2">
+            <div className="flex justify-between">
+              <span className={cn('font-medium', budget.computedActual > budget.limit ? 'text-destructive' : 'text-emerald-500')}>{formatCurrency(budget.computedActual)}</span>
+              <span>{formatCurrency(budget.limit)}</span>
+            </div>
+            <Progress value={(budget.computedActual / budget.limit) * 100} className={cn('w-full mt-1 h-1', budget.computedActual > budget.limit ? '[&>div]:bg-destructive' : `[&>div]:${categoryColor}`)} />
+          </div>
+        </div>
+      </div>
+    );
+  };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -264,7 +289,7 @@ export function ReportsPage() {
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie data={categorySpending} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                          {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.limit > 0 && entry.computedActual > entry.limit ? '#EF4444' : COLORS[index % COLORS.length]} />))}
+                          {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={tailwindColorToHex[useCategoryColor(entry.name)] || '#6b7280'} />))}
                         </Pie>
                         <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.computedActual)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                       </PieChart>
@@ -295,19 +320,7 @@ export function ReportsPage() {
                     <div className="w-1/2">{t('budget.progress')}</div>
                   </div>
                   {budgetsWithActuals.slice(0, 5).map(b => (
-                    <div key={b.id} className="flex flex-col text-sm p-2 rounded-md hover:bg-muted/50">
-                      <div className="flex items-center">
-                        <div className="w-1/4 font-semibold">{b.category}</div>
-                        <div className="w-1/4 text-muted-foreground">{format(new Date(b.month), 'MMM yyyy', { locale: es })}</div>
-                        <div className="w-1/2">
-                          <div className="flex justify-between">
-                            <span className={cn('font-medium', b.computedActual > b.limit ? 'text-destructive' : 'text-emerald-500')}>{formatCurrency(b.computedActual)}</span>
-                            <span>{formatCurrency(b.limit)}</span>
-                          </div>
-                          <Progress value={(b.computedActual / b.limit) * 100} className={cn('w-full mt-1 h-1', b.computedActual > b.limit ? '[&>div]:bg-destructive' : '[&>div]:bg-emerald-500')} />
-                        </div>
-                      </div>
-                    </div>
+                    <BudgetRow key={b.id} budget={b} />
                   ))}
                    {budgetsWithActuals.length === 0 && !loading && <p className="text-center text-muted-foreground py-4">No hay presupuestos para mostrar.</p>}
                   <Button asChild variant="link" className="mt-4 w-full p-0 h-auto">

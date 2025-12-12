@@ -19,6 +19,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { api } from '@/lib/api-client';
 import { Combobox } from '@/components/ui/combobox';
 import t from '@/lib/i18n';
+import { useCategoryColor } from '@/hooks/useCategoryColor';
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 const formSchema = z.object({
   id: z.string().optional(),
