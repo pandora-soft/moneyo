@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -107,7 +107,7 @@ export function ReportsPage() {
 
     const png = await new Promise<string | null>((resolve) => {
       // -------------------------------------------------------------------------
-      // 3️⃣ Load timeout (5 seconds) – prevents hanging forever on broken SVGs
+      /* 3️⃣ Load timeout (5 seconds) – prevents hanging forever on broken SVGs */
       // -------------------------------------------------------------------------
       const timeoutId = setTimeout(() => {
         img.onload = null;
@@ -274,11 +274,11 @@ const computedBudgets = budgets.map(b => {
             } else {
                 doc.setFont('helvetica');
                 doc.setFontSize(11);
-                (doc as any).autoTable({
-                    startY: chartY,
-                    head: [['Mes', t('finance.income'), t('finance.expense')]],
-                    body: monthlyBody,
-                });
+            autoTable(doc, {
+                startY: chartY,
+                head: [['Mes', t('finance.income'), t('finance.expense')]],
+                body: monthlyBody,
+            });
                 chartY = (doc as any).lastAutoTable?.finalY ?? (chartY + 120);
             }
 
@@ -301,7 +301,7 @@ const computedBudgets = budgets.map(b => {
             } else {
                 doc.setFont('helvetica');
                 doc.setFontSize(11);
-                (doc as any).autoTable({
+                autoTable(doc, {
                     startY: pieY,
                     head: [['Categoría', 'Gasto', 'Límite']],
                     body: categoryBody.map(row => [
@@ -338,7 +338,7 @@ const computedBudgets = budgets.map(b => {
                 doc.text('No hay datos para este período.', 40, budgetsY, { maxWidth: 400 });
                 budgetsY += 40;
             } else {
-                (doc as any).autoTable({
+                autoTable(doc, {
                     startY: budgetsY,
                     head: [['Categoría', 'Mes', 'Actual', 'Límite']],
                     body: budgetsBody,
@@ -368,40 +368,11 @@ const computedBudgets = budgets.map(b => {
             document.body.removeChild(pdfLink);
             URL.revokeObjectURL(pdfUrl);
             toast.success('Reporte PDF generado.');
-        } catch (e) {
-            console.error('PDF gen error:', e);
-            console.error('Error details:', e instanceof Error ? e.stack : JSON.stringify(e, null, 2));
-            toast.error('Error al generar PDF completo. Usando versión texto.');
-
-            // ---------- Fallback plain‑text PDF generation ----------
-            const fallbackDoc = new jsPDF({ unit: 'pt', format: 'a4' });
-            fallbackDoc.setFontSize(16);
-            fallbackDoc.text('Reporte Financiero Moneyo - Versión Texto', 40, 40);
-            fallbackDoc.setFontSize(12);
-            fallbackDoc.text(`Generado: ${format(new Date(), 'PPP', { locale: es })}`, 40, 70);
-            fallbackDoc.text('Resumen Mensual:', 40, 100);
-            monthlySummary.slice(0, 8).forEach((row, i) => {
-                fallbackDoc.text(`  ${row.name}: Ingr ${formatCurrency(row.income)} | Gast ${formatCurrency(row.expense)}`, 40, 120 + i * 15);
-            });
-            fallbackDoc.text('Gastos por Categoría:', 40, 120 + monthlySummary.slice(0, 8).length * 15 + 10);
-            categorySpending.slice(0, 8).forEach((row, i) => {
-                fallbackDoc.text(`  ${row.name}: ${formatCurrency(row.value)} (Lím ${row.limit || 'N/A'})`, 40, 120 + monthlySummary.slice(0, 8).length * 15 + 30 + i * 12);
-            });
-            fallbackDoc.text('Presupuestos:', 40, 350);
-            budgetsWithActuals.slice(0, 8).forEach((b, i) => {
-                fallbackDoc.text(`  ${b.category} (${format(new Date(b.month), 'MMM yy')}): Act ${formatCurrency(b.computedActual)} / Lím ${formatCurrency(b.limit)}`, 40, 370 + i * 12);
-            });
-            const fbBlob = fallbackDoc.output('blob');
-            const fbUrl = URL.createObjectURL(fbBlob);
-            const fbLink = document.createElement('a');
-            fbLink.href = fbUrl;
-            fbLink.download = getExportFilename('pdf');
-            document.body.appendChild(fbLink);
-            fbLink.click();
-            document.body.removeChild(fbLink);
-            URL.revokeObjectURL(fbUrl);
-            toast.success('PDF texto descargado.');
-        } finally {
+} catch (e) {
+    console.error('PDF gen error:', e);
+    console.error('Error details:', e instanceof Error ? e.stack : JSON.stringify(e, null, 2));
+    toast.error('Error al generar el PDF.');
+} finally {
             setGeneratingPDF(false);
         }
     }
