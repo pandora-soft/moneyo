@@ -153,6 +153,9 @@ const translations = {
     financesDesc: 'Ajustes relacionados con la moneda y fechas.',
     fiscalMonthStart: 'Inicio del Mes Fiscal',
     recurrentDefaultFreq: 'Frecuencia Recurrente por Defecto',
+    gemini: {
+      key: 'Clave API de Gemini (opcional)',
+    },
     users: {
       title: 'Usuarios',
       description: 'Gestiona los usuarios y sus permisos en la aplicación.',
@@ -231,7 +234,7 @@ const translations = {
       initialBalance: 'Saldo Inicial',
       bank: 'Cuenta Bancaria',
       cash: 'Efectivo',
-      credit_card: 'Tarjeta de Crédito',
+      credit_card: 'Tarjeta de Cr��dito',
       negativeBalanceError: 'El saldo no puede ser negativo.',
     },
     transaction: {

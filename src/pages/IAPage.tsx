@@ -19,7 +19,7 @@ const containerVariants = {
 };
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 100 } },
+  visible: { y: 0, opacity: 1, transition: { duration: 0.3, ease: "easeOut" } },
 };
 export function IAPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +41,7 @@ export function IAPage() {
     setIsLoading(true);
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
-      toast.error('Clave API de Gemini no encontrada.', { description: 'Por favor, configúrala en la página de Ajustes.' });
+      toast.error('Clave API de Gemini no encontrada.', { description: 'Por favor, configúrala en la p��gina de Ajustes.' });
       setIsLoading(false);
       return;
     }
@@ -82,7 +82,7 @@ export function IAPage() {
       }
       setCameraOpen(true);
     } catch (err) {
-      toast.error('No se pudo acceder a la cámara.', { description: 'Asegúrate de haber concedido los permisos necesarios.' });
+      toast.error('No se pudo acceder a la c��mara.', { description: 'Asegúrate de haber concedido los permisos necesarios.' });
     }
   };
   const takePicture = () => {
