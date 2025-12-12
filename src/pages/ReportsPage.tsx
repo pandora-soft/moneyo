@@ -180,7 +180,8 @@ export function ReportsPage() {
         toast.info('Generando reporte PDF...');
         try {
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-            (doc as any).autoTable = (await import('jspdf-autotable')).default;
+            const autoTableFn = (await import('jspdf-autotable')).default;
+            if (!(doc as any).autoTable) (doc as any).autoTable = autoTableFn;
             doc.setFontSize(18);
             doc.text('Reporte Financiero - Moneyo', 40, 40);
             doc.setFontSize(11);
@@ -189,23 +190,36 @@ export function ReportsPage() {
             doc.text(t('labels.monthlySummary'), 40, 90);
             const [barImage, pieImage] = await Promise.all([svgToPngDataUrl(barChartRef.current), svgToPngDataUrl(pieChartRef.current)]);
             let currentY = 100;
-            if (barImage) {
+            if (!barImage) {
+              doc.text('Gráfico de barras no disponible', 40, currentY, { maxWidth: 400 });
+              currentY += 40;
+            } else {
               const pageWidth = doc.internal.pageSize.getWidth();
               const maxWidth = pageWidth - 80;
               const imgHeight = (300 * maxWidth) / 600;
               doc.addImage(barImage, 'PNG', 40, currentY, maxWidth, imgHeight);
               currentY += imgHeight + 10;
             }
-            (doc as any).autoTable({
-              startY: currentY,
-              head: [['Mes', t('finance.income'), t('finance.expense')]],
-              body: monthlySummary.slice(0, 10).map(row => [row.name, formatCurrency(row.income), formatCurrency(row.expense)]),
-            });
-            currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 20);
+            try {
+              doc.setFont('helvetica');
+              doc.setFontSize(11);
+              (doc as any).autoTable({
+                startY: currentY,
+                head: [['Mes', t('finance.income'), t('finance.expense')]],
+                body: monthlySummary.slice(0, 10).map(row => [row.name, formatCurrency(row.income), formatCurrency(row.expense)]),
+              });
+              currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 120);
+            } catch (e) {
+              doc.text('Error al generar tabla de resumen mensual', 40, currentY, { maxWidth: 400 });
+              currentY += 40;
+            }
             doc.addPage();
             doc.text(t('labels.categorySpending'), 40, 40);
             currentY = 50;
-            if (pieImage) {
+            if (!pieImage) {
+              doc.text('Gráfico de categorías no disponible', 40, currentY, { maxWidth: 400 });
+              currentY += 40;
+            } else {
               const pageWidth = doc.internal.pageSize.getWidth();
               const maxWidth = pageWidth - 80;
               const imgHeight = (300 * maxWidth) / 600;
@@ -213,20 +227,70 @@ export function ReportsPage() {
               currentY += imgHeight + 10;
             }
             const categoryBody = categorySpending.slice(0, 10);
-            (doc as any).autoTable({
-              startY: currentY,
-              head: [['Categoría', 'Gasto', 'Límite']],
-              body: categoryBody.map(row => [row.name, formatCurrency(row.value), row.limit > 0 ? formatCurrency(row.limit) : 'N/A']),
+            try {
+              doc.setFont('helvetica');
+              doc.setFontSize(11);
+              (doc as any).autoTable({
+                startY: currentY,
+                head: [['Categoría', 'Gasto', 'Límite']],
+                body: categoryBody.map(row => [row.name, formatCurrency(row.value), row.limit > 0 ? formatCurrency(row.limit) : 'N/A']),
+                didParseCell: (data: any) => {
+                  if (data.section === 'body') {
+                    const item = categoryBody[data.row.index];
+                    if (item && item.limit > 0 && item.computedActual > item.limit) {
+                      data.cell.styles.textColor = [255, 0, 0];
+                    }
+                  }
+                },
+              });
+              currentY = (doc as any).lastAutoTable?.finalY ?? (currentY + 120);
+            } catch (e) {
+              doc.text('Error al generar tabla de gastos por categoría', 40, currentY, { maxWidth: 400 });
+              currentY += 40;
+            }
+            // --- Budgets summary section ---
+            doc.addPage();
+            doc.setFontSize(16);
+            doc.text('Resumen de Presupuestos', 40, 40);
+            let budgetsY = 70;
+            doc.setFont('helvetica');
+            doc.setFontSize(11);
+            const budgetsBody = budgetsWithActuals.slice(0, 10).map(b => [
+              b.category,
+              format(new Date(b.month), 'MMM yyyy', { locale: es }),
+              formatCurrency(b.computedActual),
+              formatCurrency(b.limit),
+            ]);
+            try {
+              (doc as any).autoTable({
+                startY: budgetsY,
+                head: [['Categoría', 'Mes', 'Actual', 'Límite']],
+                body: budgetsBody,
               didParseCell: (data: any) => {
                 if (data.section === 'body') {
-                  const item = categoryBody[data.row.index];
-                  if (item && item.limit > 0 && item.computedActual > item.limit) {
+                  const budget = budgetsWithActuals[data.row.index];
+                  if (budget && budget.computedActual > budget.limit) {
                     data.cell.styles.textColor = [255, 0, 0];
                   }
                 }
               },
-            });
-            doc.save(getExportFilename('pdf'));
+              });
+              budgetsY = (doc as any).lastAutoTable?.finalY ?? (budgetsY + 120);
+            } catch (e) {
+              doc.text('Error al generar tabla de presupuestos', 40, budgetsY, { maxWidth: 400 });
+              budgetsY += 40;
+            }
+
+            // --- Save PDF ---
+            const pdfBlob = doc.output('blob');
+            const pdfLink = document.createElement('a');
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            pdfLink.setAttribute('href', pdfUrl);
+            pdfLink.setAttribute('download', getExportFilename('pdf'));
+            document.body.appendChild(pdfLink);
+            pdfLink.click();
+            document.body.removeChild(pdfLink);
+            URL.revokeObjectURL(pdfUrl);
             toast.success('Reporte PDF generado.');
         } catch (e) {
             toast.error(`Error al generar el reporte: ${e instanceof Error ? e.message : String(e)}`);
