@@ -59,33 +59,91 @@ export function ReportsPage() {
   const pieChartRef = useRef<HTMLDivElement | null>(null);
   const refetchTrigger = useAppStore((state) => state.refetchData);
   const svgToPngDataUrl = async (container: HTMLDivElement | null, defaultWidth = 600, defaultHeight = 300): Promise<string | null> => {
-    try {
-      if (!container) return null;
-      const svgEl = container.querySelector('svg');
-      if (!svgEl) return null;
-      const cloned = svgEl.cloneNode(true) as SVGElement;
-      if (!cloned.getAttribute('xmlns')) cloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-      const svgString = new XMLSerializer().serializeToString(cloned);
-      const data = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
-      const img = new Image();
-      const png = await new Promise<string | null>((resolve) => {
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width || defaultWidth;
-            canvas.height = img.height || defaultHeight;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return resolve(null);
-            ctx.drawImage(img, 0, 0);
-            resolve(canvas.toDataURL('image/png'));
-          } catch (err) { resolve(null); }
-        };
-        img.onerror = () => resolve(null);
-        img.src = data;
-      });
-      return png;
-    } catch (err) { return null; }
-  };
+  try {
+    if (!container) return null;
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return null;
+
+    // Clone the SVG element
+    const cloned = svgEl.cloneNode(true) as SVGElement;
+    if (!cloned.getAttribute('xmlns')) cloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+    // -------------------------------------------------------------------------
+    // 1️⃣ Compute bounding box and set width/height/viewBox on the clone
+    // -------------------------------------------------------------------------
+    const rect = svgEl.getBoundingClientRect();
+    if (!cloned.getAttribute('viewBox')) {
+      cloned.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+    }
+    cloned.setAttribute('width', `${rect.width}`);
+    cloned.setAttribute('height', `${rect.height}`);
+
+    // -------------------------------------------------------------------------
+    // 2️⃣ Inline all computed styles so the SVG renders correctly when exported
+    // -------------------------------------------------------------------------
+    const inlineComputedStyles = (original: Element, clone: Element) => {
+      const computed = getComputedStyle(original);
+      let styleStr = '';
+      for (let i = 0; i < computed.length; i++) {
+        const prop = computed[i];
+        const value = computed.getPropertyValue(prop);
+        styleStr += `${prop}:${value} !important;`;
+      }
+      if (styleStr.trim()) {
+        clone.setAttribute('style', styleStr);
+      }
+      const origChildren = original.children;
+      const cloneChildren = clone.children;
+      for (let i = 0; i < origChildren.length; i++) {
+        inlineComputedStyles(origChildren[i] as Element, cloneChildren[i] as Element);
+      }
+    };
+    inlineComputedStyles(svgEl, cloned);
+    // -------------------------------------------------------------------------
+
+    const svgString = new XMLSerializer().serializeToString(cloned);
+    const data = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+    const img = new Image();
+
+    const png = await new Promise<string | null>((resolve) => {
+      // -------------------------------------------------------------------------
+      // 3️⃣ Load timeout (5 seconds) – prevents hanging forever on broken SVGs
+      // -------------------------------------------------------------------------
+      const timeoutId = setTimeout(() => {
+        img.onload = null;
+        img.onerror = null;
+        resolve(null);
+      }, 5000);
+
+      img.onload = () => {
+        clearTimeout(timeoutId);
+        try {
+          const canvas = document.createElement('canvas');
+          // -------------------------------------------------------------------------
+          // 4️⃣ Use natural dimensions when available, fall back to defaults
+          // -------------------------------------------------------------------------
+          canvas.width = img.naturalWidth || defaultWidth;
+          canvas.height = img.naturalHeight || defaultHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(null);
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch (err) {
+          resolve(null);
+        }
+      };
+      img.onerror = () => {
+        clearTimeout(timeoutId);
+        resolve(null);
+      };
+      img.src = data;
+    });
+
+    return png;
+  } catch (err) {
+    return null;
+  }
+};
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -177,7 +235,7 @@ export function ReportsPage() {
         document.body.removeChild(link);
     } else {
         setGeneratingPDF(true);
-        toast.info('Generando reporte PDF...');
+        
         try {
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
             const autoTableFn = (await import('jspdf-autotable')).default;
@@ -233,7 +291,11 @@ export function ReportsPage() {
               (doc as any).autoTable({
                 startY: currentY,
                 head: [['Categoría', 'Gasto', 'Límite']],
-                body: categoryBody.map(row => [row.name, formatCurrency(row.value), row.limit > 0 ? formatCurrency(row.limit) : 'N/A']),
+                body: categoryBody.map(row => [
+                  row.name,
+                  formatCurrency(row.value),
+                  row.limit > 0 ? formatCurrency(row.limit) : 'N/A',
+                ]),
                 didParseCell: (data: any) => {
                   if (data.section === 'body') {
                     const item = categoryBody[data.row.index];
@@ -255,27 +317,27 @@ export function ReportsPage() {
             let budgetsY = 70;
             doc.setFont('helvetica');
             doc.setFontSize(11);
-            const budgetsBody = budgetsWithActuals.slice(0, 10).map(b => [
-              b.category,
-              format(new Date(b.month), 'MMM yyyy', { locale: es }),
-              formatCurrency(b.computedActual),
-              formatCurrency(b.limit),
-            ]);
-            try {
-              (doc as any).autoTable({
-                startY: budgetsY,
-                head: [['Categoría', 'Mes', 'Actual', 'Límite']],
-                body: budgetsBody,
-              didParseCell: (data: any) => {
-                if (data.section === 'body') {
-                  const budget = budgetsWithActuals[data.row.index];
-                  if (budget && budget.computedActual > budget.limit) {
-                    data.cell.styles.textColor = [255, 0, 0];
-                  }
-                }
-              },
-              });
-              budgetsY = (doc as any).lastAutoTable?.finalY ?? (budgetsY + 120);
+const budgetsBody = budgetsWithActuals.slice(0, 10).map(b => [
+  b.category,
+  format(new Date(b.month), 'MMM yyyy', { locale: es }),
+  formatCurrency(b.computedActual),
+  formatCurrency(b.limit),
+]);
+try {
+  (doc as any).autoTable({
+    startY: budgetsY,
+    head: [['Categoría', 'Mes', 'Actual', 'Límite']],
+    body: budgetsBody,
+    didParseCell: (data: any) => {
+      if (data.section === 'body') {
+        const budget = budgetsWithActuals[data.row.index];
+        if (budget && budget.computedActual > budget.limit) {
+          data.cell.styles.textColor = [255, 0, 0];
+        }
+      }
+    },
+  });
+  budgetsY = (doc as any).lastAutoTable?.finalY ?? (budgetsY + 120);
             } catch (e) {
               doc.text('Error al generar tabla de presupuestos', 40, budgetsY, { maxWidth: 400 });
               budgetsY += 40;
@@ -293,7 +355,7 @@ export function ReportsPage() {
             URL.revokeObjectURL(pdfUrl);
             toast.success('Reporte PDF generado.');
         } catch (e) {
-            toast.error(`Error al generar el reporte: ${e instanceof Error ? e.message : String(e)}`);
+            console.error('PDF gen error:', e);
         } finally {
             setGeneratingPDF(false);
         }
