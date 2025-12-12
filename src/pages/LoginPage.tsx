@@ -1,7 +1,7 @@
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,7 +91,7 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="text-center text-sm">
             <p className="w-full">
-              ¿No tienes cuenta? <Link to="/register" className="text-primary hover:underline"> {t('auth.register')}</Link>
+              Default admin: username: admin, password: admin
             </p>
           </CardFooter>
         </Card>

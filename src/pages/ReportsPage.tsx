@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { autoTable } from 'jspdf-autotable';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -134,6 +134,7 @@ export function ReportsPage() {
         toast.info('Generando reporte PDF...');
         try {
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            if (!(doc as any).autoTable) (doc as any).autoTable = (opts: any) => (autoTable as any)(doc, opts);
             doc.setFontSize(18);
             doc.text('Reporte Financiero - Moneyo', 40, 40);
             doc.setFontSize(11);
@@ -149,12 +150,13 @@ export function ReportsPage() {
               doc.addImage(barImage, 'PNG', 40, currentY, maxWidth, imgHeight);
               currentY += imgHeight + 10;
             }
-            autoTable(doc, {
+            (doc as any).autoTable({
               startY: currentY,
               head: [['Mes', t('finance.income'), t('finance.expense')]],
               body: monthlySummary.slice(0, 10).map(row => [row.name, formatCurrency(row.income), formatCurrency(row.expense)]),
             });
-            currentY = (doc as any).lastAutoTable.finalY + 20;
+            const lastY = (doc as any).lastAutoTable?.finalY ?? (currentY + 20);
+            currentY = lastY + 20;
             doc.addPage();
             doc.text(t('labels.categorySpending'), 40, 40);
             currentY = 50;
@@ -165,10 +167,20 @@ export function ReportsPage() {
               doc.addImage(pieImage, 'PNG', 40, currentY, maxWidth, imgHeight);
               currentY += imgHeight + 10;
             }
-            autoTable(doc, {
+            const categoryBody = categorySpending.slice(0, 10);
+            (doc as any).autoTable({
               startY: currentY,
               head: [['Categoría', 'Gasto', 'Límite']],
-              body: categorySpending.slice(0, 10).map(row => [row.name, formatCurrency(row.value), row.limit > 0 ? formatCurrency(row.limit) : 'N/A']),
+              body: categoryBody.map(row => [row.name, formatCurrency(row.value), row.limit > 0 ? formatCurrency(row.limit) : 'N/A']),
+              didParseCell: (data: any) => {
+                // style body rows red when computedActual > limit for that category
+                if (data.section === 'body') {
+                  const item = categoryBody[data.row.index];
+                  if (item && item.limit > 0 && item.computedActual > item.limit) {
+                    data.cell.styles.textColor = [255, 0, 0];
+                  }
+                }
+              },
             });
             doc.save(`moneyo-reporte.pdf`);
             toast.success('Reporte PDF generado.');
