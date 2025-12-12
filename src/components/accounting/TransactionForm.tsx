@@ -82,15 +82,17 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
     resolver: zodResolver(formSchema),
     mode: 'onChange',
     defaultValues: {
+      /* explicit defaults – these are set first so they can be overridden by any provided defaultValues */
+      amount: 0,
       type: 'expense',
       accountId: '',
       accountToId: '',
-      amount: defaultValues?.amount ?? 0,
       category: '',
-      ts: new Date(defaultValues?.ts || Date.now()),
+      ts: new Date(Date.now()),
       note: '',
-      recurrent: defaultValues?.recurrent ?? false,
-      frequency: defaultValues?.frequency ?? settings.recurrentDefaultFrequency,
+      recurrent: false,
+      frequency: '',
+      /* spread incoming defaults last – they may override the above defaults */
       ...defaultValues,
     }
   });
@@ -166,7 +168,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         <FormField control={form.control} name="amount" render={({ field }) => (
             <FormItem>
               <FormLabel>{t('form.transaction.amount')}</FormLabel>
-              <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))} /></FormControl>
+              <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
               <FormMessage />
             </FormItem>
         )} />

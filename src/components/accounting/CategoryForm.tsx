@@ -17,7 +17,7 @@ interface Props {
 export function CategoryForm({ onSubmit, defaultValues }: Props) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: defaultValues || { name: '' },
+    defaultValues: { ...(defaultValues || {}), name: defaultValues?.name ?? "" },
   });
   const { isSubmitting } = form.formState;
   const handleSubmit = async (values: FormValues) => {

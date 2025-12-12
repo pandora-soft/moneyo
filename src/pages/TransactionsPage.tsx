@@ -330,8 +330,10 @@ export function TransactionsPage() {
       </div>
       <Sheet open={isImportSheetOpen} onOpenChange={setImportSheetOpen}>
             <SheetContent className="sm:max-w-2xl w-full" aria-describedby="import-sheet-desc">
-            <SheetHeader><SheetTitle>{t('transactions.importSheet.title')}</SheetTitle></SheetHeader>
-            <SheetDescription id="import-sheet-desc">{t('transactions.importSheet.description')}</SheetDescription>
+            <SheetHeader>
+              <SheetTitle>{t('transactions.importSheet.title')}</SheetTitle>
+              <SheetDescription id="import-sheet-desc">{t('transactions.importSheet.description')}</SheetDescription>
+            </SheetHeader>
             <div className="py-4">
                 <p className="text-sm text-muted-foreground mb-2">{t('transactions.importSheet.preview')}</p>
                 <p className="text-xs text-muted-foreground mb-4">{t('transactions.importSheet.columns')}</p>
