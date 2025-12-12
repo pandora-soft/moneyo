@@ -27,7 +27,6 @@ import { toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Skeleton } from './components/ui/skeleton';
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: Home },
   { href: '/accounts', label: 'Cuentas', icon: Wallet },
   { href: '/transactions', label: 'Transacciones', icon: List },
   { href: '/budgets', label: 'Presupuestos', icon: PiggyBank },
