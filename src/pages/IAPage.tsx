@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, easeOut } from 'framer-motion';
 import { BrainCircuit, Upload, Camera, Layers, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,7 @@ const containerVariants = {
 };
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { duration: 0.3, ease: "easeOut" } },
+  visible: { y: 0, opacity: 1, transition: { duration: 0.3, ease: easeOut } },
 };
 export function IAPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +41,7 @@ export function IAPage() {
     setIsLoading(true);
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
-      toast.error('Clave API de Gemini no encontrada.', { description: 'Por favor, configúrala en la p��gina de Ajustes.' });
+      toast.error('Clave API de Gemini no encontrada.', { description: 'Por favor, configúrala en la página de Ajustes.' });
       setIsLoading(false);
       return;
     }
@@ -58,7 +58,7 @@ export function IAPage() {
       openModal(transactionData);
       toast.success('Recibo analizado con éxito.', { description: 'Revisa y guarda la nueva transacción.' });
     } catch (error: any) {
-      toast.error('Error al analizar la imagen.', { description: error.message || 'Inténtalo de nuevo.' });
+      toast.error('Error al analizar la imagen.', { description: error.message || 'Int��ntalo de nuevo.' });
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +82,7 @@ export function IAPage() {
       }
       setCameraOpen(true);
     } catch (err) {
-      toast.error('No se pudo acceder a la c��mara.', { description: 'Asegúrate de haber concedido los permisos necesarios.' });
+      toast.error('No se pudo acceder a la cámara.', { description: 'Asegúrate de haber concedido los permisos necesarios.' });
     }
   };
   const takePicture = () => {
