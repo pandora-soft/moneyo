@@ -16,7 +16,9 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import LoginPage from '@/pages/LoginPage';
 import { Toaster } from '@/components/ui/sonner';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Home, Wallet, List, BarChart, Settings, PiggyBank, LogOut } from 'lucide-react';
+import { Home, Wallet, List, BarChart, Settings, PiggyBank, LogOut, Menu } from 'lucide-react';
+import { useTranslations } from '@/lib/i18n';
+import { motion } from 'framer-motion';
 import { cn } from './lib/utils';
 import { useAppStore } from './stores/useAppStore';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './components/ui/sheet';
@@ -26,13 +28,7 @@ import type { Account, Transaction } from '@shared/types';
 import { toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Skeleton } from './components/ui/skeleton';
-const navItems = [
-  { href: '/accounts', label: 'Cuentas', icon: Wallet },
-  { href: '/transactions', label: 'Transacciones', icon: List },
-  { href: '/budgets', label: 'Presupuestos', icon: PiggyBank },
-  { href: '/reports', label: 'Reportes', icon: BarChart },
-  { href: '/settings', label: 'Ajustes', icon: Settings },
-];
+
 const GlobalTransactionSheet = () => {
   const isModalOpen = useAppStore(s => s.isModalOpen);
   const modalInitialValues = useAppStore(s => s.modalInitialValues);
@@ -106,10 +102,27 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 };
 export const AppRoot = () => {
   const navigate = useNavigate();
+  const t = useTranslations();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const navItems = [
+    { href: '/accounts', label: t('pages.accounts'), icon: Wallet },
+    { href: '/transactions', label: t('pages.transactions'), icon: List },
+    { href: '/budgets', label: t('pages.budgets'), icon: PiggyBank },
+    { href: '/reports', label: t('pages.reports'), icon: BarChart },
+    { href: '/settings', label: t('pages.settings'), icon: Settings },
+  ];
   const handleLogout = () => {
     clearToken();
     toast.info('Sesión cerrada.');
     navigate('/login');
+  };
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
+  };
+  const itemVariants = {
+    hidden: { opacity: 0, x: -20 },
+    visible: { opacity: 1, x: 0 },
   };
   return (
     <div className="min-h-screen bg-background font-sans antialiased">
@@ -135,6 +148,15 @@ export const AppRoot = () => {
                 </NavLink>
               ))}
             </nav>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Abrir menú de navegación"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={handleLogout}><LogOut className="size-4" /></Button>
@@ -145,6 +167,50 @@ export const AppRoot = () => {
       <main>
         <Outlet />
       </main>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="right" className="p-0 sm:max-w-sm">
+          <SheetHeader className="p-6 border-b">
+            <SheetTitle>Menú</SheetTitle>
+          </SheetHeader>
+          <motion.ul
+            className="mt-6 flex flex-col space-y-2 px-6"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {navItems.map(({ href, label, icon: Icon }) => (
+              <motion.li key={href} variants={itemVariants}>
+                <NavLink
+                  to={href}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex h-12 items-center gap-3 px-4 rounded-lg hover:bg-accent w-full justify-start text-base",
+                      isActive ? "bg-accent text-foreground" : "text-muted-foreground"
+                    )
+                  }
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{label}</span>
+                </NavLink>
+              </motion.li>
+            ))}
+          </motion.ul>
+          <div className="border-t p-6 pt-0">
+            <Button
+              variant="ghost"
+              className="w-full h-12 justify-start gap-3 px-4 hover:bg-destructive/20 text-destructive font-medium"
+              onClick={() => {
+                setMobileOpen(false);
+                handleLogout();
+              }}
+            >
+              <LogOut className="h-5 w-5" />
+              <span>{t('auth.logout')}</span>
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
       <GlobalTransactionSheet />
       <Toaster richColors position="top-right" />
       <footer className="border-t">
