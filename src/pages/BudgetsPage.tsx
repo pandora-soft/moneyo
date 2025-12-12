@@ -22,6 +22,50 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useCategoryColor } from '@/hooks/useCategoryColor';
+type BudgetWithColor = Budget & { computedActual: number; color: string };
+const BudgetCard = ({ budget }: { budget: BudgetWithColor }) => {
+  const formatCurrency = useFormatCurrency();
+  const [isSheetOpen, setSheetOpen] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<Partial<Budget> | null>(null);
+  const [deletingBudget, setDeletingBudget] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const { triggerRefetch } = useAppStore.getState();
+  const handleDuplicate = (budgetToDuplicate: Budget) => {
+    const { id, computedActual, ...newBudget } = budgetToDuplicate;
+    let nextMonth = addMonths(new Date(budgetToDuplicate.month), 1);
+    // This logic should ideally be server-side or use a full list of budgets,
+    // but for client-side duplication, this is a reasonable approach.
+    setEditingBudget({ ...newBudget, month: nextMonth.getTime(), computedActual: undefined });
+    setSheetOpen(true);
+  };
+  return (
+    <Card className="hover:shadow-lg transition-shadow duration-200">
+      <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex-1 font-semibold">
+          <span className={cn(budget.color, "text-white px-2 py-1 rounded-md text-sm")}>{budget.category}</span>
+        </div>
+        <div className="w-full sm:w-1/2">
+          <div className="flex justify-between text-sm mb-1">
+            <span className={cn(budget.computedActual > budget.limit && 'text-destructive font-bold')}>{formatCurrency(budget.computedActual)}</span>
+            <span className="text-muted-foreground">{t('budget.limit')}: {formatCurrency(budget.limit)}</span>
+          </div>
+          <Progress value={(budget.computedActual / budget.limit) * 100} className={cn('h-2', budget.computedActual > budget.limit ? '[&>div]:bg-destructive' : `[&>div]:${budget.color}`)} />
+        </div>
+        <div className="flex gap-2 self-end sm:self-center items-center">
+          <Badge variant={budget.computedActual > budget.limit ? 'destructive' : 'default'}>{budget.computedActual > budget.limit ? t('budget.over') : t('budget.under')}</Badge>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => { setEditingBudget(budget); setSheetOpen(true); }}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDuplicate(budget)}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingBudget(budget.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 export function BudgetsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -69,8 +113,21 @@ export function BudgetsPage() {
       limit: b.limit,
       actual: b.computedActual,
     }));
-    return { uniqueMonths: uniqueMonthKeys, uniqueCategories, filteredBudgetsWithActuals: budgetsWithActuals, chartData };
+    return { uniqueMonths: uniqueMonthKeys, uniqueCategories, filteredBudgetsWithActuals, chartData };
   }, [budgets, transactions, filterDate]);
+  const categoryColors = useCategoryColor();
+  const budgetsWithColors = useMemo(() => {
+    return filteredBudgetsWithActuals.map(b => ({
+      ...b,
+      color: categoryColors(b.category)
+    }));
+  }, [filteredBudgetsWithActuals, categoryColors]);
+  const chartDataWithColors = useMemo(() => {
+    return chartData.map(d => ({
+      ...d,
+      color: categoryColors(d.name)
+    }));
+  }, [chartData, categoryColors]);
   const handleFormSubmit = async (values: Omit<Budget, 'id' | 'computedActual'>) => {
     try {
       if (editingBudget?.id) {
@@ -101,18 +158,6 @@ export function BudgetsPage() {
       setDeleteDialogOpen(false);
     }
   };
-  const handleDuplicate = (budget: Budget) => {
-    const { id, computedActual, ...newBudget } = budget;
-    let nextMonth = addMonths(new Date(budget.month), 1);
-    const existingBudgetsForCategory = budgets
-      .filter(b => b.category === budget.category)
-      .map(b => format(new Date(b.month), 'yyyy-MM'));
-    while (existingBudgetsForCategory.includes(format(nextMonth, 'yyyy-MM'))) {
-      nextMonth = addMonths(nextMonth, 1);
-    }
-    setEditingBudget({ ...newBudget, month: nextMonth.getTime(), computedActual: undefined });
-    setSheetOpen(true);
-  };
   const exportFilteredBudgets = () => {
     const headers = "Mes,Categoría,Límite,Gasto Real,Estado\n";
     const csvContent = filteredBudgetsWithActuals.map(b => {
@@ -127,37 +172,6 @@ export function BudgetsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-  const BudgetCard = ({ budget }: { budget: Budget & { computedActual: number } }) => {
-    const categoryColor = useCategoryColor(budget.category);
-    const progressColor = categoryColor.replace('bg-', '');
-    return (
-      <Card className="hover:shadow-lg transition-shadow duration-200">
-        <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex-1 font-semibold">
-            <span className={cn(categoryColor, "text-white px-2 py-1 rounded-md text-sm")}>{budget.category}</span>
-          </div>
-          <div className="w-full sm:w-1/2">
-            <div className="flex justify-between text-sm mb-1">
-              <span className={cn(budget.computedActual > budget.limit && 'text-destructive font-bold')}>{formatCurrency(budget.computedActual)}</span>
-              <span className="text-muted-foreground">{t('budget.limit')}: {formatCurrency(budget.limit)}</span>
-            </div>
-            <Progress value={(budget.computedActual / budget.limit) * 100} className={cn('h-2', budget.computedActual > budget.limit ? '[&>div]:bg-destructive' : `[&>div]:${categoryColor}`)} />
-          </div>
-          <div className="flex gap-2 self-end sm:self-center items-center">
-            <Badge variant={budget.computedActual > budget.limit ? 'destructive' : 'default'}>{budget.computedActual > budget.limit ? t('budget.over') : t('budget.under')}</Badge>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => { setEditingBudget(budget); setSheetOpen(true); }}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDuplicate(budget)}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingBudget(budget.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardContent>
-      </Card>
-    );
   };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -198,7 +212,7 @@ export function BudgetsPage() {
           <CardContent>
             {loading ? <Skeleton className="h-[300px]" /> : (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
+                <BarChart data={chartDataWithColors}>
                   <XAxis dataKey="name" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
@@ -214,8 +228,8 @@ export function BudgetsPage() {
                   <Legend />
                   <Bar dataKey="limit" fill="#8884d8" name={t('budget.limit')} radius={[4, 4, 0, 0]} />
                   <Bar dataKey="actual" name={t('budget.actual')} radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={useCategoryColor(entry.name).replace('bg-','').replace('-500','')} />
+                    {chartDataWithColors.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color.replace('bg-','').replace('-500','')} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -227,10 +241,10 @@ export function BudgetsPage() {
           <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
           </div>
-        ) : filteredBudgetsWithActuals.length > 0 ? (
+        ) : budgetsWithColors.length > 0 ? (
           <motion.div className="space-y-4" variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }} initial="hidden" animate="show">
             <AnimatePresence>
-              {filteredBudgetsWithActuals.map(budget => (
+              {budgetsWithColors.map(budget => (
                 <motion.div key={budget.id} layout variants={{ hidden: { y: 20, opacity: 0 }, show: { y: 0, opacity: 1 } }} exit={{ opacity: 0, y: -20 }}>
                   <BudgetCard budget={budget} />
                 </motion.div>

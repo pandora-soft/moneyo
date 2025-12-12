@@ -26,6 +26,27 @@ const tailwindColorToHex: Record<string, string> = {
   'bg-green-500': '#22c55e', 'bg-indigo-500': '#6366f1', 'bg-rose-500': '#f43f5e',
   'bg-slate-500': '#64748b', 'bg-gray-500': '#6b7280',
 };
+type BudgetWithColor = Budget & { computedActual: number; color: string };
+const BudgetRow = ({ budget }: { budget: BudgetWithColor }) => {
+  const formatCurrency = useFormatCurrency();
+  return (
+    <div className="flex flex-col text-sm p-2 rounded-md hover:bg-muted/50">
+      <div className="flex items-center">
+        <div className="w-1/4 font-semibold">
+          <span className={cn(budget.color, "text-white px-2 py-1 rounded-md text-sm")}>{budget.category}</span>
+        </div>
+        <div className="w-1/4 text-muted-foreground">{format(new Date(budget.month), 'MMM yyyy', { locale: es })}</div>
+        <div className="w-1/2">
+          <div className="flex justify-between">
+            <span className={cn('font-medium', budget.computedActual > budget.limit ? 'text-destructive' : 'text-emerald-500')}>{formatCurrency(budget.computedActual)}</span>
+            <span>{formatCurrency(budget.limit)}</span>
+          </div>
+          <Progress value={(budget.computedActual / budget.limit) * 100} className={cn('w-full mt-1 h-1', budget.computedActual > budget.limit ? '[&>div]:bg-destructive' : `[&>div]:${budget.color}`)} />
+        </div>
+      </div>
+    </div>
+  );
+};
 export function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -90,6 +111,7 @@ export function ReportsPage() {
       end: filters.dateRange!.to ?? new Date(),
     }));
   }, [transactions, filters.dateRange]);
+  const categoryColors = useCategoryColor();
   const { monthlySummary, categorySpending, budgetsWithActuals } = useMemo(() => {
     const summary = filteredTransactions.reduce((acc, tx) => {
       const monthKey = format(new Date(tx.ts), 'yyyy-MM');
@@ -110,7 +132,7 @@ export function ReportsPage() {
     const categoryChartData = Object.entries(spending)
       .map(([name, value]) => {
         const budget = budgets.find(b => b.category === name && getMonth(new Date(b.month)) === getMonth(currentMonthStart) && getYear(new Date(b.month)) === getYear(currentMonthStart));
-        return { name, value, limit: budget?.limit || 0, computedActual: value };
+        return { name, value, limit: budget?.limit || 0, computedActual: value, color: categoryColors(name) };
       })
       .sort((a, b) => b.value - a.value);
     const computedBudgets = budgets.map(b => {
@@ -118,7 +140,7 @@ export function ReportsPage() {
       const actual = filteredTransactions
         .filter(t => t.type === 'expense' && getMonth(new Date(t.ts)) === getMonth(monthStart) && getYear(new Date(t.ts)) === getYear(monthStart) && t.category === b.category)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      return { ...b, computedActual: actual };
+      return { ...b, computedActual: actual, color: categoryColors(b.category) };
     });
     computedBudgets.sort((a, b) => {
       const key = sortConfig.key;
@@ -128,7 +150,7 @@ export function ReportsPage() {
       return 0;
     });
     return { monthlySummary: monthlyChartData, categorySpending: categoryChartData, budgetsWithActuals: computedBudgets };
-  }, [filteredTransactions, budgets, sortConfig]);
+  }, [filteredTransactions, budgets, sortConfig, categoryColors]);
   const handleSort = (key: 'category' | 'month') => {
     setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
   };
@@ -225,26 +247,6 @@ export function ReportsPage() {
     link.click();
     document.body.removeChild(link);
   };
-  const BudgetRow = ({ budget }: { budget: Budget & { computedActual: number } }) => {
-    const categoryColor = useCategoryColor(budget.category);
-    return (
-      <div className="flex flex-col text-sm p-2 rounded-md hover:bg-muted/50">
-        <div className="flex items-center">
-          <div className="w-1/4 font-semibold">
-            <span className={cn(categoryColor, "text-white px-2 py-1 rounded-md text-sm")}>{budget.category}</span>
-          </div>
-          <div className="w-1/4 text-muted-foreground">{format(new Date(budget.month), 'MMM yyyy', { locale: es })}</div>
-          <div className="w-1/2">
-            <div className="flex justify-between">
-              <span className={cn('font-medium', budget.computedActual > budget.limit ? 'text-destructive' : 'text-emerald-500')}>{formatCurrency(budget.computedActual)}</span>
-              <span>{formatCurrency(budget.limit)}</span>
-            </div>
-            <Progress value={(budget.computedActual / budget.limit) * 100} className={cn('w-full mt-1 h-1', budget.computedActual > budget.limit ? '[&>div]:bg-destructive' : `[&>div]:${categoryColor}`)} />
-          </div>
-        </div>
-      </div>
-    );
-  };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -289,7 +291,7 @@ export function ReportsPage() {
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie data={categorySpending} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                          {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={tailwindColorToHex[useCategoryColor(entry.name)] || '#6b7280'} />))}
+                          {categorySpending.map((entry, index) => (<Cell key={`cell-${index}`} fill={tailwindColorToHex[entry.color] || '#6b7280'} />))}
                         </Pie>
                         <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.computedActual)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                       </PieChart>
