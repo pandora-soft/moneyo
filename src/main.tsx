@@ -67,7 +67,13 @@ const GlobalTransactionSheet = () => {
             accounts={accounts}
             onSubmit={handleFormSubmit}
             onFinished={closeModal}
-            defaultValues={{ ...modalInitialValues, ts: new Date(modalInitialValues.ts || Date.now()), accountToId: modalInitialValues.accountTo }}
+            /* Guard against undefined modalInitialValues */
+            defaultValues={modalInitialValues ? {
+              ...modalInitialValues,
+              ts: new Date(modalInitialValues.ts || Date.now()),
+              accountToId: modalInitialValues.accountTo,
+            } : {}}
+```
           />
         )}
       </SheetContent>
@@ -168,9 +174,12 @@ export const AppRoot = () => {
         <Outlet />
       </main>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="right" className="p-0 sm:max-w-sm">
-          <SheetHeader className="p-6 border-b">
-            <SheetTitle>Menú</SheetTitle>
+          <SheetContent side="right" className="p-0 sm:max-w-sm" aria-describedby="mobile-menu-desc">
+            <SheetHeader className="p-6 border-b">
+              <SheetTitle>Menú</SheetTitle>
+              <SheetDescription id="mobile-menu-desc">
+                Menú de navegación móvil
+              </SheetDescription>
           </SheetHeader>
           <motion.ul
             className="mt-6 flex flex-col space-y-2 px-6"
