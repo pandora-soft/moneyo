@@ -21,6 +21,7 @@ const translations = {
     months: 'meses',
     confirmDelete: '¿Estás seguro?',
     filteredXOfY: (filtered: number, total: number) => `Mostrando ${filtered} de ${total} transacciones.`,
+    paginationReset: 'Mostrar todo',
   },
   pages: {
     dashboard: 'Dashboard',
@@ -266,6 +267,14 @@ const translations = {
     category: 'Categoría',
     date: 'Fecha',
     amount: 'Monto',
+  },
+  pagination: {
+    showingXofY: (start: number, end: number, total: number) => `Mostrando ${start}-${end} de ~${total}`,
+    rowsPerPage: 'Filas por página',
+    prev: 'Anterior',
+    next: 'Siguiente',
+    of: 'de',
+    all: 'Todo',
   },
 } as const;
 type PathImpl<T, K extends keyof T> =

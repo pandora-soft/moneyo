@@ -1,7 +1,7 @@
 import { IndexedEntity, Entity, Env, Index } from "./core-utils";
-import type { Account, Transaction, Budget, Settings, Currency, User } from "@shared/types";
+import type { Account, Transaction, Budget, Settings, Currency, User, TransactionType } from "@shared/types";
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@shared/mock-data";
-import { addDays, addMonths, addWeeks, isBefore, startOfToday } from 'date-fns';
+import { addDays, addMonths, addWeeks, isBefore, startOfToday, isWithinInterval } from 'date-fns';
 // --- UTILITY FUNCTIONS FOR HASHING ---
 export async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(password);
@@ -140,11 +140,36 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
       return [];
     }
   }
-  async listTransactions(limit = 50, cursor = 0): Promise<{ items: Transaction[]; next: number | null; }> {
+  async listTransactions(
+    limit = 50,
+    cursor = 0,
+    filters: {
+      accountId?: string;
+      type?: TransactionType;
+      dateFrom?: number;
+      dateTo?: number;
+      query?: string;
+    } = {}
+  ): Promise<{ items: Transaction[]; next: number | null; totalCount: number; }> {
     const { transactions } = await this.getState();
-    const paginated = transactions.slice(cursor, cursor + limit);
-    const nextCursor = cursor + limit < transactions.length ? cursor + limit : null;
-    return { items: paginated, next: nextCursor };
+    const filtered = transactions.filter(tx => {
+      if (filters.accountId && filters.accountId !== 'all' && tx.accountId !== filters.accountId) return false;
+      if (filters.type && filters.type !== 'all' && tx.type !== filters.type) return false;
+      if (filters.dateFrom && filters.dateTo) {
+        if (!isWithinInterval(new Date(tx.ts), { start: filters.dateFrom, end: filters.dateTo })) return false;
+      }
+      if (filters.query) {
+        const q = filters.query.toLowerCase();
+        const categoryMatch = tx.category.toLowerCase().includes(q);
+        const noteMatch = tx.note?.toLowerCase().includes(q);
+        if (!categoryMatch && !noteMatch) return false;
+      }
+      return true;
+    });
+    const totalCount = filtered.length;
+    const paginated = filtered.slice(cursor, cursor + limit);
+    const nextCursor = cursor + limit < totalCount ? cursor + limit : null;
+    return { items: paginated, next: nextCursor, totalCount };
   }
   async updateTransaction(id: string, updates: Partial<Omit<Transaction, 'id'>>): Promise<Transaction> {
     const { transactions } = await this.getState();
@@ -224,7 +249,6 @@ export class SessionEntity extends IndexedEntity<Session> {
   static readonly initialState: Session = { id: '', userId: '', expires: 0 };
   static seedData = [];
 }
-
 export class SettingsEntity extends Entity<Settings> {
   static readonly entityName = "settings";
   static readonly initialState: Settings = { currency: 'EUR', fiscalMonthStart: 1, recurrentDefaultFrequency: 'monthly' };

@@ -42,6 +42,11 @@ export interface Budget {
   limit: number;
   computedActual?: number; // Optional field for frontend-computed values
 }
+export interface PaginatedTransactions {
+  items: Transaction[];
+  next: number | null;
+  totalCount: number;
+}
 // Auth types
 export interface User {
   id: string;

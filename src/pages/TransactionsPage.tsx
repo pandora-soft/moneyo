@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { PlusCircle, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, Download } from 'lucide-react';
+import { PlusCircle, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,8 +11,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
 import { api } from '@/lib/api-client';
-import type { Account, Transaction } from '@shared/types';
-import { format, isWithinInterval, isValid } from 'date-fns';
+import type { Account, Transaction, PaginatedTransactions } from '@shared/types';
+import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ import { useFormatCurrency } from '@/lib/formatCurrency';
 import t from '@/lib/i18n';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 export function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -33,54 +34,62 @@ export function TransactionsPage() {
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRecurrentView, setIsRecurrentView] = useState(false);
+  const [pagination, setPagination] = useState({
+    cursor: 0,
+    history: [0],
+    rowsPerPage: 25,
+    totalCount: 0,
+    hasNextPage: false,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { openModal } = useAppStore();
   const refetchTrigger = useAppStore((state) => state.refetchData);
   const formatCurrency = useFormatCurrency();
   const accountsById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (newCursor = 0, newRowsPerPage = pagination.rowsPerPage) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [txs, accs] = await Promise.all([
-        api<{ items: Transaction[] }>('/api/finance/transactions?limit=1000').then(p => p.items),
-        api<Account[]>('/api/finance/accounts'),
+      const params = new URLSearchParams();
+      params.append('limit', String(newRowsPerPage));
+      params.append('cursor', String(newCursor));
+      if (filters.accountId !== 'all') params.append('accountId', filters.accountId);
+      if (filters.type !== 'all') params.append('type', filters.type);
+      if (filters.query) params.append('query', filters.query);
+      if (filters.dateRange?.from) params.append('dateFrom', String(filters.dateRange.from.getTime()));
+      if (filters.dateRange?.to) params.append('dateTo', String(filters.dateRange.to.getTime()));
+      const [txsData, accs] = await Promise.all([
+        api<PaginatedTransactions>(`/api/finance/transactions?${params.toString()}`),
+        accounts.length === 0 ? api<Account[]>('/api/finance/accounts') : Promise.resolve(accounts),
       ]);
-      setTransactions(txs);
-      setAccounts(accs);
+      setTransactions(txsData.items);
+      setPagination(prev => ({
+        ...prev,
+        cursor: newCursor,
+        totalCount: txsData.totalCount,
+        hasNextPage: txsData.next !== null,
+        rowsPerPage: newRowsPerPage,
+      }));
+      if (accounts.length === 0) setAccounts(accs);
     } catch (error) {
       console.error("Failed to fetch data", error);
       toast.error('Error al cargar los datos.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters, accounts, pagination.rowsPerPage]);
   useEffect(() => {
-    fetchData();
-  }, [fetchData, refetchTrigger]);
+    setPagination(p => ({ ...p, cursor: 0, history: [0] }));
+    fetchData(0, pagination.rowsPerPage);
+  }, [filters, refetchTrigger, isRecurrentView]);
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      if (isRecurrentView && !tx.recurrent) {
-        return false;
-      }
-      const queryMatch = filters.query.length > 1 ?
-        tx.category.toLowerCase().includes(filters.query.toLowerCase()) ||
-        tx.note?.toLowerCase().includes(filters.query.toLowerCase()) : true;
-      const accountMatch = filters.accountId === 'all' || tx.accountId === filters.accountId;
-      const typeMatch = filters.type === 'all' || tx.type === filters.type;
-      const dateMatch = filters.dateRange?.from ?
-        isWithinInterval(new Date(tx.ts), {
-          start: filters.dateRange.from,
-          end: filters.dateRange.to || new Date(),
-        }) : true;
-      return queryMatch && accountMatch && typeMatch && dateMatch;
-    });
-  }, [transactions, filters, isRecurrentView]);
+    return isRecurrentView ? transactions.filter(tx => tx.recurrent) : transactions;
+  }, [transactions, isRecurrentView]);
   const handleDelete = async () => {
     if (!deletingId) return;
     try {
       await api(`/api/finance/transactions/${deletingId}`, { method: 'DELETE' });
       toast.success('Transacción eliminada.');
-      fetchData();
+      fetchData(pagination.cursor);
     } catch (e) {
       toast.error('Error al eliminar la transacción.');
     } finally {
@@ -151,7 +160,7 @@ export function TransactionsPage() {
         `"${tx.amount}"`,
         `"${tx.category}"`,
         `"${tx.note || ''}"`,
-        tx.recurrent || tx.parentId ? 'S��' : 'No'
+        tx.recurrent || tx.parentId ? 'Sí' : 'No'
       ];
       return row.join(',');
     }).join('\n');
@@ -166,9 +175,28 @@ export function TransactionsPage() {
     URL.revokeObjectURL(url);
     toast.success('CSV exportado correctamente.');
   };
+  const handleNextPage = () => {
+    const nextCursor = pagination.cursor + pagination.rowsPerPage;
+    setPagination(p => ({ ...p, history: [...p.history, nextCursor] }));
+    fetchData(nextCursor);
+  };
+  const handlePrevPage = () => {
+    const newHistory = [...pagination.history];
+    newHistory.pop();
+    const prevCursor = newHistory[newHistory.length - 1] ?? 0;
+    setPagination(p => ({ ...p, history: newHistory }));
+    fetchData(prevCursor);
+  };
+  const handleRowsPerPageChange = (value: string) => {
+    const newRows = value === 'all' ? 10000 : parseInt(value, 10);
+    setPagination(p => ({ ...p, rowsPerPage: newRows, cursor: 0, history: [0] }));
+    fetchData(0, newRows);
+  };
   const accountIcons = { cash: <Banknote className="size-4 text-muted-foreground" />, bank: <Landmark className="size-4 text-muted-foreground" />, credit_card: <CreditCard className="size-4 text-muted-foreground" /> };
   const isDefaultFilter = filters.query === '' && filters.accountId === 'all' && filters.type === 'all' && !filters.dateRange;
   const deleteDescriptionId = 'delete-transaction-description';
+  const pageStart = pagination.cursor + 1;
+  const pageEnd = Math.min(pagination.cursor + pagination.rowsPerPage, pagination.totalCount);
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -187,87 +215,107 @@ export function TransactionsPage() {
         </header>
         <TransactionFilters filters={filters} setFilters={setFilters} accounts={accounts} />
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
-            <p className="text-sm text-muted-foreground">
-                {t('common.filteredXOfY', filteredTransactions.length, transactions.length)}
-            </p>
+            <div className="flex items-center space-x-2">
+              <Switch id="recurrent-view" checked={isRecurrentView} onCheckedChange={setIsRecurrentView} />
+              <Label htmlFor="recurrent-view">{t('transactions.recurrent.view')}</Label>
+            </div>
             <div className="flex items-center space-x-2">
                 <Button variant="outline" onClick={exportCSV} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> {t('transactions.exportCSV')}</Button>
                 <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating}>
                     {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />}
                     {t('common.generateAll')}
                 </Button>
-                <div className="flex items-center space-x-2">
-                  <Switch id="recurrent-view" checked={isRecurrentView} onCheckedChange={setIsRecurrentView} />
-                  <Label htmlFor="recurrent-view">{t('transactions.recurrent.view')}</Label>
-                </div>
             </div>
         </div>
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('table.account')}</TableHead>
-                  <TableHead>{t('table.category')}</TableHead>
-                  <TableHead>{t('table.date')}</TableHead>
-                  <TableHead className="text-right">{t('table.amount')}</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                  ))
-                ) : filteredTransactions.length > 0 ? (
-                  filteredTransactions.map((tx) => {
-                    const account = accountsById.get(tx.accountId);
-                    return (
-                      <TableRow key={tx.id} className={cn("hover:bg-muted/50 transition-colors duration-150", (tx.recurrent || tx.parentId) && 'bg-muted/30')}>
-                        <TableCell><div className="flex items-center gap-2">{account && accountIcons[account.type]}<span className="font-medium">{account?.name || 'N/A'}</span></div></TableCell>
-                        <TableCell>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
-                                {tx.recurrent && <Badge variant="secondary">{t('transactions.recurrent.template')}</Badge>}
-                                {tx.parentId && <Badge variant="secondary" className="text-xs">{t('transactions.recurrent.generated')}</Badge>}
-                            </div>
-                        </TableCell>
-                        <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>
-                        <TableCell className={cn("text-right font-mono", tx.type === 'income' ? 'text-emerald-500' : 'text-foreground')}>{formatCurrency(tx.amount, tx.currency)}</TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-transparent hover:border-input hover:bg-accent"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openModal(tx)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, frequency: undefined, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
+            <div className="overflow-auto h-[60vh]">
+              <Table>
+                <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                        {isRecurrentView ? "No hay transacciones recurrentes." : !isDefaultFilter ? (
-                          <>
-                            <p>{t('common.noMatches')}</p>
-                            <Button variant="link" onClick={() => setFilters({ query: '', accountId: 'all', type: 'all', dateRange: undefined })}>
-                              {t('filters.clear')}
-                            </Button>
-                          </>
-                        ) : (
-                          "No hay transacciones todavía."
-                        )}
-                      </motion.div>
-                    </TableCell>
+                    <TableHead>{t('table.account')}</TableHead>
+                    <TableHead>{t('table.category')}</TableHead>
+                    <TableHead>{t('table.date')}</TableHead>
+                    <TableHead className="text-right">{t('table.amount')}</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    ))
+                  ) : filteredTransactions.length > 0 ? (
+                    filteredTransactions.map((tx) => {
+                      const account = accountsById.get(tx.accountId);
+                      return (
+                        <TableRow key={tx.id} className={cn("hover:bg-muted/50 transition-colors duration-150", (tx.recurrent || tx.parentId) && 'bg-muted/30')}>
+                          <TableCell><div className="flex items-center gap-2">{account && accountIcons[account.type]}<span className="font-medium">{account?.name || 'N/A'}</span></div></TableCell>
+                          <TableCell>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant={tx.type === 'transfer' ? 'default' : 'outline'}>{tx.category}</Badge>
+                                  {tx.recurrent && <Badge variant="secondary">{t('transactions.recurrent.template')}</Badge>}
+                                  {tx.parentId && <Badge variant="secondary" className="text-xs">{t('transactions.recurrent.generated')}</Badge>}
+                              </div>
+                          </TableCell>
+                          <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>
+                          <TableCell className={cn("text-right font-mono", tx.type === 'income' ? 'text-emerald-500' : 'text-foreground')}>{formatCurrency(tx.amount, tx.currency)}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-transparent hover:border-input hover:bg-accent"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openModal(tx)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { const { id, ...copy } = tx; openModal({ ...copy, ts: Date.now(), recurrent: false, frequency: undefined, parentId: undefined }); }}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingId(tx.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                          {isRecurrentView ? "No hay transacciones recurrentes." : !isDefaultFilter ? (
+                            <>
+                              <p>{t('common.noMatches')}</p>
+                              <Button variant="link" onClick={() => setFilters({ query: '', accountId: 'all', type: 'all', dateRange: undefined })}>
+                                {t('filters.clear')}
+                              </Button>
+                            </>
+                          ) : (
+                            "No hay transacciones todavía."
+                          )}
+                        </motion.div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between p-4 border-t">
+            <div className="text-sm text-muted-foreground mb-2 sm:mb-0">
+              {t('pagination.showingXofY', pageStart, pageEnd, pagination.totalCount)}
+            </div>
+            <div className="flex items-center space-x-2 sm:space-x-6">
+              <div className="flex items-center space-x-2">
+                <p className="text-sm font-medium">{t('pagination.rowsPerPage')}</p>
+                <Select value={String(pagination.rowsPerPage)} onValueChange={handleRowsPerPageChange}>
+                  <SelectTrigger className="h-8 w-[70px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[25, 50, 100].map(size => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}
+                    <SelectItem value="10000">{t('pagination.all')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrevPage} disabled={pagination.history.length <= 1 || loading}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleNextPage} disabled={!pagination.hasNextPage || loading}><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+            </div>
+          </CardFooter>
         </Card>
       </div>
       <Sheet open={isImportSheetOpen} onOpenChange={setImportSheetOpen}>

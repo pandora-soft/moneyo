@@ -5,7 +5,8 @@ import { ok, bad, notFound, isStr } from './core-utils';
 import type { Account, Transaction, Budget, Settings, TransactionType, Currency, User } from "@shared/types";
 import type { Context } from "hono";
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User } }>) {
+type AppHono = Hono<{ Bindings: Env, Variables: { user?: User } }>;
+export function userRoutes(app: AppHono) {
   // --- SEEDING MIDDLEWARE ---
   app.use('/api/*', async (c, next) => {
     await Promise.all([
@@ -40,7 +41,7 @@ export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User }
       await sessionEntity.delete();
       return bad(c, 'Invalid session');
     }
-    (c as any).set('user', user);
+    c.set('user', user);
     await next();
   };
   const adminGuard = async (c: Context<{ Bindings: Env, Variables: { user?: User } }>, next: () => Promise<void>) => {
@@ -96,7 +97,6 @@ export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User }
     const { password, role, email } = await c.req.json<Partial<User> & { password?: string }>();
     const user = new UserEntity(c.env, id);
     if (!await user.exists()) return notFound(c, 'User not found');
-
     // Prepare updates
     let passwordHash: string | undefined;
     if (password) {
@@ -106,7 +106,6 @@ export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User }
     if (role) updates.role = role;
     if (email) updates.email = email;
     if (passwordHash) updates.passwordHash = passwordHash;
-
     const updatedUser = await user.mutate(u => ({ ...u, ...updates }));
     const { passwordHash: _, ...userWithoutPassword } = updatedUser;
     return ok(c, userWithoutPassword);
@@ -152,8 +151,13 @@ export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User }
   finance.get('/transactions', async (c) => {
     const limit = Number(c.req.query('limit')) || 50;
     const cursor = Number(c.req.query('cursor')) || 0;
+    const accountId = c.req.query('accountId');
+    const type = c.req.query('type') as TransactionType | undefined;
+    const dateFrom = c.req.query('dateFrom') ? Number(c.req.query('dateFrom')) : undefined;
+    const dateTo = c.req.query('dateTo') ? Number(c.req.query('dateTo')) : undefined;
+    const query = c.req.query('query');
     const ledger = new LedgerEntity(c.env, 'main');
-    const page = await ledger.listTransactions(limit, cursor);
+    const page = await ledger.listTransactions(limit, cursor, { accountId, type, dateFrom, dateTo, query });
     return ok(c, page);
   });
   finance.post('/transactions', async (c) => {
