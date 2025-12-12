@@ -213,6 +213,18 @@ export class CurrencyEntity extends IndexedEntity<Currency> {
         { id: 'ars', code: 'ARS', symbol: '$', suffix: false },
     ];
 }
+export interface Session {
+  id: string; // token UUID
+  userId: string;
+  expires: number;
+}
+export class SessionEntity extends IndexedEntity<Session> {
+  static readonly entityName = 'session';
+  static readonly indexName = 'sessions';
+  static readonly initialState: Session = { id: '', userId: '', expires: 0 };
+  static seedData = [];
+}
+
 export class SettingsEntity extends Entity<Settings> {
   static readonly entityName = "settings";
   static readonly initialState: Settings = { currency: 'EUR', fiscalMonthStart: 1, recurrentDefaultFrequency: 'monthly' };

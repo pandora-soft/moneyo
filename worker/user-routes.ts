@@ -1,11 +1,9 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
-import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity, CurrencyEntity, FrequencyEntity, UserEntity, verifyPassword, hashPassword } from "./entities";
+import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity, CurrencyEntity, FrequencyEntity, UserEntity, SessionEntity, verifyPassword, hashPassword } from "./entities";
 import { ok, bad, notFound, isStr } from './core-utils';
 import type { Account, Transaction, Budget, Settings, TransactionType, Currency, User } from "@shared/types";
 import type { Context } from "hono";
-// In-memory session store (for this simple example)
-const sessions = new Map<string, { userId: string; expires: number }>();
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User } }>) {
   // --- SEEDING MIDDLEWARE ---
@@ -25,15 +23,24 @@ export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User }
   const authGuard = async (c: Context<{ Bindings: Env, Variables: { user?: User } }>, next: () => Promise<void>) => {
     const authHeader = c.req.header('Authorization');
     const token = authHeader?.split(' ')[1];
-    if (!token) return bad(c, 'Unauthorized');
-    const session = sessions.get(token);
-    if (!session || session.expires < Date.now()) {
-      sessions.delete(token);
-      return bad(c, 'Unauthorized');
+    if (!isStr(token)) return bad(c, 'Unauthorized');
+    const sessionEntity = new SessionEntity(c.env, token);
+    const session = await sessionEntity.getState();
+    if (!session) {
+      await SessionEntity.delete(c.env, token);
+      return bad(c, 'Session expired');
     }
-    const user = await new UserEntity(c.env, session.userId).getState();
-    if (!user) return bad(c, 'Unauthorized');
-    c.set('user', user);
+    if (Date.now() >= session.expires) {
+      await SessionEntity.delete(c.env, token);
+      return bad(c, 'Session expired');
+    }
+    const userEntity = new UserEntity(c.env, session.userId);
+    const user = await userEntity.getState();
+    if (!user) {
+      await sessionEntity.delete();
+      return bad(c, 'Invalid session');
+    }
+    (c as any).set('user', user);
     await next();
   };
   const adminGuard = async (c: Context<{ Bindings: Env, Variables: { user?: User } }>, next: () => Promise<void>) => {
@@ -54,12 +61,13 @@ export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User }
       return bad(c, 'Invalid credentials');
     }
     const token = crypto.randomUUID();
-    sessions.set(token, { userId: user.id, expires: Date.now() + SESSION_DURATION });
+    const sessionData = { id: token, userId: user.id, expires: Date.now() + SESSION_DURATION };
+    await SessionEntity.create(c.env, sessionData);
     const { passwordHash, ...userWithoutPassword } = user;
     return ok(c, { token, user: userWithoutPassword });
   });
   auth.get('/verify', authGuard, (c) => {
-    const user = c.get('user');
+    const user = c.get('user') as User;
     if (!user) return bad(c, 'Unauthorized');
     const { passwordHash, ...userWithoutPassword } = user;
     return ok(c, { user: userWithoutPassword });
@@ -88,13 +96,19 @@ export function userRoutes(app: Hono<{ Bindings: Env, Variables: { user?: User }
     const { password, role, email } = await c.req.json<Partial<User> & { password?: string }>();
     const user = new UserEntity(c.env, id);
     if (!await user.exists()) return notFound(c, 'User not found');
-    const updatedUser = await user.mutate(async (u) => {
-      if (password) u.passwordHash = await hashPassword(password);
-      if (role) u.role = role;
-      if (email) u.email = email;
-      return u;
-    });
-    const { passwordHash, ...userWithoutPassword } = updatedUser;
+
+    // Prepare updates
+    let passwordHash: string | undefined;
+    if (password) {
+      passwordHash = await hashPassword(password);
+    }
+    const updates: Partial<User> = {};
+    if (role) updates.role = role;
+    if (email) updates.email = email;
+    if (passwordHash) updates.passwordHash = passwordHash;
+
+    const updatedUser = await user.mutate(u => ({ ...u, ...updates }));
+    const { passwordHash: _, ...userWithoutPassword } = updatedUser;
     return ok(c, userWithoutPassword);
   });
   finance.delete('/users/:id', adminGuard, async (c) => {
