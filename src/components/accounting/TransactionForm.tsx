@@ -63,8 +63,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   const refetchTrigger = useAppStore((state) => state.refetchData);
   const [categories, setCategories] = useState<{ value: string; label: string }[]>([]);
   const [frequencies, setFrequencies] = useState<Frequency[]>([]);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(defaultValues?.attachmentDataUrl || null);
-  const [isPdf, setIsPdf] = useState(false);
+  // Removed previewUrl and isPdf state – attachment handling is now done via form field value
   const [isDragging, setIsDragging] = useState(false);
   useEffect(() => {
     api<{ id: string; name: string }[]>('/api/finance/categories')
@@ -91,12 +90,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       ...defaultValues,
     }
   });
-  useEffect(() => {
-    if (defaultValues?.attachmentDataUrl) {
-      setPreviewUrl(defaultValues.attachmentDataUrl);
-      setIsPdf(defaultValues.attachmentDataUrl.startsWith('data:application/pdf'));
-    }
-  }, [defaultValues?.attachmentDataUrl]);
+  // Removed effect – attachment data is now handled directly by the form field
   const { isSubmitting } = form.formState;
   const transactionType = form.watch('type');
   const isRecurrent = form.watch('recurrent');
@@ -109,26 +103,23 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
       form.setValue('category', '');
     }
   }, [transactionType, form]);
-  const handleFileChange = useCallback((file: File | null) => {
-    if (!file) return;
-    if (file.size > MAX_FILE_SIZE) {
-      toast.error('El archivo es demasiado grande (máx 5MB).');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const dataUrl = reader.result as string;
-      setPreviewUrl(dataUrl);
-      setIsPdf(file.type === 'application/pdf');
-      form.setValue('attachmentDataUrl', dataUrl, { shouldValidate: true });
-    };
-    reader.readAsDataURL(file);
-  }, [form]);
-  const handleRemoveAttachment = () => {
-    setPreviewUrl(null);
-    setIsPdf(false);
-    form.setValue('attachmentDataUrl', '', { shouldValidate: true });
-  };
+  const handleFileChange = useCallback(
+    (file: File | null, onValueChange: (url: string) => void) => {
+      if (!file) return;
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error('El archivo es demasiado grande (máx 5MB).');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        onValueChange(dataUrl);
+      };
+      reader.readAsDataURL(file);
+    },
+    []
+  );
+  // Removed handleRemoveAttachment – clearing is done via field.onChange('')
   const handleSubmit: SubmitHandler<TransactionFormValues> = async (values) => {
     const accountFound = accounts.find(a => a.id === values.accountId);
     const finalValues: Partial<Transaction> & { id?: string } = {
@@ -159,37 +150,79 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         <FormField control={form.control} name="category" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>{t('form.transaction.category')}</FormLabel><Combobox options={categories} value={field.value} onChange={(value) => field.onChange(value || '')} placeholder="Seleccione o escriba una categoría..." disabled={transactionType === 'transfer'} /><FormMessage /></FormItem> )} />
         <FormField control={form.control} name="ts" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>{t('form.transaction.date')}</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus locale={es} /></PopoverContent></Popover><FormMessage /></FormItem> )} />
         <FormField control={form.control} name="note" render={({ field }) => ( <FormItem><FormLabel>{t('form.transaction.note')}</FormLabel><FormControl><Textarea placeholder="Detalles adicionales..." {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
-        {/* Attachment Section */}
-        <div className="space-y-2">
-          <FormLabel>Adjunto (Opcional)</FormLabel>
-          {previewUrl ? (
-            <div className="relative group">
-              {isPdf ? (
-                <div className="flex items-center justify-center h-48 w-full bg-muted rounded-lg border-2 border-dashed">
-                  <FileText className="size-16 text-muted-foreground" />
+        {/* Attachment Section – now a FormField */}
+        <FormField
+          control={form.control}
+          name="attachmentDataUrl"
+          render={({ field }) => (
+            <FormItem className="space-y-2">
+              <FormLabel>{t('form.attachment.optional') || 'Adjunto (Opcional)'}</FormLabel>
+
+              {field.value ? (
+                <div className="relative group">
+                  {field.value.startsWith('data:application/pdf') ? (
+                    <div className="flex items-center justify-center h-48 w-full bg-muted rounded-lg border-2 border-dashed">
+                      <FileText className="size-16 text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <img
+                      src={field.value}
+                      alt="Preview"
+                      className="w-full h-48 object-cover rounded-lg shadow-md"
+                    />
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => field.onChange('')}
+                  >
+                    <X className="size-4" />
+                  </Button>
                 </div>
               ) : (
-                <img src={previewUrl} alt="Preview" className="w-full h-48 object-cover rounded-lg shadow-md" />
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    handleFileChange(e.dataTransfer.files[0] ?? null, field.onChange);
+                  }}
+                  className={cn(
+                    "flex justify-center items-center w-full h-32 px-6 py-10 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors",
+                    isDragging && "border-primary bg-primary/10"
+                  )}
+                  onClick={() => document.getElementById('attachment-input')?.click()}
+                >
+                  <div className="text-center">
+                    <UploadCloud className="mx-auto size-8 text-muted-foreground" />
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Arrastra un archivo o haz clic para subirlo
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      PDF, PNG, JPG, GIF hasta 5MB
+                    </p>
+                  </div>
+                  <Input
+                    id="attachment-input"
+                    type="file"
+                    className="hidden"
+                    accept="image/*,application/pdf"
+                    onChange={(e) =>
+                      handleFileChange(e.target.files?.[0] ?? null, field.onChange)
+                    }
+                  />
+                </div>
               )}
-              <Button variant="destructive" size="icon" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={handleRemoveAttachment}><X className="size-4" /></Button>
-            </div>
-          ) : (
-            <div
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileChange(e.dataTransfer.files[0]); }}
-              className={cn("flex justify-center items-center w-full h-32 px-6 py-10 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors", isDragging && "border-primary bg-primary/10")}
-              onClick={() => document.getElementById('attachment-input')?.click()}
-            >
-              <div className="text-center">
-                <UploadCloud className="mx-auto size-8 text-muted-foreground" />
-                <p className="mt-2 text-sm text-muted-foreground">Arrastra un archivo o haz clic para subirlo</p>
-                <p className="text-xs text-muted-foreground">PDF, PNG, JPG, GIF hasta 5MB</p>
-              </div>
-              <Input id="attachment-input" type="file" className="hidden" accept="image/*,application/pdf" onChange={(e) => handleFileChange(e.target.files?.[0] || null)} />
-            </div>
+
+              <FormMessage />
+            </FormItem>
           )}
-        </div>
+        />
         {transactionType !== 'transfer' && ( <> <FormField control={form.control} name="recurrent" render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>{t('form.transaction.recurrent')}</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem> )} /> {isRecurrent && ( <FormField control={form.control} name="frequency" render={({ field }) => ( <FormItem><FormLabel>{t('form.transaction.frequency')}</FormLabel><Select value={field.value ?? ''} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="Seleccione una frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} /> )} </> )}
         <div className="flex justify-end pt-4 sticky bottom-0 z-10">
           <Button type="submit" variant="default" disabled={!form.formState.isValid || isSubmitting}>
