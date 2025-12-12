@@ -113,7 +113,7 @@ export function BudgetsPage() {
     setSheetOpen(true);
   };
   const exportFilteredBudgets = () => {
-    const headers = "Mes,Categoría,Límite,Gasto Real,Estado\n";
+    const headers = "Mes,Categor��a,Límite,Gasto Real,Estado\n";
     const csvContent = filteredBudgetsWithActuals.map(b => {
       const status = b.computedActual > b.limit ? t('budget.over') : t('budget.under');
       return `${format(new Date(b.month), 'yyyy-MM')},"${b.category}",${b.limit},${b.computedActual},${status}`;
@@ -139,15 +139,15 @@ export function BudgetsPage() {
             <PlusCircle className="mr-2 size-5" /> {t('budget.create')}
           </Button>
         </header>
-        <Card className="mb-8">
-          <CardHeader className="flex-row items-center justify-between">
-            <div>
+        <Card className="mb-8 overflow-hidden">
+          <CardHeader className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4">
+            <div className="w-full sm:w-auto">
               <CardTitle>{t('budget.summary')}</CardTitle>
               <CardDescription>{t('budget.summaryDesc')}</CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
               <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(`${val}-01T12:00:00Z`))}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Seleccionar mes" />
                 </SelectTrigger>
                 <SelectContent>
@@ -158,7 +158,7 @@ export function BudgetsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" onClick={exportFilteredBudgets} disabled={filteredBudgetsWithActuals.length === 0}>
+              <Button variant="outline" onClick={exportFilteredBudgets} disabled={filteredBudgetsWithActuals.length === 0} className="w-full sm:w-auto">
                 <Download className="mr-2 size-4" /> {t('common.exportBudgets')}
               </Button>
             </div>
