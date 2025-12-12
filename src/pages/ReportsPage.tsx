@@ -235,113 +235,130 @@ const computedBudgets = budgets.map(b => {
         document.body.removeChild(link);
     } else {
         setGeneratingPDF(true);
-        
         try {
             const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-            const autoTableFn = (await import('jspdf-autotable')).default;
-            if (!(doc as any).autoTable) (doc as any).autoTable = autoTableFn;
+
+            // Header
             doc.setFontSize(18);
             doc.text('Reporte Financiero - Moneyo', 40, 40);
             doc.setFontSize(11);
             doc.text(`Generado el: ${format(new Date(), 'PPP', { locale: es })}`, 40, 60);
             doc.setFontSize(12);
             doc.text(t('labels.monthlySummary'), 40, 90);
-            const [barImage, pieImage] = await Promise.all([svgToPngDataUrl(barChartRef.current), svgToPngDataUrl(pieChartRef.current)]);
-let chartY = 110;
-if (barImage) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const maxWidth = pageWidth - 80;
-  const imgHeight = (300 * maxWidth) / 600;
-  doc.addImage(barImage, 'PNG', 40, chartY, maxWidth, imgHeight);
-  chartY += imgHeight + 10;
-}
-const monthlyBody = monthlySummary.slice(0, 10).map(row => [row.name, formatCurrency(row.income), formatCurrency(row.expense)]);
-if (monthlyBody.length === 0) {
-  doc.text('No hay datos para este período.', 40, chartY, { maxWidth: 400 });
-  chartY += 40;
-} else {
-  doc.setFont('helvetica');
-  doc.setFontSize(11);
-  (doc as any).autoTable({
-    startY: chartY,
-    head: [['Mes', t('finance.income'), t('finance.expense')]],
-    body: monthlyBody,
-  });
-  chartY = (doc as any).lastAutoTable?.finalY ?? (chartY + 120);
-}
-doc.addPage();
-doc.text(t('labels.categorySpending'), 40, 40);
-let pieY = 70;
-if (pieImage) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const maxWidth = pageWidth - 80;
-  const imgHeight = (300 * maxWidth) / 600;
-  doc.addImage(pieImage, 'PNG', 40, pieY, maxWidth, imgHeight);
-  pieY += imgHeight + 10;
-}
+
+            // Charts
+            const [barImage, pieImage] = await Promise.all([
+                svgToPngDataUrl(barChartRef.current),
+                svgToPngDataUrl(pieChartRef.current),
+            ]);
+
+            // Bar chart
+            let chartY = 110;
+            if (barImage) {
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const maxWidth = pageWidth - 80;
+                const imgHeight = (300 * maxWidth) / 600;
+                doc.addImage(barImage, 'PNG', 40, chartY, maxWidth, imgHeight);
+                chartY += imgHeight + 10;
+            }
+
+            // Monthly summary table
+            const monthlyBody = monthlySummary.slice(0, 10).map(row => [
+                row.name,
+                formatCurrency(row.income),
+                formatCurrency(row.expense),
+            ]);
+            if (monthlyBody.length === 0) {
+                doc.text('No hay datos para este período.', 40, chartY, { maxWidth: 400 });
+                chartY += 40;
+            } else {
+                doc.setFont('helvetica');
+                doc.setFontSize(11);
+                (doc as any).autoTable({
+                    startY: chartY,
+                    head: [['Mes', t('finance.income'), t('finance.expense')]],
+                    body: monthlyBody,
+                });
+                chartY = (doc as any).lastAutoTable?.finalY ?? (chartY + 120);
+            }
+
+            // Category spending (pie) page
+            doc.addPage();
+            doc.text(t('labels.categorySpending'), 40, 40);
+            let pieY = 70;
+            if (pieImage) {
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const maxWidth = pageWidth - 80;
+                const imgHeight = (300 * maxWidth) / 600;
+                doc.addImage(pieImage, 'PNG', 40, pieY, maxWidth, imgHeight);
+                pieY += imgHeight + 10;
+            }
+
             const categoryBody = categorySpending.slice(0, 10);
-if (categoryBody.length === 0) {
-  doc.text('No hay datos para este período.', 40, pieY, { maxWidth: 400 });
-  pieY += 40;
-} else {
-  doc.setFont('helvetica');
-  doc.setFontSize(11);
-  (doc as any).autoTable({
-    startY: pieY,
-    head: [['Categoría', 'Gasto', 'Límite']],
-    body: categoryBody.map(row => [
-      row.name,
-      formatCurrency(row.value),
-      row.limit > 0 ? formatCurrency(row.limit) : 'N/A',
-    ]),
-    didParseCell: (data: any) => {
-      if (data.section === 'body') {
-        const item = categoryBody[data.row.index];
-        if (item && item.limit > 0 && item.computedActual > item.limit) {
-          data.cell.styles.textColor = [255, 0, 0];
-        }
-      }
-    },
-  });
-  pieY = (doc as any).lastAutoTable?.finalY ?? (pieY + 120);
-}
-            // --- Budgets summary section ---
+            if (categoryBody.length === 0) {
+                doc.text('No hay datos para este período.', 40, pieY, { maxWidth: 400 });
+                pieY += 40;
+            } else {
+                doc.setFont('helvetica');
+                doc.setFontSize(11);
+                (doc as any).autoTable({
+                    startY: pieY,
+                    head: [['Categoría', 'Gasto', 'Límite']],
+                    body: categoryBody.map(row => [
+                        row.name,
+                        formatCurrency(row.value),
+                        row.limit > 0 ? formatCurrency(row.limit) : 'N/A',
+                    ]),
+                    didParseCell: (data: any) => {
+                        if (data.section === 'body') {
+                            const item = categoryBody[data.row.index];
+                            if (item && item.limit > 0 && item.computedActual > item.limit) {
+                                data.cell.styles.textColor = [255, 0, 0];
+                            }
+                        }
+                    },
+                });
+                pieY = (doc as any).lastAutoTable?.finalY ?? (pieY + 10);
+            }
+
+            // Budgets summary page
             doc.addPage();
             doc.setFontSize(16);
             doc.text('Resumen de Presupuestos', 40, 40);
             let budgetsY = 70;
             doc.setFont('helvetica');
             doc.setFontSize(11);
-const budgetsBody = budgetsWithActuals.slice(0, 10).map(b => [
-  b.category,
-  format(new Date(b.month), 'MMM yyyy', { locale: es }),
-  formatCurrency(b.computedActual),
-  formatCurrency(b.limit),
-]);
-if (budgetsBody.length === 0) {
-  doc.text('No hay datos para este período.', 40, budgetsY, { maxWidth: 400 });
-  budgetsY += 40;
-} else {
-  doc.setFont('helvetica');
-  doc.setFontSize(11);
-  (doc as any).autoTable({
-    startY: budgetsY,
-    head: [['Categoría', 'Mes', 'Actual', 'Límite']],
-    body: budgetsBody,
-    didParseCell: (data: any) => {
-      if (data.section === 'body') {
-        const budget = budgetsWithActuals[data.row.index];
-        if (budget && budget.computedActual > budget.limit) {
-          data.cell.styles.textColor = [255, 0, 0];
-        }
-      }
-    },
-  });
-  budgetsY = (doc as any).lastAutoTable?.finalY ?? (budgetsY + 120);
-}
+            const budgetsBody = budgetsWithActuals.slice(0, 10).map(b => [
+                b.category,
+                format(new Date(b.month), 'MMM yyyy', { locale: es }),
+                formatCurrency(b.computedActual),
+                formatCurrency(b.limit),
+            ]);
+            if (budgetsBody.length === 0) {
+                doc.text('No hay datos para este período.', 40, budgetsY, { maxWidth: 400 });
+                budgetsY += 40;
+            } else {
+                (doc as any).autoTable({
+                    startY: budgetsY,
+                    head: [['Categoría', 'Mes', 'Actual', 'Límite']],
+                    body: budgetsBody,
+                    didParseCell: (data: any) => {
+                        if (data.section === 'body') {
+                            const budget = budgetsWithActuals[data.row.index];
+                            if (budget && budget.computedActual > budget.limit) {
+                                data.cell.styles.textColor = [255, 0, 0];
+                            }
+                        }
+                    },
+                });
+                budgetsY = (doc as any).lastAutoTable?.finalY ?? (budgetsY + 120);
+            }
 
-            // --- Save PDF ---
+            // Save PDF
             const pdfBlob = doc.output('blob');
+            if (!pdfBlob || !(pdfBlob instanceof Blob) || pdfBlob.size === 0) {
+                throw new Error('PDF blob inválido o vacío');
+            }
             const pdfLink = document.createElement('a');
             const pdfUrl = URL.createObjectURL(pdfBlob);
             pdfLink.setAttribute('href', pdfUrl);
@@ -353,6 +370,37 @@ if (budgetsBody.length === 0) {
             toast.success('Reporte PDF generado.');
         } catch (e) {
             console.error('PDF gen error:', e);
+            console.error('Error details:', e instanceof Error ? e.stack : JSON.stringify(e, null, 2));
+            toast.error('Error al generar PDF completo. Usando versión texto.');
+
+            // ---------- Fallback plain‑text PDF generation ----------
+            const fallbackDoc = new jsPDF({ unit: 'pt', format: 'a4' });
+            fallbackDoc.setFontSize(16);
+            fallbackDoc.text('Reporte Financiero Moneyo - Versión Texto', 40, 40);
+            fallbackDoc.setFontSize(12);
+            fallbackDoc.text(`Generado: ${format(new Date(), 'PPP', { locale: es })}`, 40, 70);
+            fallbackDoc.text('Resumen Mensual:', 40, 100);
+            monthlySummary.slice(0, 8).forEach((row, i) => {
+                fallbackDoc.text(`  ${row.name}: Ingr ${formatCurrency(row.income)} | Gast ${formatCurrency(row.expense)}`, 40, 120 + i * 15);
+            });
+            fallbackDoc.text('Gastos por Categoría:', 40, 120 + monthlySummary.slice(0, 8).length * 15 + 10);
+            categorySpending.slice(0, 8).forEach((row, i) => {
+                fallbackDoc.text(`  ${row.name}: ${formatCurrency(row.value)} (Lím ${row.limit || 'N/A'})`, 40, 120 + monthlySummary.slice(0, 8).length * 15 + 30 + i * 12);
+            });
+            fallbackDoc.text('Presupuestos:', 40, 350);
+            budgetsWithActuals.slice(0, 8).forEach((b, i) => {
+                fallbackDoc.text(`  ${b.category} (${format(new Date(b.month), 'MMM yy')}): Act ${formatCurrency(b.computedActual)} / Lím ${formatCurrency(b.limit)}`, 40, 370 + i * 12);
+            });
+            const fbBlob = fallbackDoc.output('blob');
+            const fbUrl = URL.createObjectURL(fbBlob);
+            const fbLink = document.createElement('a');
+            fbLink.href = fbUrl;
+            fbLink.download = getExportFilename('pdf');
+            document.body.appendChild(fbLink);
+            fbLink.click();
+            document.body.removeChild(fbLink);
+            URL.revokeObjectURL(fbUrl);
+            toast.success('PDF texto descargado.');
         } finally {
             setGeneratingPDF(false);
         }
@@ -464,4 +512,5 @@ if (budgetsBody.length === 0) {
     </div>
   );
 }
+ 
  
