@@ -13,10 +13,11 @@ import { TransactionsPage } from '@/pages/TransactionsPage';
 import { BudgetsPage } from '@/pages/BudgetsPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { IAPage } from '@/pages/IAPage';
 import LoginPage from '@/pages/LoginPage';
 import { Toaster } from '@/components/ui/sonner';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Home, Wallet, List, BarChart, Settings, PiggyBank, LogOut, Menu } from 'lucide-react';
+import { Home, Wallet, List, BarChart, Settings, PiggyBank, LogOut, Menu, Brain } from 'lucide-react';
 import { useTranslations } from '@/lib/i18n';
 import { motion } from 'framer-motion';
 import { cn } from './lib/utils';
@@ -113,6 +114,7 @@ export const AppRoot = () => {
     { href: '/transactions', label: t('pages.transactions'), icon: List },
     { href: '/budgets', label: t('pages.budgets'), icon: PiggyBank },
     { href: '/reports', label: t('pages.reports'), icon: BarChart },
+    { href: '/ia', label: 'IA', icon: Brain },
     { href: '/settings', label: t('pages.settings'), icon: Settings },
   ];
   const handleLogout = () => {
@@ -244,6 +246,7 @@ const router = createBrowserRouter([
       { path: "transactions", element: <TransactionsPage /> },
       { path: "budgets", element: <BudgetsPage /> },
       { path: "reports", element: <ReportsPage /> },
+      { path: "ia", element: <IAPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

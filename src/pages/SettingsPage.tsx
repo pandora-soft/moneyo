@@ -14,7 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api-client';
 import type { Settings, Currency, User } from '@shared/types';
 import { toast } from 'sonner';
-import { Loader2, Plus, Edit, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, CheckCircle } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import t from '@/lib/i18n';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -24,6 +24,8 @@ import { CurrencyForm } from '@/components/accounting/CurrencyForm';
 import { FrequencyForm } from '@/components/accounting/FrequencyForm';
 import { UserForm } from '@/components/accounting/UserForm';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 type Category = { id: string; name: string };
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
 type SafeUser = Omit<User, 'passwordHash'>;
@@ -31,6 +33,7 @@ const settingsSchema = z.object({
   currency: z.string().min(1, "Debe seleccionar una moneda."),
   fiscalMonthStart: z.number().int().min(1, "Mínimo 1").max(28, "Máximo 28").optional(),
   recurrentDefaultFrequency: z.string().min(1, "Debe seleccionar una frecuencia."),
+  geminiApiKey: z.string().optional(),
 });
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 const cardVariants: Variants = {
@@ -48,10 +51,6 @@ export function SettingsPage() {
   const { isDark } = useTheme();
   const { setSettings, triggerRefetch, setCurrencies: setStoreCurrencies } = useAppStore.getState();
   const currentUser = useAppStore(s => s.settings.user);
-  const form = useForm<SettingsFormValues>({
-    resolver: zodResolver(settingsSchema),
-  });
-  const { isSubmitting, isDirty } = form.formState;
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -69,6 +68,14 @@ export function SettingsPage() {
   const [deletingCurrency, setDeletingCurrency] = useState<Currency | null>(null);
   const [deletingFrequency, setDeletingFrequency] = useState<Frequency | null>(null);
   const [deletingUser, setDeletingUser] = useState<SafeUser | null>(null);
+  const [isVerifyingKey, setIsVerifyingKey] = useState(false);
+  const form = useForm<SettingsFormValues>({
+    resolver: zodResolver(settingsSchema),
+    defaultValues: {
+      geminiApiKey: localStorage.getItem('gemini_api_key') || '',
+    }
+  });
+  const { isSubmitting, isDirty } = form.formState;
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
@@ -85,6 +92,7 @@ export function SettingsPage() {
       form.reset({
         ...settings,
         fiscalMonthStart: settings.fiscalMonthStart ?? 1,
+        geminiApiKey: localStorage.getItem('gemini_api_key') || '',
       });
       setSettings(settings);
       setCategories(cats);
@@ -101,14 +109,42 @@ export function SettingsPage() {
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+  const validateApiKey = async (key: string) => {
+    if (!key) {
+      toast.warning('La clave API no puede estar vacía.');
+      return false;
+    }
+    setIsVerifyingKey(true);
+    try {
+      const genAI = new GoogleGenerativeAI(key);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      await model.countTokens("test");
+      toast.success('Clave API de Gemini válida.');
+      return true;
+    } catch (error) {
+      toast.error('La clave API de Gemini no es válida.');
+      return false;
+    } finally {
+      setIsVerifyingKey(false);
+    }
+  };
   const onSubmit: SubmitHandler<SettingsFormValues> = async (data) => {
     try {
+      const { geminiApiKey, ...settingsData } = data;
       const updatedSettings = await api<Settings>('/api/finance/settings', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify(settingsData),
       });
+      if (geminiApiKey) {
+        localStorage.setItem('gemini_api_key', geminiApiKey);
+        toast.warning('¡Advertencia de seguridad!', {
+          description: 'Tu clave API se guarda en el almacenamiento local de tu navegador. No es seguro para producción.',
+        });
+      } else {
+        localStorage.removeItem('gemini_api_key');
+      }
       toast.success('Ajustes guardados correctamente.');
-      form.reset(updatedSettings);
+      form.reset({ ...updatedSettings, geminiApiKey });
       useAppStore.getState().setCurrency(updatedSettings.currency);
       setSettings(updatedSettings);
       triggerRefetch();
@@ -116,6 +152,7 @@ export function SettingsPage() {
       toast.error('Error al guardar los ajustes.');
     }
   };
+  // CRUD handlers for Category, Currency, Frequency, User (unchanged)
   const handleCategorySubmit = async (values: { name: string }) => {
     try {
       if (editingCategory) {
@@ -276,8 +313,13 @@ export function SettingsPage() {
                         <FormField control={form.control} name="currency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('finance.mainCurrency')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar moneda" /></SelectTrigger></FormControl><SelectContent>{currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.fiscalMonthStart')}</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value) || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.recurrentDefaultFreq')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="geminiApiKey" render={({ field }) => (<FormItem><FormLabel>{t('settings.gemini.key')}</FormLabel><FormControl><Textarea rows={3} placeholder="AIza..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                       </CardContent>
-                      <div className="flex justify-end p-6 border-t">
+                      <div className="flex justify-between items-center p-6 border-t">
+                        <Button type="button" variant="outline" onClick={() => validateApiKey(form.getValues('geminiApiKey') || '')} disabled={isVerifyingKey}>
+                          {isVerifyingKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                          Probar Clave
+                        </Button>
                         <Button type="submit" disabled={isSubmitting || !isDirty}>
                           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           {t('common.save')}

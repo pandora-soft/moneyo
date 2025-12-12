@@ -156,7 +156,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
           name="attachmentDataUrl"
           render={({ field }) => (
             <FormItem className="space-y-2">
-              <FormLabel>{t('form.attachment.optional') || 'Adjunto (Opcional)'}</FormLabel>
+              <FormLabel>Adjunto (Opcional)</FormLabel>
 
               {field.value ? (
                 <div className="relative group">
