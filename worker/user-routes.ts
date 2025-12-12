@@ -5,7 +5,7 @@ import { ok, bad, notFound, isStr } from './core-utils';
 import type { Account, Transaction, Budget, Settings, TransactionType, Currency, User } from "@shared/types";
 import type { Context } from "hono";
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-type AppHono = Hono<{ Bindings: Env, Variables: { user?: User } }>;
+export type AppHono = Hono<{ Bindings: Env, Variables: { user?: User } }>;
 export function userRoutes(app: AppHono) {
   // --- SEEDING MIDDLEWARE ---
   app.use('/api/*', async (c, next) => {
@@ -152,7 +152,7 @@ export function userRoutes(app: AppHono) {
     const limit = Number(c.req.query('limit')) || 50;
     const cursor = Number(c.req.query('cursor')) || 0;
     const accountId = c.req.query('accountId');
-    const type = c.req.query('type') as TransactionType | undefined;
+    const type = c.req.query('type');
     const dateFrom = c.req.query('dateFrom') ? Number(c.req.query('dateFrom')) : undefined;
     const dateTo = c.req.query('dateTo') ? Number(c.req.query('dateTo')) : undefined;
     const query = c.req.query('query');

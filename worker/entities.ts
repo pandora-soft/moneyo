@@ -145,7 +145,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     cursor = 0,
     filters: {
       accountId?: string;
-      type?: TransactionType;
+      type?: string;
       dateFrom?: number;
       dateTo?: number;
       query?: string;
@@ -154,7 +154,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const { transactions } = await this.getState();
     const filtered = transactions.filter(tx => {
       if (filters.accountId && filters.accountId !== 'all' && tx.accountId !== filters.accountId) return false;
-      if (filters.type && filters.type !== 'all' && tx.type !== filters.type) return false;
+      if (filters.type && filters.type !== 'all' && tx.type !== (filters.type as TransactionType)) return false;
       if (filters.dateFrom && filters.dateTo) {
         if (!isWithinInterval(new Date(tx.ts), { start: filters.dateFrom, end: filters.dateTo })) return false;
       }

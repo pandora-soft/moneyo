@@ -44,8 +44,9 @@ export interface Budget {
 }
 export interface PaginatedTransactions {
   items: Transaction[];
-  next: number | null;
+  next: number | null | string;
   totalCount: number;
+  prev?: string | number;
 }
 // Auth types
 export interface User {
