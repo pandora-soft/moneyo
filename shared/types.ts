@@ -34,6 +34,7 @@ export interface Transaction {
   recurrent?: boolean;
   frequency?: string;
   parentId?: string; // To link generated transactions to their recurrent template
+  attachmentDataUrl?: string; // Base64 data URL for attachment preview (image/PDF)
 }
 export interface Budget {
   id:string;

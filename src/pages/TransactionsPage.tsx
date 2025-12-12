@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { PlusCircle, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlusCircle, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, Download, ChevronLeft, ChevronRight, FileText, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
@@ -35,6 +36,7 @@ export function TransactionsPage() {
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRecurrentView, setIsRecurrentView] = useState(false);
+  const [attachmentModal, setAttachmentModal] = useState<{ open: boolean; url: string | null }>({ open: false, url: null });
   const [pagination, setPagination] = useState({
     cursor: 0,
     history: [0],
@@ -43,9 +45,7 @@ export function TransactionsPage() {
     hasNextPage: false,
   });
   const rowsPerPageRef = useRef(pagination.rowsPerPage);
-  useEffect(() => {
-    rowsPerPageRef.current = pagination.rowsPerPage;
-  }, [pagination.rowsPerPage]);
+  useEffect(() => { rowsPerPageRef.current = pagination.rowsPerPage; }, [pagination.rowsPerPage]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { openModal } = useAppStore();
   const refetchTrigger = useAppStore((state) => state.refetchData);
@@ -68,16 +68,9 @@ export function TransactionsPage() {
         accounts.length === 0 ? api<Account[]>('/api/finance/accounts') : Promise.resolve(accounts),
       ]);
       setTransactions(txsData.items);
-      setPagination(prev => ({
-        ...prev,
-        cursor: newCursor,
-        totalCount: txsData.totalCount,
-        hasNextPage: txsData.next !== null,
-        rowsPerPage: rpp,
-      }));
+      setPagination(prev => ({ ...prev, cursor: newCursor, totalCount: txsData.totalCount, hasNextPage: txsData.next !== null, rowsPerPage: rpp }));
       if (accounts.length === 0) setAccounts(accs);
     } catch (error) {
-      console.error("Failed to fetch data", error);
       toast.error('Error al cargar los datos.');
     } finally {
       setLoading(false);
@@ -111,12 +104,11 @@ export function TransactionsPage() {
     const lines = text.split('\n').slice(1).filter(l => l.trim());
     const preview = lines.map(line => {
         const [date, accountName, type, amount, category, note] = line.split(',');
-        const isDateValid = isValid(new Date(date));
-        return { date, accountName, type, amount, category, note, isDateValid };
+        return { date, accountName, type, amount, category, note, isDateValid: isValid(new Date(date)) };
     });
     setImportPreview(preview);
     setImportSheetOpen(true);
-    event.target.value = ''; // Reset file input
+    event.target.value = '';
   };
   const handleImport = async () => {
     if (!importFile) return;
@@ -156,17 +148,14 @@ export function TransactionsPage() {
       toast.warning('No hay transacciones para exportar.');
       return;
     }
-    const headers = 'Fecha,Cuenta,Tipo,Monto,Categoría,Nota,Recurrente\n';
+    const headers = 'Fecha,Cuenta,Tipo,Monto,Categoría,Nota,Recurrente,Adjunto\n';
     const csv = filteredTransactions.map(tx => {
       const account = accountsById.get(tx.accountId);
       const row = [
         `"${format(new Date(tx.ts), 'dd/MM/yyyy', { locale: es })}"`,
-        `"${account?.name || ''}"`,
-        `"${tx.type}"`,
-        `"${tx.amount}"`,
-        `"${tx.category}"`,
-        `"${tx.note || ''}"`,
-        tx.recurrent || tx.parentId ? 'S��' : 'No'
+        `"${account?.name || ''}"`, `"${tx.type}"`, `"${tx.amount}"`, `"${tx.category}"`, `"${tx.note || ''}"`,
+        tx.recurrent || tx.parentId ? 'Sí' : 'No',
+        tx.attachmentDataUrl ? 'Sí' : 'No'
       ];
       return row.join(',');
     }).join('\n');
@@ -206,6 +195,7 @@ export function TransactionsPage() {
   const TransactionRow = ({ tx }: { tx: Transaction }) => {
     const categoryColor = useCategoryColor(tx.category);
     const account = accountsById.get(tx.accountId);
+    const isPdf = tx.attachmentDataUrl?.startsWith('data:application/pdf');
     return (
       <TableRow className={cn("hover:bg-muted/50 transition-colors duration-150", (tx.recurrent || tx.parentId) && 'bg-muted/30')}>
         <TableCell><div className="flex items-center gap-2">{account && accountIcons[account.type]}<span className="font-medium">{account?.name || 'N/A'}</span></div></TableCell>
@@ -218,7 +208,12 @@ export function TransactionsPage() {
         </TableCell>
         <TableCell>{format(new Date(tx.ts), "d MMM, yyyy", { locale: es })}</TableCell>
         <TableCell className={cn("text-right font-mono", tx.type === 'income' ? 'text-emerald-500' : 'text-foreground')}>{formatCurrency(tx.amount, tx.currency)}</TableCell>
-        <TableCell>
+        <TableCell className="flex items-center justify-end gap-1">
+          {tx.attachmentDataUrl && (
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setAttachmentModal({ open: true, url: tx.attachmentDataUrl! })}>
+              {isPdf ? <FileText className="size-4" /> : <img src={tx.attachmentDataUrl} alt="adjunto" className="w-6 h-6 object-cover rounded" />}
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 border-transparent hover:border-input hover:bg-accent"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -235,148 +230,45 @@ export function TransactionsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
-          <div>
-            <h1 className="text-4xl font-display font-bold">{t('pages.transactions')}</h1>
-            <p className="text-muted-foreground mt-1">{t('transactions.history')}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 size-4" /> {t('transactions.importCSV')}</Button>
-            <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => openModal()}>
-              <PlusCircle className="mr-2 size-5" /> {t('common.addTransaction')}
-            </Button>
-          </div>
+          <div><h1 className="text-4xl font-display font-bold">{t('pages.transactions')}</h1><p className="text-muted-foreground mt-1">{t('transactions.history')}</p></div>
+          <div className="flex flex-wrap gap-2"><input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" /><Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 size-4" /> {t('transactions.importCSV')}</Button><Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => openModal()}><PlusCircle className="mr-2 size-5" /> {t('common.addTransaction')}</Button></div>
         </header>
         <TransactionFilters filters={filters} setFilters={setFilters} accounts={accounts} />
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
-            <div className="flex items-center space-x-2">
-              <Switch id="recurrent-view" checked={isRecurrentView} onCheckedChange={setIsRecurrentView} />
-              <Label htmlFor="recurrent-view">{t('transactions.recurrent.view')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-                <Button variant="outline" onClick={exportCSV} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> {t('transactions.exportCSV')}</Button>
-                <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating}>
-                    {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />}
-                    {t('common.generateAll')}
-                </Button>
-            </div>
+            <div className="flex items-center space-x-2"><Switch id="recurrent-view" checked={isRecurrentView} onCheckedChange={setIsRecurrentView} /><Label htmlFor="recurrent-view">{t('transactions.recurrent.view')}</Label></div>
+            <div className="flex items-center space-x-2"><Button variant="outline" onClick={exportCSV} disabled={loading || filteredTransactions.length === 0}><Download className="mr-2 size-4" /> {t('transactions.exportCSV')}</Button><Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating}>{isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />} {t('common.generateAll')}</Button></div>
         </div>
         <Card>
-          <CardContent className="p-0">
-            <div className="overflow-auto h-[60vh]">
-              <div className="min-w-full overflow-x-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-card z-10">
-                    <TableRow>
-                      <TableHead>{t('table.account')}</TableHead>
-                      <TableHead>{t('table.category')}</TableHead>
-                      <TableHead>{t('table.date')}</TableHead>
-                      <TableHead className="text-right">{t('table.amount')}</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      Array.from({ length: 10 }).map((_, i) => (
-                        <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                      ))
-                    ) : filteredTransactions.length > 0 ? (
-                      filteredTransactions.map((tx) => <TransactionRow key={tx.id} tx={tx} />)
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
-                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                            {isRecurrentView ? "No hay transacciones recurrentes." : !isDefaultFilter ? (
-                              <>
-                                <p>{t('common.noMatches')}</p>
-                                <Button variant="link" onClick={() => setFilters({ query: '', accountId: 'all', type: 'all', dateRange: undefined })}>
-                                  {t('filters.clear')}
-                                </Button>
-                              </>
-                            ) : (
-                              "No hay transacciones todavía."
-                            )}
-                          </motion.div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </CardContent>
+          <CardContent className="p-0"><div className="overflow-auto h-[60vh]"><div className="min-w-full overflow-x-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>{t('table.account')}</TableHead><TableHead>{t('table.category')}</TableHead><TableHead>{t('table.date')}</TableHead><TableHead className="text-right">{t('table.amount')}</TableHead><TableHead className="w-[100px] text-right">Acciones</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {loading ? ( Array.from({ length: 10 }).map((_, i) => ( <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow> )) ) : filteredTransactions.length > 0 ? ( filteredTransactions.map((tx) => <TransactionRow key={tx.id} tx={tx} />) ) : ( <TableRow><TableCell colSpan={5} className="h-24 text-center"><motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>{isRecurrentView ? "No hay transacciones recurrentes." : !isDefaultFilter ? ( <><p>{t('common.noMatches')}</p><Button variant="link" onClick={() => setFilters({ query: '', accountId: 'all', type: 'all', dateRange: undefined })}>{t('filters.clear')}</Button></> ) : ( "No hay transacciones todavía." )}</motion.div></TableCell></TableRow> )}
+              </TableBody>
+            </Table>
+          </div></div></CardContent>
           <CardFooter className="flex flex-col sm:flex-row items-center justify-between p-4 border-t">
-            <div className="text-sm text-muted-foreground mb-2 sm:mb-0">
-              {t('pagination.showingXofY', pageStart, pageEnd, pagination.totalCount)}
-            </div>
+            <div className="text-sm text-muted-foreground mb-2 sm:mb-0">{t('pagination.showingXofY', pageStart, pageEnd, pagination.totalCount)}</div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-6">
-              <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium">{t('pagination.rowsPerPage')}</p>
-                <Select value={String(pagination.rowsPerPage)} onValueChange={handleRowsPerPageChange}>
-                  <SelectTrigger className="h-8 w-[70px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[25, 50, 100].map(size => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}
-                    <SelectItem value="10000">{t('pagination.all')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrevPage} disabled={pagination.history.length <= 1 || loading}><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleNextPage} disabled={!pagination.hasNextPage || loading}><ChevronRight className="h-4 w-4" /></Button>
-              </div>
+              <div className="flex items-center space-x-2"><p className="text-sm font-medium">{t('pagination.rowsPerPage')}</p><Select value={String(pagination.rowsPerPage)} onValueChange={handleRowsPerPageChange}><SelectTrigger className="h-8 w-[70px]"><SelectValue /></SelectTrigger><SelectContent>{[25, 50, 100].map(size => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}<SelectItem value="10000">{t('pagination.all')}</SelectItem></SelectContent></Select></div>
+              <div className="flex items-center space-x-2"><Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrevPage} disabled={pagination.history.length <= 1 || loading}><ChevronLeft className="h-4 w-4" /></Button><Button variant="outline" size="icon" className="h-8 w-8" onClick={handleNextPage} disabled={!pagination.hasNextPage || loading}><ChevronRight className="h-4 w-4" /></Button></div>
             </div>
           </CardFooter>
         </Card>
       </div>
-      <Sheet open={isImportSheetOpen} onOpenChange={setImportSheetOpen}>
-            <SheetContent className="sm:max-w-2xl w-full" aria-describedby="import-sheet-desc">
-            <SheetHeader>
-              <SheetTitle>{t('transactions.importSheet.title')}</SheetTitle>
-              <SheetDescription id="import-sheet-desc">{t('transactions.importSheet.description')}</SheetDescription>
-            </SheetHeader>
-            <div className="py-4">
-                <p className="text-sm text-muted-foreground mb-2">{t('transactions.importSheet.preview')}</p>
-                <p className="text-xs text-muted-foreground mb-4">{t('transactions.importSheet.columns')}</p>
-                <div className="max-h-96 overflow-auto border rounded-md">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                {importPreview[0] && Object.keys(importPreview[0]).filter(k => k !== 'isDateValid').map(key => <TableHead key={key}>{key}</TableHead>)}
-                                <TableHead>{t('transactions.importSheet.validation')}</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {importPreview.map((row, i) => (
-                                <TableRow key={i}>
-                                    {Object.entries(row).filter(([k]) => k !== 'isDateValid').map(([key, val], j) => <TableCell key={j}>{val as string}</TableCell>)}
-                                    <TableCell>
-                                        {!row.isDateValid && <Badge variant="destructive">{t('transactions.importSheet.invalidDate')}</Badge>}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-                <div className="mt-6 flex justify-end">
-                    <Button onClick={handleImport}>{t('transactions.importSheet.confirm')}</Button>
-                </div>
-            </div>
-        </SheetContent>
-      </Sheet>
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent aria-describedby={deleteDescriptionId}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle>
-            <AlertDialogDescription id={deleteDescriptionId}>
-              {t('transactions.deleteWarning')} {t('transactions.deleteCascade')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Sheet open={isImportSheetOpen} onOpenChange={setImportSheetOpen}><SheetContent className="sm:max-w-2xl w-full" aria-describedby="import-sheet-desc"><SheetHeader><SheetTitle>{t('transactions.importSheet.title')}</SheetTitle><SheetDescription id="import-sheet-desc">{t('transactions.importSheet.description')}</SheetDescription></SheetHeader><div className="py-4"><p className="text-sm text-muted-foreground mb-2">{t('transactions.importSheet.preview')}</p><p className="text-xs text-muted-foreground mb-4">{t('transactions.importSheet.columns')}</p><div className="max-h-96 overflow-auto border rounded-md"><Table><TableHeader><TableRow>{importPreview[0] && Object.keys(importPreview[0]).filter(k => k !== 'isDateValid').map(key => <TableHead key={key}>{key}</TableHead>)}<TableHead>{t('transactions.importSheet.validation')}</TableHead></TableRow></TableHeader><TableBody>{importPreview.map((row, i) => ( <TableRow key={i}>{Object.entries(row).filter(([k]) => k !== 'isDateValid').map(([key, val], j) => <TableCell key={j}>{val as string}</TableCell>)}<TableCell>{!row.isDateValid && <Badge variant="destructive">{t('transactions.importSheet.invalidDate')}</Badge>}</TableCell></TableRow> ))}</TableBody></Table></div><div className="mt-6 flex justify-end"><Button onClick={handleImport}>{t('transactions.importSheet.confirm')}</Button></div></div></SheetContent></Sheet>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}><AlertDialogContent aria-describedby={deleteDescriptionId}><AlertDialogHeader><AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle><AlertDialogDescription id={deleteDescriptionId}>{t('transactions.deleteWarning')} {t('transactions.deleteCascade')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <Dialog open={attachmentModal.open} onOpenChange={(open) => setAttachmentModal({ open, url: open ? attachmentModal.url : null })}>
+        <DialogContent className="max-w-4xl w-full h-[90vh] p-2">
+          {attachmentModal.url && (
+            attachmentModal.url.startsWith('data:application/pdf') ? (
+              <iframe src={attachmentModal.url} className="w-full h-full" title="Attachment Preview" />
+            ) : (
+              <img src={attachmentModal.url} alt="Attachment Preview" className="max-w-full max-h-full object-contain mx-auto" />
+            )
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

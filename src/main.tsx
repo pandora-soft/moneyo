@@ -28,7 +28,6 @@ import type { Account, Transaction } from '@shared/types';
 import { toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Skeleton } from './components/ui/skeleton';
-
 const GlobalTransactionSheet = () => {
   const isModalOpen = useAppStore(s => s.isModalOpen);
   const modalInitialValues = useAppStore(s => s.modalInitialValues);
@@ -73,7 +72,6 @@ const GlobalTransactionSheet = () => {
               ts: new Date(modalInitialValues.ts || Date.now()),
               accountToId: modalInitialValues.accountTo,
             } : {}}
-```
           />
         )}
       </SheetContent>
