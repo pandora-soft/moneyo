@@ -19,7 +19,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import t from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
-import { useCategoryColor } from '@/hooks/useCategoryColor';
+import { getCategoryColor } from '@/hooks/useCategoryColor';
 const tailwindColorToHex: Record<string, string> = {
   'bg-emerald-500': '#10b981', 'bg-orange-500': '#f97316', 'bg-blue-500': '#3b82f6',
   'bg-purple-500': '#8b5cf6', 'bg-red-500': '#ef4444', 'bg-yellow-500': '#eab308',
@@ -111,7 +111,7 @@ export function ReportsPage() {
       end: filters.dateRange!.to ?? new Date(),
     }));
   }, [transactions, filters.dateRange]);
-  const categoryColors = useCategoryColor();
+  // Removed: useCategoryColor hook is no longer needed; we use getCategoryColor directly.
   const { monthlySummary, categorySpending, budgetsWithActuals } = useMemo(() => {
     const summary = filteredTransactions.reduce((acc, tx) => {
       const monthKey = format(new Date(tx.ts), 'yyyy-MM');
@@ -129,18 +129,18 @@ export function ReportsPage() {
         acc[tx.category] += Math.abs(tx.amount);
         return acc;
       }, {} as Record<string, number>);
-    const categoryChartData = Object.entries(spending)
-      .map(([name, value]) => {
-        const budget = budgets.find(b => b.category === name && getMonth(new Date(b.month)) === getMonth(currentMonthStart) && getYear(new Date(b.month)) === getYear(currentMonthStart));
-        return { name, value, limit: budget?.limit || 0, computedActual: value, color: categoryColors(name) };
-      })
+        const categoryChartData = Object.entries(spending)
+          .map(([name, value]) => {
+            const budget = budgets.find(b => b.category === name && getMonth(new Date(b.month)) === getMonth(currentMonthStart) && getYear(new Date(b.month)) === getYear(currentMonthStart));
+            return { name, value, limit: budget?.limit || 0, computedActual: value, color: getCategoryColor(name) };
+          })
       .sort((a, b) => b.value - a.value);
     const computedBudgets = budgets.map(b => {
       const monthStart = new Date(b.month);
       const actual = filteredTransactions
         .filter(t => t.type === 'expense' && getMonth(new Date(t.ts)) === getMonth(monthStart) && getYear(new Date(t.ts)) === getYear(monthStart) && t.category === b.category)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      return { ...b, computedActual: actual, color: categoryColors(b.category) };
+      return { ...b, computedActual: actual, color: getCategoryColor(b.category) };
     });
     computedBudgets.sort((a, b) => {
       const key = sortConfig.key;
@@ -150,7 +150,7 @@ export function ReportsPage() {
       return 0;
     });
     return { monthlySummary: monthlyChartData, categorySpending: categoryChartData, budgetsWithActuals: computedBudgets };
-  }, [filteredTransactions, budgets, sortConfig, categoryColors]);
+  }, [filteredTransactions, budgets, sortConfig]);
   const handleSort = (key: 'category' | 'month') => {
     setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
   };

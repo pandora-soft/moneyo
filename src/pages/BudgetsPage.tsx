@@ -21,7 +21,21 @@ import t from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { useCategoryColor } from '@/hooks/useCategoryColor';
+ // Mapping Tailwind CSS background color classes to HEX values for Recharts
+ const tailwindColorToHex: Record<string, string> = {
+   'bg-emerald-500': '#10b981',
+   'bg-orange-500': '#f97316',
+   'bg-blue-500': '#3b82f6',
+   'bg-purple-500': '#8b5cf6',
+   'bg-red-500': '#ef4444',
+   'bg-yellow-500': '#eab308',
+   'bg-green-500': '#22c55e',
+   'bg-indigo-500': '#6366f1',
+   'bg-rose-500': '#f43f5e',
+   'bg-slate-500': '#64748b',
+   'bg-gray-500': '#6b7280',
+ };
+import { getCategoryColor } from '@/hooks/useCategoryColor';
 type BudgetWithColor = Budget & { computedActual: number; color: string };
 const BudgetCard = ({ budget }: { budget: BudgetWithColor }) => {
   const formatCurrency = useFormatCurrency();
@@ -98,7 +112,7 @@ export function BudgetsPage() {
   const { uniqueMonths, uniqueCategories, filteredBudgetsWithActuals, chartData } = useMemo(() => {
     const allDates = [...budgets.map(b => b.month), ...transactions.map(t => t.ts)];
     const uniqueMonthKeys = [...new Set(allDates.map(d => format(new Date(d), 'yyyy-MM')))].sort().reverse();
-    const allCategories = [...new Set(transactions.filter(t => t.type === 'expense').map(t => t.category)), 'Salario', 'Alquiler', 'Comida', 'Transporte', 'Ocio'];
+    const allCategories = [...new Set([...transactions.filter(t => t.type === 'expense').map(t => t.category), 'Salario', 'Alquiler', 'Comida', 'Transporte', 'Ocio'])];
     const uniqueCategories = [...new Set(allCategories)];
     const currentMonthBudgets = budgets.filter(b => format(new Date(b.month), 'yyyy-MM') === format(filterDate, 'yyyy-MM'));
     const budgetsWithActuals = currentMonthBudgets.map(b => {
@@ -113,21 +127,21 @@ export function BudgetsPage() {
       limit: b.limit,
       actual: b.computedActual,
     }));
-    return { uniqueMonths: uniqueMonthKeys, uniqueCategories, filteredBudgetsWithActuals, chartData };
+    return { uniqueMonths: uniqueMonthKeys, uniqueCategories, filteredBudgetsWithActuals: budgetsWithActuals, chartData };
   }, [budgets, transactions, filterDate]);
-  const categoryColors = useCategoryColor();
+ // Removed: const categoryColors = useCategoryColor(); // Not needed; using getCategoryColor directly
   const budgetsWithColors = useMemo(() => {
     return filteredBudgetsWithActuals.map(b => ({
       ...b,
-      color: categoryColors(b.category)
+      color: getCategoryColor(b.category)
     }));
-  }, [filteredBudgetsWithActuals, categoryColors]);
+  }, [filteredBudgetsWithActuals]);
   const chartDataWithColors = useMemo(() => {
     return chartData.map(d => ({
       ...d,
-      color: categoryColors(d.name)
+      color: getCategoryColor(d.name)
     }));
-  }, [chartData, categoryColors]);
+  }, [chartData]);
   const handleFormSubmit = async (values: Omit<Budget, 'id' | 'computedActual'>) => {
     try {
       if (editingBudget?.id) {
@@ -229,7 +243,7 @@ export function BudgetsPage() {
                   <Bar dataKey="limit" fill="#8884d8" name={t('budget.limit')} radius={[4, 4, 0, 0]} />
                   <Bar dataKey="actual" name={t('budget.actual')} radius={[4, 4, 0, 0]}>
                     {chartDataWithColors.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color.replace('bg-','').replace('-500','')} />
+                      <Cell key={`cell-${index}`} fill={tailwindColorToHex[entry.color] || '#8884d8'} />
                     ))}
                   </Bar>
                 </BarChart>
