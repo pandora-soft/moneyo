@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { toast } from "sonner";
 export interface ReceiptAnalysisResult {
   merchant: string;
   amount: number;
@@ -26,9 +27,10 @@ Do not add any extra text or explanations outside of the JSON object.
 `;
 export async function analyzeReceipt(imageBase64: string, apiKey: string): Promise<ReceiptAnalysisResult> {
   try {
+    const modelName = localStorage.getItem('gemini_model') || 'gemini-1.5-flash';
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: modelName,
       safetySettings: [
         { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
         { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
@@ -42,7 +44,6 @@ export async function analyzeReceipt(imageBase64: string, apiKey: string): Promi
     };
     const result = await model.generateContent([structuredPrompt, imagePart]);
     const responseText = result.response.text();
-    // Clean the response to ensure it's valid JSON
     const jsonString = responseText.replace(/```json|```/g, '').trim();
     const parsedResult = JSON.parse(jsonString) as Partial<ReceiptAnalysisResult>;
     return {
@@ -57,5 +58,22 @@ export async function analyzeReceipt(imageBase64: string, apiKey: string): Promi
       throw new Error('La clave API de Gemini no es válida o ha expirado.');
     }
     throw new Error('No se pudo procesar la imagen con la IA. Inténtalo de nuevo.');
+  }
+}
+export async function validateApiKey(key: string, modelName: string): Promise<boolean> {
+  if (!key) {
+    toast.warning('La clave API no puede estar vacía.');
+    return false;
+  }
+  try {
+    const genAI = new GoogleGenerativeAI(key);
+    const model = genAI.getGenerativeModel({ model: modelName });
+    await model.countTokens("test");
+    toast.success('Clave API de Gemini y modelo válidos.');
+    return true;
+  } catch (error) {
+    console.error("API Key Validation Error:", error);
+    toast.error('La clave API de Gemini o el modelo no son válidos.');
+    return false;
   }
 }

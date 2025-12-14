@@ -155,6 +155,7 @@ const translations = {
     recurrentDefaultFreq: 'Frecuencia Recurrente por Defecto',
     gemini: {
       key: 'Clave API de Gemini (opcional)',
+      model: 'Modelo Gemini',
     },
     users: {
       title: 'Usuarios',
