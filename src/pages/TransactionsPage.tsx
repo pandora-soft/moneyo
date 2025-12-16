@@ -47,7 +47,7 @@ export function TransactionsPage() {
   const rowsPerPageRef = useRef(pagination.rowsPerPage);
   useEffect(() => { rowsPerPageRef.current = pagination.rowsPerPage; }, [pagination.rowsPerPage]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { openModal } = useAppStore();
+  const openModal = useAppStore(s => s.openModal);
   const refetchTrigger = useAppStore((state) => state.refetchData);
   const formatCurrency = useFormatCurrency();
   const accountsById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);

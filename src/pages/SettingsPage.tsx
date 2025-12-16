@@ -34,7 +34,6 @@ const settingsSchema = z.object({
   fiscalMonthStart: z.number().int().min(1, "Mínimo 1").max(28, "Máximo 28").optional(),
   recurrentDefaultFrequency: z.string().min(1, "Debe seleccionar una frecuencia."),
   geminiApiKey: z.string().optional(),
-  geminiModel: z.string().optional(),
 });
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 const cardVariants: Variants = {
@@ -74,7 +73,6 @@ export function SettingsPage() {
     resolver: zodResolver(settingsSchema),
     defaultValues: {
       geminiApiKey: localStorage.getItem('gemini_api_key') || '',
-      geminiModel: localStorage.getItem('gemini_model') || 'gemini-1.5-flash',
     }
   });
   const { isSubmitting, isDirty } = form.formState;
@@ -95,7 +93,6 @@ export function SettingsPage() {
         ...settings,
         fiscalMonthStart: settings.fiscalMonthStart ?? 1,
         geminiApiKey: localStorage.getItem('gemini_api_key') || '',
-        geminiModel: localStorage.getItem('gemini_model') || 'gemini-1.5-flash',
       });
       setSettings(settings);
       setCategories(cats);
@@ -114,14 +111,13 @@ export function SettingsPage() {
   }, [fetchAllData]);
   const handleValidateApiKey = async () => {
     const key = form.getValues('geminiApiKey') || '';
-    const model = form.getValues('geminiModel') || localStorage.getItem('gemini_model') || 'gemini-1.5-flash';
     setIsVerifyingKey(true);
-    await validateApiKey(key, model);
+    await validateApiKey(key);
     setIsVerifyingKey(false);
   };
   const onSubmit: SubmitHandler<SettingsFormValues> = async (data) => {
     try {
-      const { geminiApiKey, geminiModel, ...settingsData } = data;
+      const { geminiApiKey, ...settingsData } = data;
       const updatedSettings = await api<Settings>('/api/finance/settings', {
         method: 'POST',
         body: JSON.stringify(settingsData),
@@ -134,13 +130,8 @@ export function SettingsPage() {
       } else {
         localStorage.removeItem('gemini_api_key');
       }
-      if (geminiModel) {
-        localStorage.setItem('gemini_model', geminiModel);
-      } else {
-        localStorage.removeItem('gemini_model');
-      }
       toast.success('Ajustes guardados correctamente.');
-      form.reset({ ...updatedSettings, geminiApiKey, geminiModel });
+      form.reset({ ...updatedSettings, geminiApiKey });
       useAppStore.getState().setCurrency(updatedSettings.currency);
       setSettings(updatedSettings);
       triggerRefetch();
@@ -309,10 +300,6 @@ export function SettingsPage() {
                         <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.fiscalMonthStart')}</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value) || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.recurrentDefaultFreq')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="geminiApiKey" render={({ field }) => (<FormItem><FormLabel>{t('settings.gemini.key')}</FormLabel><FormControl><Textarea rows={3} placeholder="AIza..." {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="geminiModel" render={({ field }) => (<FormItem><FormLabel>{t('settings.gemini.model')}</FormLabel><Select onValueChange={(val) => { localStorage.setItem('gemini_model', val); field.onChange(val); }} value={field.value || ''}><FormControl><SelectTrigger><SelectValue placeholder="Seleccionar modelo" /></SelectTrigger></FormControl><SelectContent>
-                          <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
-                          <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
-                        </SelectContent></Select><FormMessage /></FormItem>)} />
                       </CardContent>
                       <div className="flex justify-between items-center p-6 border-t">
                         <Button type="button" variant="outline" onClick={handleValidateApiKey} disabled={isVerifyingKey}>

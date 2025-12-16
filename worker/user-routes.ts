@@ -6,9 +6,10 @@ import type { Account, Transaction, Budget, Settings, TransactionType, Currency,
 import type { Context } from "hono";
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 export type AppHono = Hono<{ Bindings: Env, Variables: { user?: User } }>;
-export function userRoutes(app: AppHono) {
+export function userRoutes(app: Hono<{ Bindings: Env }>) {
+  const typedApp = app as unknown as AppHono;
   // --- SEEDING MIDDLEWARE ---
-  app.use('/api/*', async (c, next) => {
+  typedApp.use('/api/*', async (c, next) => {
     await Promise.all([
       UserEntity.ensureSeed(c.env),
       AccountEntity.ensureSeed(c.env),
@@ -73,7 +74,7 @@ export function userRoutes(app: AppHono) {
     const { passwordHash, ...userWithoutPassword } = user;
     return ok(c, { user: userWithoutPassword });
   });
-  app.route('/api/auth', auth);
+  typedApp.route('/api/auth', auth);
   // --- FINANCE ROUTES (PROTECTED) ---
   const finance = new Hono<{ Bindings: Env, Variables: { user?: User } }>();
   finance.use('*', authGuard);
@@ -413,5 +414,5 @@ export function userRoutes(app: AppHono) {
     await settingsEntity.patch(body);
     return ok(c, await settingsEntity.getState());
   });
-  app.route('/api/finance', finance);
+  typedApp.route('/api/finance', finance);
 }
