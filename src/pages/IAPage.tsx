@@ -32,11 +32,18 @@ export function IAPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const openModal = useAppStore((s) => s.openModal);
   const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
+  // Pause and clear video element first
+  if (videoRef.current) {
+    videoRef.current.pause();
+    videoRef.current.srcObject = null;
+    videoRef.current.load();
+  }
+
+  if (streamRef.current) {
+    streamRef.current.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }
+}, []);
   const handleAnalysis = async (base64Image: string) => {
     setIsLoading(true);
     const apiKey = localStorage.getItem('gemini_api_key');
@@ -72,21 +79,90 @@ export function IAPage() {
     reader.readAsDataURL(file);
   };
   const startCamera = async (multiShot = false) => {
-    setIsMultiShot(multiShot);
-    setFirstShot(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setCameraOpen(true);
-    } catch (err) {
-      toast.error('No se pudo acceder a la cámara.', { description: 'Asegúrate de haber concedido los permisos necesarios.' });
-    }
+  setIsMultiShot(multiShot);
+  setFirstShot(null);
+
+  const envConstraints = {
+    video: {
+      facingMode: 'environment',
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+    },
   };
+  const userConstraints = {
+    video: {
+      facingMode: 'user',
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+    },
+  };
+
+  let stream: MediaStream | null = null;
+
+  // Try rear camera first
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(envConstraints);
+  } catch (err) {
+    console.warn('Cámara trasera no disponible, intentando frontal', err);
+    // Fallback to front camera
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(userConstraints);
+    } catch (err2) {
+      toast.error('Error al iniciar cámara', {
+        description: `Error al iniciar cámara (${(err2 as any).message}). Prueba conceder permisos o front cam.`,
+      });
+      return;
+    }
+  }
+
+  if (!stream) return;
+
+  streamRef.current = stream;
+
+  if (videoRef.current) {
+    const video = videoRef.current;
+    video.srcObject = stream;
+    video.load();
+
+    // Wait for canplay (or timeout) then play
+    const canPlay = new Promise<void>((resolve, reject) => {
+      const onCanPlay = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = (e: any) => {
+        cleanup();
+        reject(e);
+      };
+      const cleanup = () => {
+        video.removeEventListener('canplay', onCanPlay);
+        video.removeEventListener('error', onError);
+      };
+      video.addEventListener('canplay', onCanPlay);
+      video.addEventListener('error', onError);
+    });
+
+    const timeout = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout al iniciar video')), 5000)
+    );
+
+    try {
+      await Promise.race([canPlay, timeout]);
+      await video.play();
+      setCameraOpen(true);
+    } catch (e) {
+      toast.error('Error al iniciar cámara', {
+        description: (e as Error).message,
+      });
+      stopCamera();
+    }
+  }
+};
   const takePicture = () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || videoRef.current.readyState < 2) {
+      toast.error('Cámara no está lista, espera un momento.');
+      return;
+    }
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
@@ -221,7 +297,7 @@ export function IAPage() {
             <SheetDescription id="camera-sheet-desc">Apunta al recibo y asegúrate de que sea legible.</SheetDescription>
           </SheetHeader>
           <div className="relative flex-grow bg-black flex items-center justify-center">
-            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain bg-black" />
             {firstShot && isMultiShot && (
               <img src={firstShot} alt="Primera captura" className="absolute top-4 left-4 w-24 h-auto border-2 border-white rounded-md opacity-80" />
             )}
