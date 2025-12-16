@@ -27,7 +27,7 @@ Do not add any extra text or explanations outside of the JSON object.
 `;
 export async function analyzeReceipt(imageBase64: string, apiKey: string): Promise<ReceiptAnalysisResult> {
   try {
-    const modelName = 'gemini-1.5-flash';
+    const modelName = localStorage.getItem('gemini_model') || 'gemini-1.5-flash-latest';
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: modelName,
@@ -66,16 +66,17 @@ export async function validateApiKey(key: string): Promise<boolean> {
     return false;
   }
   try {
-    const modelName = 'gemini-1.5-flash';
+    const modelName = localStorage.getItem('gemini_model') || 'gemini-1.5-flash-latest';
     const genAI = new GoogleGenerativeAI(key);
     const model = genAI.getGenerativeModel({ model: modelName });
     const result = await model.generateContent([{text: 'test'}]);
     console.log('Model validation success -', modelName, result.response.text());
-    toast.success('Clave API de Gemini y modelo válidos.');
+    toast.success(`Clave API de Gemini y modelo (${modelName}) válidos.`);
     return true;
   } catch (error) {
-    console.error('API Key Validation Error for model', 'gemini-1.5-flash', error);
-    toast.error('La clave API de Gemini no es válida.');
+    const modelName = localStorage.getItem('gemini_model') || 'gemini-1.5-flash-latest';
+    console.error('API Key Validation Error for model', modelName, error);
+    toast.error(`La clave API de Gemini no es válida para el modelo ${modelName}.`);
     return false;
   }
 }

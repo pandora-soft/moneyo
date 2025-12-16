@@ -105,7 +105,7 @@ const translations = {
   },
   budget: {
     list: 'Presupuestos',
-    description: 'Define y sigue tus límites de gasto mensuales.',
+    description: 'Define y sigue tus l��mites de gasto mensuales.',
     create: 'Crear Presupuesto',
     summary: 'Resumen de Presupuestos',
     summaryDesc: 'Planificado vs. Gasto real para el mes seleccionado.',
@@ -155,7 +155,7 @@ const translations = {
     recurrentDefaultFreq: 'Frecuencia Recurrente por Defecto',
     gemini: {
       key: 'Clave API de Gemini (opcional)',
-      model: 'Modelo Gemini',
+      model: 'Modelo Gemini (ej. gemini-1.5-flash-latest)',
     },
     users: {
       title: 'Usuarios',
@@ -235,7 +235,7 @@ const translations = {
       initialBalance: 'Saldo Inicial',
       bank: 'Cuenta Bancaria',
       cash: 'Efectivo',
-      credit_card: 'Tarjeta de Cr��dito',
+      credit_card: 'Tarjeta de Crédito',
       negativeBalanceError: 'El saldo no puede ser negativo.',
     },
     transaction: {
