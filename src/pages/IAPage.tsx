@@ -46,6 +46,36 @@ const fileInputRef = useRef<HTMLInputElement>(null);
     }
     setShowPlayOverlay(false);
   }, []);
+
+  // New effect: bind the stream to the video element and handle autoplay
+  useEffect(() => {
+    if (isCameraOpen && streamRef.current && videoRef.current && !(videoRef.current.srcObject)) {
+      const video = videoRef.current;
+      video.srcObject = streamRef.current;
+      video.muted = true;
+      video.playsInline = true;
+
+        const playVideo = () => {
+-          video.play().catch(() => setShowPlayOverlay(true));
++          video.play().catch((e) => {
++            console.warn('Autoplay failed, showing play button.', e);
++            setShowPlayOverlay(true);
++          });
+        };
+
+      if (video.readyState >= 3) {
+        playVideo();
+      } else {
+        const handler = () => {
+          playVideo();
+        };
+        video.addEventListener('canplay', handler, { once: true });
+        return () => {
+          video.removeEventListener('canplay', handler);
+        };
+      }
+    }
+  }, [isCameraOpen]);
   const startStream = useCallback(async () => {
     try {
       let stream: MediaStream | null = null;
@@ -72,15 +102,13 @@ const fileInputRef = useRef<HTMLInputElement>(null);
             stream = await navigator.mediaDevices.getUserMedia({ video: true });
           } catch (e3) {
             console.error('All camera attempts failed.', e3);
-            toast.error('No se pudo acceder a ninguna cámara.');
-            setCameraOpen(false);
-            return;
+        toast.error('No se pudo acceder a ninguna cámara.');
+        return;
           }
         }
       }
       if (!stream) {
         toast.error('No se pudo inicializar la cámara.');
-        setCameraOpen(false);
         return;
       }
       streamRef.current = stream;
@@ -93,29 +121,13 @@ const fileInputRef = useRef<HTMLInputElement>(null);
           : 'Cámara frontal activada',
         { description: trackLabel }
       );
-      if (videoRef.current) {
-        const video = videoRef.current;
-        video.srcObject = stream;
-        video.muted = true;
-        video.playsInline = true;
-        video.play().catch((e) => {
-          console.warn('Autoplay failed, showing play button.', e);
-          setShowPlayOverlay(true);
-        });
-      }
+
     } catch (error) {
       console.error('Error general en startStream:', error, navigator.userAgent);
       toast.error('Error al inicializar la cámara.');
-      setCameraOpen(false);
-    } finally {
-      setCameraLoading(false);
     }
   }, []);
-  useEffect(() => {
-    if (isCameraOpen && !streamRef.current) {
-      startStream();
-    }
-  }, [isCameraOpen, startStream]);
+
   const handleAnalysis = async (base64Image: string) => {
     setIsLoading(true);
     const apiKey = localStorage.getItem('gemini_api_key');
@@ -155,12 +167,18 @@ const fileInputRef = useRef<HTMLInputElement>(null);
     }
 
   };
-  const openCamera = (multiShot = false) => {
+  const openCamera = async (multiShot = false) => {
     console.log('openCamera called', multiShot);
     setCameraLoading(true);
     setIsMultiShot(multiShot);
     setFirstShot(null);
-    setCameraOpen(true);
+    await startStream();          // start the stream first
++    if (!streamRef.current) {
++      // Camera could not be started; abort opening the sheet
++      return;
++    }
++    setCameraOpen(true);          // then open the sheet
+    setCameraLoading(false);      // finally clear loading state
   };
   const takePicture = () => {
     if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
@@ -285,9 +303,9 @@ const fileInputRef = useRef<HTMLInputElement>(null);
                     type="button"
                     className="w-full"
                     disabled={cameraLoading || isCameraOpen || isLoading}
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault();
-                      openCamera(false);
+                      await openCamera(false);
                     }}
                   >
                     Abrir Cámara
@@ -307,9 +325,9 @@ const fileInputRef = useRef<HTMLInputElement>(null);
                     type="button"
                     className="w-full"
                     disabled={cameraLoading || isCameraOpen || isLoading}
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault();
-                      openCamera(true);
+                      await openCamera(true);
                     }}
                   >
                     Iniciar Captura Doble
@@ -321,6 +339,7 @@ const fileInputRef = useRef<HTMLInputElement>(null);
         )}
       </div>
       <Sheet
+        className="z-[9999]"
         open={isCameraOpen}
         onOpenChange={(open) => {
           if (!open) {
@@ -330,7 +349,10 @@ const fileInputRef = useRef<HTMLInputElement>(null);
           }
         }}
       >
-        <SheetContent className="w-full h-full sm:max-w-full p-0 flex flex-col" aria-describedby="camera-sheet-desc">
+        <SheetContent
+          className="fixed inset-0 z-[9999] w-screen h-screen p-0 flex flex-col sm:relative sm:inset-auto sm:w-[400px] sm:h-[90vh] sm:max-w-md sm:rounded-lg sm:shadow-2xl"
+          aria-describedby="camera-sheet-desc"
+        >
           <SheetHeader className="p-4 border-b flex-shrink-0">
             <SheetTitle>{isMultiShot ? (firstShot ? 'Captura la 2ª Parte' : 'Captura la 1ª Parte') : 'Capturar Recibo'}</SheetTitle>
             <SheetDescription id="camera-sheet-desc">Apunta al recibo y asegúrate de que sea legible.</SheetDescription>
