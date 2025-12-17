@@ -27,7 +27,7 @@ export function IAPage() {
   const [isMultiShot, setIsMultiShot] = useState(false);
   const [firstShot, setFirstShot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const openModal = useAppStore((s) => s.openModal);
@@ -246,16 +246,19 @@ export function IAPage() {
                   <CardDescription>Sube una imagen de tu recibo desde tu dispositivo.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" onClick={() => fileInputRef.current?.click()}>
-                    Seleccionar Archivo
-                  </Button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept="image/png, image/jpeg, image/webp"
-                    onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
-                  />
+<label htmlFor="receipt-upload" className="w-full block cursor-pointer">
+  <Button className="w-full">
+    Seleccionar Archivo
+  </Button>
+</label>
+<input
+  type="file"
+  id="receipt-upload"
+  className="hidden"
+  accept="image/*"
+  capture="environment"
+  onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
+/>
                 </CardContent>
               </Card>
             </motion.div>
