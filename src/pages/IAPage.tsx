@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, easeOut } from 'framer-motion';
 import { BrainCircuit, Upload, Camera, Layers, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ export function IAPage() {
   const [isMultiShot, setIsMultiShot] = useState(false);
   const [firstShot, setFirstShot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showPlayOverlay, setShowPlayOverlay] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -43,7 +44,140 @@ export function IAPage() {
     streamRef.current.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
   }
+  setShowPlayOverlay(false);
 }, []);
+
+// Stub for future stream initialization
+const startStream = useCallback(async () => {
+  console.log('startStream initiated');
+  try {
+    // Get permission with minimal constraints
+    const permStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    permStream.getTracks().forEach(track => track.stop());
+  } catch (e) {
+    console.error('Permission denied:', e);
+    toast.error('Camera permission required.');
+    // openCamera(false); // removed – openCamera is defined later and would cause a ReferenceError
+    // wait no setCameraOpen(false);
+    setCameraOpen(false);
+    return;
+  }
+
+  // Enumerate with labels now available
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const videoDevs = devices.filter((d: any) => d.kind === 'videoinput');
+  console.table(
+    videoDevs.map((d: any) => ({
+      label: d.label,
+      deviceId: d.deviceId.slice(-4),
+      groupId: d.groupId?.slice(-4),
+    }))
+  );
+
+  if (videoDevs.length === 0) {
+    toast.error('No video devices found.');
+    setCameraOpen(false);
+    return;
+  }
+
+  // Select preferred: rear > front > first
+  let selected =
+    videoDevs.find((d: any) => /back|rear|environment/i.test(d.label)) ||
+    videoDevs.find((d: any) => /front|user|selfie|face/i.test(d.label)) ||
+    videoDevs[0];
+
+  console.log('Selected:', selected.label || 'unknown', selected.deviceId.slice(-4));
+
+  // Primary constraints
+  const primaryConstraints: MediaStreamConstraints = {
+    video: {
+      deviceId: { exact: selected.deviceId },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+    },
+  };
+
+  let stream: MediaStream | null = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
+  } catch (e) {
+    console.warn('Exact deviceId failed:', e);
+    // Fallback
+    const fallbackConstraints = [
+      {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      },
+      {
+        video: {
+          facingMode: { ideal: 'user' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      },
+      {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      },
+    ];
+
+    for (const cons of fallbackConstraints) {
+      try {
+        console.log('Fallback try:', JSON.stringify(cons.video.facingMode || cons.video));
+        stream = await navigator.mediaDevices.getUserMedia(cons);
+        break;
+      } catch (err) {
+        console.warn('Fallback failed:', err);
+      }
+    }
+  }
+
+  if (!stream) {
+    toast.error('Unable to access any camera.');
+    setCameraOpen(false);
+    return;
+  }
+
+  streamRef.current = stream;
+  const track = stream.getVideoTracks()[0];
+  const settings = track.getSettings();
+  const usedDeviceId = settings.deviceId;
+  const usedDev = videoDevs.find((d: any) => d.deviceId === usedDeviceId);
+  const label = usedDev?.label || 'Unknown';
+  const isRear = /back|rear|environment/i.test(label);
+  console.log('Used cam:', label, 'facingMode:', settings.facingMode);
+  toast.success(isRear ? 'Rear cam OK' : 'Using front cam', { description: label });
+
+  // Video setup
+  if (videoRef.current) {
+    const video = videoRef.current;
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    video
+      .play()
+      .catch(e => {
+        console.warn('Autoplay failed:', e);
+        setShowPlayOverlay(true);
+      });
+  }
+} catch (error) {
+  console.error('startStream error:', error);
+  toast.error('Camera failed to initialize');
+}
+}, []);
+
+// Trigger stream stub when the sheet opens
+useEffect(() => {
+  if (isCameraOpen && !streamRef.current) {
+    startStream();
+  }
+}, [isCameraOpen, startStream]);
   const handleAnalysis = async (base64Image: string) => {
     setIsLoading(true);
     const apiKey = localStorage.getItem('gemini_api_key');
@@ -78,118 +212,17 @@ export function IAPage() {
     };
     reader.readAsDataURL(file);
   };
-  const startCamera = async (multiShot = false) => {
+  const openCamera = async (multiShot = false) => {
+  // Minimal opening logic – stream handling moved to startStream effect
   setIsMultiShot(multiShot);
   setFirstShot(null);
-
-  // Define a list of constraint options to try, from most specific to generic
-  const constraintsOptions = [
-    {
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-    },
-    {
-      video: {
-        facingMode: { ideal: 'user' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-    },
-    {
-      video: {
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-    },
-  ];
-
-  let stream: MediaStream | null = null;
-
-  // Loop through the constraint options until one succeeds
-  for (const constraints of constraintsOptions) {
-    console.log(
-      'Trying constraints:' +
-        JSON.stringify(constraints.video?.facingMode || 'default')
-    );
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-      // Success – break out of the loop
-      break;
-    } catch (err) {
-      console.warn('Constraint failed, trying next (if any):', err);
-      // Continue to next constraints set
-    }
-  }
-
-  // If none of the attempts succeeded, inform the user
-  if (!stream) {
-    toast.error(
-      'No camera available. Grant permissions and retry.'
-    );
-    return;
-  }
-
-  streamRef.current = stream;
-
-  // Diagnostic logging: show which camera was actually used
-  const track = stream.getVideoTracks()[0];
-  const settings = track.getSettings();
-  console.log('Used facingMode:', settings.facingMode);
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  console.table(devices.filter((d: any) => d.kind === 'videoinput'));
-  if (settings.facingMode === 'environment') {
-    toast.success('Rear cam OK');
-  } else {
-    toast.info('Using front cam');
-  }
-
-  if (videoRef.current) {
-    const video = videoRef.current;
-    video.srcObject = stream;
-    video.load();
-
-    // Wait for canplay (or timeout) then play
-    const canPlay = new Promise<void>((resolve, reject) => {
-      const onCanPlay = () => {
-        cleanup();
-        resolve();
-      };
-      const onError = (e: any) => {
-        cleanup();
-        reject(e);
-      };
-      const cleanup = () => {
-        video.removeEventListener('canplay', onCanPlay);
-        video.removeEventListener('error', onError);
-      };
-      video.addEventListener('canplay', onCanPlay);
-      video.addEventListener('error', onError);
-    });
-
-    const timeout = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error('Timeout al iniciar video')), 5000)
-    );
-
-    try {
-      await Promise.race([canPlay, timeout]);
-      await video.play();
-      setCameraOpen(true);
-    } catch (e) {
-      toast.error('Error al iniciar cámara', {
-        description: (e as Error).message,
-      });
-      stopCamera();
-    }
-  }
+  setCameraOpen(true);
 };
   const takePicture = () => {
-    if (!videoRef.current || videoRef.current.readyState < 2) {
-      toast.error('Cámara no está lista, espera un momento.');
+if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
+      toast.warning('Preview not ready - tap ▶️ first');
       return;
-    }
+}
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
@@ -297,7 +330,7 @@ export function IAPage() {
                   <CardDescription>Usa la cámara de tu dispositivo para capturar el recibo.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" onClick={() => startCamera(false)}>
+                  <Button className="w-full" onClick={() => openCamera(false)}>
                     Abrir Cámara
                   </Button>
                 </CardContent>
@@ -311,7 +344,7 @@ export function IAPage() {
                   <CardDescription>Captura recibos largos en dos fotos separadas.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" onClick={() => startCamera(true)}>
+                  <Button className="w-full" onClick={() => openCamera(true)}>
                     Iniciar Captura Doble
                   </Button>
                 </CardContent>
@@ -320,16 +353,33 @@ export function IAPage() {
           </motion.div>
         )}
       </div>
-      <Sheet open={isCameraOpen} onOpenChange={(open) => { if (!open) { stopCamera(); setCameraOpen(false); } }}>
+      <Sheet open={isCameraOpen} onOpenChange={(open) => { if (!open) { stopCamera(); setCameraOpen(false); setShowPlayOverlay(false); } }}>
         <SheetContent className="w-full h-full sm:max-w-full p-0 flex flex-col" aria-describedby="camera-sheet-desc">
           <SheetHeader className="p-4 border-b flex-shrink-0">
             <SheetTitle>{isMultiShot ? (firstShot ? 'Captura la 2ª Parte' : 'Captura la 1ª Parte') : 'Capturar Recibo'}</SheetTitle>
             <SheetDescription id="camera-sheet-desc">Apunta al recibo y asegúrate de que sea legible.</SheetDescription>
           </SheetHeader>
-          <div className="relative flex-grow bg-black flex items-center justify-center">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain bg-black" />
+          <div className="relative flex-grow bg-black flex items-center justify-center min-h-0">
+            <video ref={videoRef} playsInline muted className="w-full h-full object-cover bg-black" />
             {firstShot && isMultiShot && (
               <img src={firstShot} alt="Primera captura" className="absolute top-4 left-4 w-24 h-auto border-2 border-white rounded-md opacity-80" />
+            )}
+            {showPlayOverlay && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10"
+              >
+                <Button
+                  onClick={() => {
+                    setShowPlayOverlay(false);
+                    if (videoRef.current) videoRef.current.play();
+                  }}
+                  className="w-28 h-28 p-0 rounded-full bg-white/20 text-white border-4 border-white/50 shadow-2xl text-5xl font-bold"
+                >
+                  ▶
+                </Button>
+              </motion.div>
             )}
           </div>
           <div className="p-4 border-t flex-shrink-0 flex justify-center">
