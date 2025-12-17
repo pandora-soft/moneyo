@@ -54,10 +54,22 @@ const fileInputRef = useRef<HTMLInputElement>(null);
       video.srcObject = streamRef.current;
       video.muted = true;
       video.playsInline = true;
-      video.play().catch(() => {
-        // Autoplay failed – overlay visibility will be managed by the new effect
-      });
+      // Trigger loading of the new stream
+      video.load();
+      // Attempt to play once metadata is ready
+      const handleLoadedMetadata = () => {
+        video.play().catch(() => {
+          // Autoplay failed – overlay visibility will be managed by the new effect
+        });
+      };
+      video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+      // Cleanup listener on effect cleanup
+      return () => {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      };
     }
+    // No cleanup needed when condition is false
+    return undefined;
   }, [isCameraOpen]);
 
 // New effect: dynamically control overlay visibility based on video readiness
@@ -366,10 +378,19 @@ useEffect(() => {
             <SheetTitle>{isMultiShot ? (firstShot ? 'Captura la 2ª Parte' : 'Captura la 1ª Parte') : 'Capturar Recibo'}</SheetTitle>
             <SheetDescription id="camera-sheet-desc">Apunta al recibo y asegúrate de que sea legible.</SheetDescription>
           </SheetHeader>
-          <div className="relative flex-grow bg-black flex items-center justify-center min-h-0">
-            <video ref={videoRef} playsInline muted className="w-full h-full object-cover bg-black" />
+          <div className="relative flex-grow bg-black min-h-0 overflow-hidden">
+            <video
+  ref={videoRef}
+  playsInline
+  muted
+  className="absolute inset-0 w-full h-full object-contain z-0 bg-black"
+/>
             {firstShot && isMultiShot && (
-              <img src={firstShot} alt="Primera captura" className="absolute top-4 left-4 w-24 h-auto border-2 border-white rounded-md opacity-80" />
+              <img
+  src={firstShot}
+  alt="Primera captura"
+  className="absolute top-4 left-4 w-24 h-auto border-2 border-white rounded-md opacity-80 z-[5]"
+/>
             )}
             {showPlayOverlay && (
               <motion.div
