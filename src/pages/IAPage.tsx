@@ -58,6 +58,9 @@ const fileInputRef = useRef<HTMLInputElement>(null);
       video.load();
       // Attempt to play once metadata is ready
       const handleLoadedMetadata = () => {
+        console.log(
+          `Video metadata loaded: ${video.videoWidth}x${video.videoHeight}, readyState: ${video.readyState}`
+        );
         video.play().catch(() => {
           // Autoplay failed – overlay visibility will be managed by the new effect
         });
@@ -99,14 +102,15 @@ useEffect(() => {
     try {
       let stream: MediaStream | null = null;
       const commonConstraints = {
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        aspectRatio: 1.777,
       };
       // 1. Try rear camera
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { ...commonConstraints, facingMode: { ideal: 'environment' } },
-        });
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { ...commonConstraints, facingMode: 'environment' },
+          });
       } catch (e) {
         console.warn('Rear camera failed, trying front camera.', e);
         // 2. Try front camera
@@ -118,7 +122,7 @@ useEffect(() => {
           console.warn('Front camera failed, trying any camera.', e2);
           // 3. Try any camera as a last resort
           try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream = await navigator.mediaDevices.getUserMedia({ video: { ...commonConstraints } });
           } catch (e3) {
             console.error('All camera attempts failed.', e3);
             toast.error('No se pudo acceder a ninguna cámara.');
@@ -383,7 +387,7 @@ useEffect(() => {
   ref={videoRef}
   playsInline
   muted
-  className="absolute inset-0 w-full h-full object-contain z-0 bg-black"
+  className="absolute inset-0 w-full h-full object-cover z-0 bg-black"
 />
             {firstShot && isMultiShot && (
               <img
