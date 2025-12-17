@@ -24,14 +24,14 @@ const itemVariants = {
 export function IAPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCameraOpen, setCameraOpen] = useState(false);
-+  const [cameraLoading, setCameraLoading] = useState(false);
+const [cameraLoading, setCameraLoading] = useState(false);
   const [isMultiShot, setIsMultiShot] = useState(false);
   const [firstShot, setFirstShot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showPlayOverlay, setShowPlayOverlay] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-+  // Ref for the hidden file input (used to programmatically trigger click)
-+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const openModal = useAppStore((s) => s.openModal);
   const stopCamera = useCallback(() => {
@@ -135,7 +135,7 @@ export function IAPage() {
         attachmentDataUrl: base64Image,
       };
       openModal(transactionData);
-      toast.success('Recibo analizado con ��xito.', { description: 'Revisa y guarda la nueva transacción.' });
+      toast.success('Recibo analizado con éxito.', { description: 'Revisa y guarda la nueva transacción.' });
     } catch (error: any) {
       toast.error('Error al analizar la imagen.', { description: error.message || 'Inténtalo de nuevo.' });
     } finally {
@@ -148,11 +148,12 @@ export function IAPage() {
     reader.onloadend = () => {
       handleAnalysis(reader.result as string);
     };
-      reader.readAsDataURL(file);
-+      // Reset the input so the same file can be selected again
-+      if (fileInputRef.current) {
-+        fileInputRef.current.value = '';
-+      }
+    reader.readAsDataURL(file);
+    // Reset the input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
   };
   const openCamera = (multiShot = false) => {
     console.log('openCamera called', multiShot);
@@ -281,14 +282,14 @@ export function IAPage() {
                 </CardHeader>
                 <CardContent>
                   <Button
-                  type="button"
-                  className="w-full"
-                  disabled={cameraLoading || isCameraOpen || isLoading}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    openCamera(false);
-                  }}
-                >
+                    type="button"
+                    className="w-full"
+                    disabled={cameraLoading || isCameraOpen || isLoading}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openCamera(false);
+                    }}
+                  >
                     Abrir Cámara
                   </Button>
                 </CardContent>
@@ -303,14 +304,14 @@ export function IAPage() {
                 </CardHeader>
                 <CardContent>
                   <Button
-                  type="button"
-                  className="w-full"
-                  disabled={cameraLoading || isCameraOpen || isLoading}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    openCamera(true);
-                  }}
-                >
+                    type="button"
+                    className="w-full"
+                    disabled={cameraLoading || isCameraOpen || isLoading}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openCamera(true);
+                    }}
+                  >
                     Iniciar Captura Doble
                   </Button>
                 </CardContent>
