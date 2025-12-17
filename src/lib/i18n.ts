@@ -19,7 +19,7 @@ const translations = {
     days: 'días',
     weeks: 'semanas',
     months: 'meses',
-    confirmDelete: '¿Estás seguro?',
+    confirmDelete: '¿Est��s seguro?',
     filteredXOfY: (filtered: number, total: number) => `Mostrando ${filtered} de ${total} transacciones.`,
     paginationReset: 'Mostrar todo',
   },
@@ -156,6 +156,7 @@ const translations = {
     gemini: {
       key: 'Clave API de Gemini (opcional)',
       model: 'Modelo Gemini (ej. gemini-1.5-flash-latest)',
+      prompt: 'Prompt personalizado IA (default + categories)',
     },
     users: {
       title: 'Usuarios',

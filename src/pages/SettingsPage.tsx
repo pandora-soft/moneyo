@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api-client';
-import { validateApiKey } from '@/lib/gemini-client';
+import { validateApiKey, analyzeReceipt } from '@/lib/gemini-client';
 import type { Settings, Currency, User } from '@shared/types';
 import { toast } from 'sonner';
 import { Loader2, Plus, Edit, Trash2, CheckCircle } from 'lucide-react';
@@ -36,6 +36,7 @@ const settingsSchema = z.object({
   recurrentDefaultFrequency: z.string().min(1, "Debe seleccionar una frecuencia."),
   geminiApiKey: z.string().optional(),
   geminiModel: z.string().optional(),
+  geminiPrompt: z.string().optional(),
 });
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 const cardVariants: Variants = {
@@ -76,6 +77,7 @@ export function SettingsPage() {
     defaultValues: {
       geminiApiKey: localStorage.getItem('gemini_api_key') || '',
       geminiModel: localStorage.getItem('gemini_model') || 'gemini-1.5-flash-latest',
+      geminiPrompt: localStorage.getItem('gemini_prompt') || '',
     }
   });
   const { isSubmitting, isDirty } = form.formState;
@@ -97,6 +99,7 @@ export function SettingsPage() {
         fiscalMonthStart: settings.fiscalMonthStart ?? 1,
         geminiApiKey: localStorage.getItem('gemini_api_key') || '',
         geminiModel: localStorage.getItem('gemini_model') || 'gemini-1.5-flash-latest',
+        geminiPrompt: localStorage.getItem('gemini_prompt') || '',
       });
       setSettings(settings);
       setCategories(cats);
@@ -119,18 +122,34 @@ export function SettingsPage() {
     await validateApiKey(key);
     setIsVerifyingKey(false);
   };
+  const handleTestPrompt = async () => {
+    const apiKey = form.getValues('geminiApiKey');
+    if (!apiKey) {
+      toast.error('Se necesita una clave API de Gemini para probar el prompt.');
+      return;
+    }
+    setIsVerifyingKey(true);
+    try {
+      const mockImage = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD86P8Ag5T/AOT5P2cv+z8f2XP/AFsDVq/5/wD/2Q==';
+      const result = await analyzeReceipt(mockImage, apiKey);
+      toast.success('✅ El prompt funciona correctamente', {
+        description: <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4"><code className="text-white">{JSON.stringify(result, null, 2)}</code></pre>,
+      });
+    } catch (e: any) {
+      toast.error('Error al probar el prompt.', { description: e.message });
+    } finally {
+      setIsVerifyingKey(false);
+    }
+  };
   const onSubmit: SubmitHandler<SettingsFormValues> = async (data) => {
     try {
-      const { geminiApiKey, geminiModel, ...settingsData } = data;
+      const { geminiApiKey, geminiModel, geminiPrompt, ...settingsData } = data;
       const updatedSettings = await api<Settings>('/api/finance/settings', {
         method: 'POST',
         body: JSON.stringify(settingsData),
       });
       if (geminiApiKey) {
         localStorage.setItem('gemini_api_key', geminiApiKey);
-        toast.warning('¡Advertencia de seguridad!', {
-          description: 'Tu clave API se guarda en el almacenamiento local de tu navegador. No es seguro para producción.',
-        });
       } else {
         localStorage.removeItem('gemini_api_key');
       }
@@ -139,8 +158,13 @@ export function SettingsPage() {
       } else {
         localStorage.removeItem('gemini_model');
       }
+      if (geminiPrompt) {
+        localStorage.setItem('gemini_prompt', geminiPrompt);
+      } else {
+        localStorage.removeItem('gemini_prompt');
+      }
       toast.success('Ajustes guardados correctamente.');
-      form.reset({ ...updatedSettings, geminiApiKey, geminiModel });
+      form.reset({ ...updatedSettings, geminiApiKey, geminiModel, geminiPrompt });
       useAppStore.getState().setCurrency(updatedSettings.currency);
       setSettings(updatedSettings);
       triggerRefetch();
@@ -308,7 +332,7 @@ export function SettingsPage() {
                         <FormField control={form.control} name="currency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('finance.mainCurrency')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar moneda" /></SelectTrigger></FormControl><SelectContent>{currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.fiscalMonthStart')}</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value) || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.recurrentDefaultFreq')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="geminiApiKey" render={({ field }) => (<FormItem><FormLabel>{t('settings.gemini.key')}</FormLabel><FormControl><Textarea rows={3} placeholder="AIza..." {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="geminiApiKey" render={({ field }) => (<FormItem><FormLabel>{t('settings.gemini.key')}</FormLabel><FormControl><Input type="password" placeholder="AIza..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="geminiModel" render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t('settings.gemini.model')}</FormLabel>
@@ -325,12 +349,34 @@ export function SettingsPage() {
                             <FormMessage />
                           </FormItem>
                         )} />
+                        <FormField control={form.control} name="geminiPrompt" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('settings.gemini.prompt')}</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                rows={6}
+                                placeholder="Analiza el recibo y extrae la información..."
+                                {...field}
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  localStorage.setItem('gemini_prompt', e.target.value);
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
                       </CardContent>
-                      <div className="flex justify-between items-center p-6 border-t">
-                        <Button type="button" variant="outline" onClick={handleValidateApiKey} disabled={isVerifyingKey}>
-                          {isVerifyingKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                          Probar Clave
-                        </Button>
+                      <div className="flex flex-wrap justify-between items-center p-6 border-t gap-2">
+                        <div className="flex gap-2">
+                          <Button type="button" variant="outline" onClick={handleValidateApiKey} disabled={isVerifyingKey || isSubmitting}>
+                            {isVerifyingKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                            Probar Clave
+                          </Button>
+                          <Button type="button" variant="outline" onClick={handleTestPrompt} disabled={isVerifyingKey || isSubmitting}>
+                            Probar Prompt
+                          </Button>
+                        </div>
                         <Button type="submit" disabled={isSubmitting || !isDirty}>
                           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           {t('common.save')}

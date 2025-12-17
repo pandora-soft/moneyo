@@ -1,19 +1,20 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { toast } from "sonner";
+import { api } from "./api-client";
+import type { ApiResponse } from "@shared/types";
 export interface ReceiptAnalysisResult {
   merchant: string;
   amount: number;
   date: string; // ISO 8601 format: YYYY-MM-DD
   category: string;
 }
-const MOCK_CATEGORIES = ['Comida', 'Transporte', 'Alquiler', 'Salario', 'Compras', 'Restaurantes', 'Supermercado', 'Ocio', 'Otro'];
-const structuredPrompt = `
+export const structuredPrompt = `
 You are an expert receipt and invoice analyzer. Your task is to extract specific information from an image of a receipt.
 The required information is:
 1.  **merchant**: The name of the store or vendor.
 2.  **amount**: The total amount paid. This should be a number, without currency symbols.
 3.  **date**: The date of the transaction in YYYY-MM-DD format.
-4.  **category**: A suggested category for the expense from the following list: ${MOCK_CATEGORIES.join(', ')}.
+4.  **category**: A suggested category for the expense.
 Analyze the provided image and return the extracted information in a valid JSON object format.
 Example response:
 {
@@ -28,6 +29,10 @@ Do not add any extra text or explanations outside of the JSON object.
 export async function analyzeReceipt(imageBase64: string, apiKey: string): Promise<ReceiptAnalysisResult> {
   try {
     const modelName = localStorage.getItem('gemini_model') || 'gemini-1.5-flash-latest';
+    const customPrompt = localStorage.getItem('gemini_prompt') || structuredPrompt;
+    const categories = await api<{ id: string; name: string }[]>('/api/finance/categories');
+    const categoriesStr = categories.map(c => c.name).join(', ');
+    const finalPrompt = customPrompt + `\n\nCategories available: ${categoriesStr}.\nSuggest a category from this list.`;
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: modelName,
@@ -42,7 +47,7 @@ export async function analyzeReceipt(imageBase64: string, apiKey: string): Promi
         mimeType: imageBase64.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/)?.[1] || 'image/jpeg',
       },
     };
-    const result = await model.generateContent([structuredPrompt, imagePart]);
+    const result = await model.generateContent([finalPrompt, imagePart]);
     const responseText = result.response.text();
     const jsonString = responseText.replace(/```json|```/g, '').trim();
     const parsedResult = JSON.parse(jsonString) as Partial<ReceiptAnalysisResult>;
