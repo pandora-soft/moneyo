@@ -82,42 +82,69 @@ export function IAPage() {
   setIsMultiShot(multiShot);
   setFirstShot(null);
 
-  const envConstraints = {
-    video: {
-      facingMode: 'environment',
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
+  // Define a list of constraint options to try, from most specific to generic
+  const constraintsOptions = [
+    {
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
     },
-  };
-  const userConstraints = {
-    video: {
-      facingMode: 'user',
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
+    {
+      video: {
+        facingMode: { ideal: 'user' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
     },
-  };
+    {
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    },
+  ];
 
   let stream: MediaStream | null = null;
 
-  // Try rear camera first
-  try {
-    stream = await navigator.mediaDevices.getUserMedia(envConstraints);
-  } catch (err) {
-    console.warn('Cámara trasera no disponible, intentando frontal', err);
-    // Fallback to front camera
+  // Loop through the constraint options until one succeeds
+  for (const constraints of constraintsOptions) {
+    console.log(
+      'Trying constraints:' +
+        JSON.stringify(constraints.video?.facingMode || 'default')
+    );
     try {
-      stream = await navigator.mediaDevices.getUserMedia(userConstraints);
-    } catch (err2) {
-      toast.error('Error al iniciar cámara', {
-        description: `Error al iniciar cámara (${(err2 as any).message}). Prueba conceder permisos o front cam.`,
-      });
-      return;
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Success – break out of the loop
+      break;
+    } catch (err) {
+      console.warn('Constraint failed, trying next (if any):', err);
+      // Continue to next constraints set
     }
   }
 
-  if (!stream) return;
+  // If none of the attempts succeeded, inform the user
+  if (!stream) {
+    toast.error(
+      'No camera available. Grant permissions and retry.'
+    );
+    return;
+  }
 
   streamRef.current = stream;
+
+  // Diagnostic logging: show which camera was actually used
+  const track = stream.getVideoTracks()[0];
+  const settings = track.getSettings();
+  console.log('Used facingMode:', settings.facingMode);
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  console.table(devices.filter((d: any) => d.kind === 'videoinput'));
+  if (settings.facingMode === 'environment') {
+    toast.success('Rear cam OK');
+  } else {
+    toast.info('Using front cam');
+  }
 
   if (videoRef.current) {
     const video = videoRef.current;
