@@ -56,11 +56,10 @@ const fileInputRef = useRef<HTMLInputElement>(null);
       video.playsInline = true;
 
         const playVideo = () => {
--          video.play().catch(() => setShowPlayOverlay(true));
-+          video.play().catch((e) => {
-+            console.warn('Autoplay failed, showing play button.', e);
-+            setShowPlayOverlay(true);
-+          });
+          video.play().catch((e) => {
+            console.warn('Autoplay failed, showing play button.', e);
+            setShowPlayOverlay(true);
+          });
         };
 
       if (video.readyState >= 3) {
@@ -102,8 +101,8 @@ const fileInputRef = useRef<HTMLInputElement>(null);
             stream = await navigator.mediaDevices.getUserMedia({ video: true });
           } catch (e3) {
             console.error('All camera attempts failed.', e3);
-        toast.error('No se pudo acceder a ninguna cámara.');
-        return;
+            toast.error('No se pudo acceder a ninguna cámara.');
+            return;
           }
         }
       }
@@ -172,13 +171,16 @@ const fileInputRef = useRef<HTMLInputElement>(null);
     setCameraLoading(true);
     setIsMultiShot(multiShot);
     setFirstShot(null);
-    await startStream();          // start the stream first
-+    if (!streamRef.current) {
-+      // Camera could not be started; abort opening the sheet
-+      return;
-+    }
-+    setCameraOpen(true);          // then open the sheet
-    setCameraLoading(false);      // finally clear loading state
+    await startStream(); // start the stream first
+
+    if (!streamRef.current) {
+      // Camera could not be started; abort opening the sheet
+      setCameraLoading(false);
+      return;
+    }
+
+    setCameraOpen(true); // then open the sheet
+    setCameraLoading(false); // finally clear loading state
   };
   const takePicture = () => {
     if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
@@ -339,7 +341,6 @@ const fileInputRef = useRef<HTMLInputElement>(null);
         )}
       </div>
       <Sheet
-        className="z-[9999]"
         open={isCameraOpen}
         onOpenChange={(open) => {
           if (!open) {
