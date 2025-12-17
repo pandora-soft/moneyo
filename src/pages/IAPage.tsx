@@ -54,26 +54,34 @@ const fileInputRef = useRef<HTMLInputElement>(null);
       video.srcObject = streamRef.current;
       video.muted = true;
       video.playsInline = true;
-
-        const playVideo = () => {
-          video.play().catch((e) => {
-            console.warn('Autoplay failed, showing play button.', e);
-            setShowPlayOverlay(true);
-          });
-        };
-
-      if (video.readyState >= 3) {
-        playVideo();
-      } else {
-        const handler = () => {
-          playVideo();
-        };
-        video.addEventListener('canplay', handler, { once: true });
-        return () => {
-          video.removeEventListener('canplay', handler);
-        };
-      }
+      video.play().catch(() => {
+        // Autoplay failed – overlay visibility will be managed by the new effect
+      });
     }
+  }, [isCameraOpen]);
+
+// New effect: dynamically control overlay visibility based on video readiness
+useEffect(() => {
+    let rafId: number;
+    const updateOverlay = () => {
+      if (isCameraOpen && videoRef.current) {
+        const video = videoRef.current;
+        setShowPlayOverlay(video.readyState < 2 || video.paused);
+        rafId = requestAnimationFrame(updateOverlay);
+      } else {
+        setShowPlayOverlay(false);
+      }
+    };
+
+    if (isCameraOpen && videoRef.current) {
+      updateOverlay();
+    } else {
+      setShowPlayOverlay(false);
+    }
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [isCameraOpen]);
   const startStream = useCallback(async () => {
     try {
@@ -184,7 +192,7 @@ const fileInputRef = useRef<HTMLInputElement>(null);
   };
   const takePicture = () => {
     if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
-      toast.warning('La vista previa no está lista. Toca "Play" primero.');
+      toast.warning('La vista previa no está lista. Toca el botón Play primero.');
       return;
     }
     const canvas = document.createElement('canvas');
@@ -369,15 +377,23 @@ const fileInputRef = useRef<HTMLInputElement>(null);
                 animate={{ opacity: 1 }}
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10"
               >
-                <Button
-                  onClick={() => {
-                    setShowPlayOverlay(false);
-                    if (videoRef.current) videoRef.current.play();
-                  }}
-                  className="w-28 h-28 p-0 rounded-full bg-white/20 text-white border-4 border-white/50 shadow-2xl text-4xl font-bold"
-                >
-                  Play
-                </Button>
+<Button
+  onClick={() => {
+    if (videoRef.current) {
+      videoRef.current
+        .play()
+        .catch((e) =>
+          toast.error(
+            'No se pudo reproducir la vista previa: ' +
+              ((e as Error)?.message ?? 'Error desconocido')
+          )
+        );
+    }
+  }}
+  className="w-28 h-28 p-0 rounded-full bg-white hover:bg-white/90 text-black font-bold shadow-2xl hover:scale-110 transition-transform"
+>
+  Play
+</Button>
               </motion.div>
             )}
           </div>
