@@ -24,11 +24,14 @@ const itemVariants = {
 export function IAPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCameraOpen, setCameraOpen] = useState(false);
++  const [cameraLoading, setCameraLoading] = useState(false);
   const [isMultiShot, setIsMultiShot] = useState(false);
   const [firstShot, setFirstShot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showPlayOverlay, setShowPlayOverlay] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
++  // Ref for the hidden file input (used to programmatically trigger click)
++  const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const openModal = useAppStore((s) => s.openModal);
   const stopCamera = useCallback(() => {
@@ -101,9 +104,11 @@ export function IAPage() {
         });
       }
     } catch (error) {
-      console.error('Error general en startStream:', error);
+      console.error('Error general en startStream:', error, navigator.userAgent);
       toast.error('Error al inicializar la cámara.');
       setCameraOpen(false);
+    } finally {
+      setCameraLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -143,9 +148,15 @@ export function IAPage() {
     reader.onloadend = () => {
       handleAnalysis(reader.result as string);
     };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
++      // Reset the input so the same file can be selected again
++      if (fileInputRef.current) {
++        fileInputRef.current.value = '';
++      }
   };
   const openCamera = (multiShot = false) => {
+    console.log('openCamera called', multiShot);
+    setCameraLoading(true);
     setIsMultiShot(multiShot);
     setFirstShot(null);
     setCameraOpen(true);
@@ -238,18 +249,26 @@ export function IAPage() {
                   <CardDescription>Sube una imagen de tu recibo desde tu dispositivo.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <label htmlFor="receipt-upload" className="w-full block cursor-pointer">
-                    <Button className="w-full">
-                      Seleccionar Archivo
-                    </Button>
-                  </label>
-                  <input
-                    type="file"
-                    id="receipt-upload"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
-                  />
+                <div className="w-full block cursor-pointer">
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    Seleccionar Archivo
+                  </Button>
+                </div>
+                <input
+                  type="file"
+                  id="receipt-upload"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
+                />
                 </CardContent>
               </Card>
             </motion.div>
@@ -261,7 +280,15 @@ export function IAPage() {
                   <CardDescription>Usa la cámara de tu dispositivo para capturar el recibo.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" onClick={() => openCamera(false)}>
+                  <Button
+                  type="button"
+                  className="w-full"
+                  disabled={cameraLoading || isCameraOpen || isLoading}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    openCamera(false);
+                  }}
+                >
                     Abrir Cámara
                   </Button>
                 </CardContent>
@@ -275,7 +302,15 @@ export function IAPage() {
                   <CardDescription>Captura recibos largos en dos fotos separadas.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" onClick={() => openCamera(true)}>
+                  <Button
+                  type="button"
+                  className="w-full"
+                  disabled={cameraLoading || isCameraOpen || isLoading}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    openCamera(true);
+                  }}
+                >
                     Iniciar Captura Doble
                   </Button>
                 </CardContent>
@@ -284,7 +319,16 @@ export function IAPage() {
           </motion.div>
         )}
       </div>
-      <Sheet open={isCameraOpen} onOpenChange={(open) => { if (!open) { stopCamera(); setCameraOpen(false); } }}>
+      <Sheet
+        open={isCameraOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCameraLoading(false);
+            stopCamera();
+            setCameraOpen(false);
+          }
+        }}
+      >
         <SheetContent className="w-full h-full sm:max-w-full p-0 flex flex-col" aria-describedby="camera-sheet-desc">
           <SheetHeader className="p-4 border-b flex-shrink-0">
             <SheetTitle>{isMultiShot ? (firstShot ? 'Captura la 2ª Parte' : 'Captura la 1ª Parte') : 'Capturar Recibo'}</SheetTitle>
