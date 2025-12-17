@@ -25,154 +25,92 @@ export function IAPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCameraOpen, setCameraOpen] = useState(false);
   const [isMultiShot, setIsMultiShot] = useState(false);
-  const [firstShot, setFirstShot] = useState(null);
+  const [firstShot, setFirstShot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showPlayOverlay, setShowPlayOverlay] = useState(false);
-
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const openModal = useAppStore((s) => s.openModal);
   const stopCamera = useCallback(() => {
-  // Pause and clear video element first
-  if (videoRef.current) {
-    videoRef.current.pause();
-    videoRef.current.srcObject = null;
-    videoRef.current.load();
-  }
-
-  if (streamRef.current) {
-    streamRef.current.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-  }
-  setShowPlayOverlay(false);
-}, []);
-
-// Stub for future stream initialization
-const startStream = useCallback(async () => {
-  console.log('startStream initiated');
-  try {
-    // Get permission with minimal constraints
-    const permStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    permStream.getTracks().forEach(track => track.stop());
-  } catch (e) {
-    console.error('Permission denied:', e);
-    toast.error('Camera permission required.');
-
-    setCameraOpen(false);
-    return;
-  }
-
-  // Enumerate with labels now available
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const videoDevs = devices.filter((d) => d.kind === 'videoinput');
-  console.table(
-    videoDevs.map((d) => ({
-      label: d.label,
-      deviceId: d.deviceId.slice(-4),
-      groupId: d.groupId?.slice(-4),
-    }))
-  );
-
-  if (videoDevs.length === 0) {
-    toast.error('No video devices found.');
-    setCameraOpen(false);
-    return;
-  }
-
-  // Select preferred: rear > front > first
-  let selected =
-    videoDevs.find((d) => /back|rear|environment/i.test(d.label)) ||
-    videoDevs.find((d) => /front|user|selfie|face/i.test(d.label)) ||
-    videoDevs[0];
-
-  console.log('Selected:', selected.label || 'unknown', selected.deviceId.slice(-4));
-
-  // Primary constraints
-  const primaryConstraints = {
-    video: {
-      deviceId: { exact: selected.deviceId },
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-    },
-  };
-
-  let stream = null;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
-  } catch (e) {
-    console.warn('Exact deviceId failed:', e);
-    // Fallback
-    const fallbackConstraints = [
-      {
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      },
-      {
-        video: {
-          facingMode: { ideal: 'user' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      },
-      {
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      },
-    ];
-
-    for (const cons of fallbackConstraints) {
-      try {
-        console.log('Fallback try:', JSON.stringify(cons.video.facingMode || cons.video));
-        stream = await navigator.mediaDevices.getUserMedia(cons);
-        break;
-      } catch (err) {
-        console.warn('Fallback failed:', err);
-      }
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+      videoRef.current.load();
     }
-  }
-
-  if (!stream) {
-    toast.error('Unable to access any camera.');
-    setCameraOpen(false);
-    return;
-  }
-
-  streamRef.current = stream;
-  const track = stream.getVideoTracks()[0];
-  const settings = track.getSettings();
-  const usedDeviceId = settings.deviceId;
-  const usedDev = videoDevs.find((d) => d.deviceId === usedDeviceId);
-  const label = usedDev?.label || 'Unknown';
-  const isRear = /back|rear|environment/i.test(label);
-  toast.success(isRear ? 'Rear cam OK' : 'Using front cam', { description: label });
-
-  // Video setup
-  if (videoRef.current) {
-    const video = videoRef.current;
-    video.srcObject = stream;
-    video.muted = true;
-    video.playsInline = true;
-    video.play().catch((e) => {
-      console.warn('Autoplay failed:', e);
-      setShowPlayOverlay(true);
-    });
-  }
-} catch (error) {
-  console.error('startStream error:', error);
-  toast.error('Camera failed to initialize');
-}
-
-// Trigger stream stub when the sheet opens
-useEffect(() => {
-  if (isCameraOpen && !streamRef.current) {
-    startStream();
-  }
-}, [isCameraOpen, startStream]);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setShowPlayOverlay(false);
+  }, []);
+  const startStream = useCallback(async () => {
+    try {
+      let stream: MediaStream | null = null;
+      const commonConstraints = {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      };
+      // 1. Try rear camera
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { ...commonConstraints, facingMode: { ideal: 'environment' } },
+        });
+      } catch (e) {
+        console.warn('Rear camera failed, trying front camera.', e);
+        // 2. Try front camera
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { ...commonConstraints, facingMode: 'user' },
+          });
+        } catch (e2) {
+          console.warn('Front camera failed, trying any camera.', e2);
+          // 3. Try any camera as a last resort
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          } catch (e3) {
+            console.error('All camera attempts failed.', e3);
+            toast.error('No se pudo acceder a ninguna cámara.');
+            setCameraOpen(false);
+            return;
+          }
+        }
+      }
+      if (!stream) {
+        toast.error('No se pudo inicializar la cámara.');
+        setCameraOpen(false);
+        return;
+      }
+      streamRef.current = stream;
+      const track = stream.getVideoTracks()[0];
+      const trackLabel = track.label || 'Cámara Desconocida';
+      console.log('Stream success:', trackLabel);
+      toast.success(
+        /back|rear|environment/i.test(trackLabel)
+          ? 'Cámara trasera activada'
+          : 'Cámara frontal activada',
+        { description: trackLabel }
+      );
+      if (videoRef.current) {
+        const video = videoRef.current;
+        video.srcObject = stream;
+        video.muted = true;
+        video.playsInline = true;
+        video.play().catch((e) => {
+          console.warn('Autoplay failed, showing play button.', e);
+          setShowPlayOverlay(true);
+        });
+      }
+    } catch (error) {
+      console.error('Error general en startStream:', error);
+      toast.error('Error al inicializar la cámara.');
+      setCameraOpen(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (isCameraOpen && !streamRef.current) {
+      startStream();
+    }
+  }, [isCameraOpen, startStream]);
   const handleAnalysis = async (base64Image: string) => {
     setIsLoading(true);
     const apiKey = localStorage.getItem('gemini_api_key');
@@ -192,7 +130,7 @@ useEffect(() => {
         attachmentDataUrl: base64Image,
       };
       openModal(transactionData);
-      toast.success('Recibo analizado con éxito.', { description: 'Revisa y guarda la nueva transacción.' });
+      toast.success('Recibo analizado con ��xito.', { description: 'Revisa y guarda la nueva transacción.' });
     } catch (error: any) {
       toast.error('Error al analizar la imagen.', { description: error.message || 'Inténtalo de nuevo.' });
     } finally {
@@ -208,17 +146,16 @@ useEffect(() => {
     reader.readAsDataURL(file);
   };
   const openCamera = (multiShot = false) => {
-  // Minimal opening logic – stream handling moved to startStream effect
-  setIsMultiShot(multiShot);
-  setFirstShot(null);
-  setCameraOpen(true);
-};
+    setIsMultiShot(multiShot);
+    setFirstShot(null);
+    setCameraOpen(true);
+  };
   const takePicture = () => {
-  if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
-    toast.warning('Preview not ready - tap play first');
-    return;
-  }
-  const canvas = document.createElement('canvas');
+    if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
+      toast.warning('La vista previa no está lista. Toca "Play" primero.');
+      return;
+    }
+    const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     const ctx = canvas.getContext('2d');
@@ -301,19 +238,18 @@ useEffect(() => {
                   <CardDescription>Sube una imagen de tu recibo desde tu dispositivo.</CardDescription>
                 </CardHeader>
                 <CardContent>
-<label htmlFor="receipt-upload" className="w-full block cursor-pointer">
-  <Button className="w-full">
-    Seleccionar Archivo
-  </Button>
-</label>
-<input
-  type="file"
-  id="receipt-upload"
-  className="hidden"
-  accept="image/*"
-  capture="environment"
-  onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
-/>
+                  <label htmlFor="receipt-upload" className="w-full block cursor-pointer">
+                    <Button className="w-full">
+                      Seleccionar Archivo
+                    </Button>
+                  </label>
+                  <input
+                    type="file"
+                    id="receipt-upload"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
+                  />
                 </CardContent>
               </Card>
             </motion.div>
@@ -348,7 +284,7 @@ useEffect(() => {
           </motion.div>
         )}
       </div>
-      <Sheet open={isCameraOpen} onOpenChange={(open) => { if (!open) { stopCamera(); setCameraOpen(false); setShowPlayOverlay(false); } }}>
+      <Sheet open={isCameraOpen} onOpenChange={(open) => { if (!open) { stopCamera(); setCameraOpen(false); } }}>
         <SheetContent className="w-full h-full sm:max-w-full p-0 flex flex-col" aria-describedby="camera-sheet-desc">
           <SheetHeader className="p-4 border-b flex-shrink-0">
             <SheetTitle>{isMultiShot ? (firstShot ? 'Captura la 2ª Parte' : 'Captura la 1ª Parte') : 'Capturar Recibo'}</SheetTitle>
@@ -365,15 +301,15 @@ useEffect(() => {
                 animate={{ opacity: 1 }}
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10"
               >
-              <Button
-                onClick={() => {
-                  setShowPlayOverlay(false);
-                  if (videoRef.current) videoRef.current.play();
-                }}
-                className="w-28 h-28 p-0 rounded-full bg-white/20 text-white border-4 border-white/50 shadow-2xl text-4xl font-bold"
-              >
-                Play
-              </Button>
+                <Button
+                  onClick={() => {
+                    setShowPlayOverlay(false);
+                    if (videoRef.current) videoRef.current.play();
+                  }}
+                  className="w-28 h-28 p-0 rounded-full bg-white/20 text-white border-4 border-white/50 shadow-2xl text-4xl font-bold"
+                >
+                  Play
+                </Button>
               </motion.div>
             )}
           </div>
