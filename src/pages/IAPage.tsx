@@ -25,12 +25,12 @@ export function IAPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCameraOpen, setCameraOpen] = useState(false);
   const [isMultiShot, setIsMultiShot] = useState(false);
-  const [firstShot, setFirstShot] = useState<string | null>(null);
+  const [firstShot, setFirstShot] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showPlayOverlay, setShowPlayOverlay] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const openModal = useAppStore((s) => s.openModal);
   const stopCamera = useCallback(() => {
   // Pause and clear video element first
@@ -57,17 +57,16 @@ const startStream = useCallback(async () => {
   } catch (e) {
     console.error('Permission denied:', e);
     toast.error('Camera permission required.');
-    // openCamera(false); // removed – openCamera is defined later and would cause a ReferenceError
-    // wait no setCameraOpen(false);
+
     setCameraOpen(false);
     return;
   }
 
   // Enumerate with labels now available
   const devices = await navigator.mediaDevices.enumerateDevices();
-  const videoDevs = devices.filter((d: any) => d.kind === 'videoinput');
+  const videoDevs = devices.filter((d) => d.kind === 'videoinput');
   console.table(
-    videoDevs.map((d: any) => ({
+    videoDevs.map((d) => ({
       label: d.label,
       deviceId: d.deviceId.slice(-4),
       groupId: d.groupId?.slice(-4),
@@ -82,14 +81,14 @@ const startStream = useCallback(async () => {
 
   // Select preferred: rear > front > first
   let selected =
-    videoDevs.find((d: any) => /back|rear|environment/i.test(d.label)) ||
-    videoDevs.find((d: any) => /front|user|selfie|face/i.test(d.label)) ||
+    videoDevs.find((d) => /back|rear|environment/i.test(d.label)) ||
+    videoDevs.find((d) => /front|user|selfie|face/i.test(d.label)) ||
     videoDevs[0];
 
   console.log('Selected:', selected.label || 'unknown', selected.deviceId.slice(-4));
 
   // Primary constraints
-  const primaryConstraints: MediaStreamConstraints = {
+  const primaryConstraints = {
     video: {
       deviceId: { exact: selected.deviceId },
       width: { ideal: 1280 },
@@ -97,7 +96,7 @@ const startStream = useCallback(async () => {
     },
   };
 
-  let stream: MediaStream | null = null;
+  let stream = null;
   try {
     stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
   } catch (e) {
@@ -147,10 +146,9 @@ const startStream = useCallback(async () => {
   const track = stream.getVideoTracks()[0];
   const settings = track.getSettings();
   const usedDeviceId = settings.deviceId;
-  const usedDev = videoDevs.find((d: any) => d.deviceId === usedDeviceId);
+  const usedDev = videoDevs.find((d) => d.deviceId === usedDeviceId);
   const label = usedDev?.label || 'Unknown';
   const isRear = /back|rear|environment/i.test(label);
-  console.log('Used cam:', label, 'facingMode:', settings.facingMode);
   toast.success(isRear ? 'Rear cam OK' : 'Using front cam', { description: label });
 
   // Video setup
@@ -159,18 +157,15 @@ const startStream = useCallback(async () => {
     video.srcObject = stream;
     video.muted = true;
     video.playsInline = true;
-    video
-      .play()
-      .catch(e => {
-        console.warn('Autoplay failed:', e);
-        setShowPlayOverlay(true);
-      });
+    video.play().catch((e) => {
+      console.warn('Autoplay failed:', e);
+      setShowPlayOverlay(true);
+    });
   }
 } catch (error) {
   console.error('startStream error:', error);
   toast.error('Camera failed to initialize');
 }
-}, []);
 
 // Trigger stream stub when the sheet opens
 useEffect(() => {
@@ -199,7 +194,7 @@ useEffect(() => {
       openModal(transactionData);
       toast.success('Recibo analizado con éxito.', { description: 'Revisa y guarda la nueva transacción.' });
     } catch (error: any) {
-      toast.error('Error al analizar la imagen.', { description: error.message || 'Int��ntalo de nuevo.' });
+      toast.error('Error al analizar la imagen.', { description: error.message || 'Inténtalo de nuevo.' });
     } finally {
       setIsLoading(false);
     }
@@ -212,18 +207,18 @@ useEffect(() => {
     };
     reader.readAsDataURL(file);
   };
-  const openCamera = async (multiShot = false) => {
+  const openCamera = (multiShot = false) => {
   // Minimal opening logic – stream handling moved to startStream effect
   setIsMultiShot(multiShot);
   setFirstShot(null);
   setCameraOpen(true);
 };
   const takePicture = () => {
-if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
-      toast.warning('Preview not ready - tap ▶️ first');
-      return;
-}
-    const canvas = document.createElement('canvas');
+  if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
+    toast.warning('Preview not ready - tap play first');
+    return;
+  }
+  const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     const ctx = canvas.getContext('2d');
@@ -370,15 +365,15 @@ if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
                 animate={{ opacity: 1 }}
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10"
               >
-                <Button
-                  onClick={() => {
-                    setShowPlayOverlay(false);
-                    if (videoRef.current) videoRef.current.play();
-                  }}
-                  className="w-28 h-28 p-0 rounded-full bg-white/20 text-white border-4 border-white/50 shadow-2xl text-5xl font-bold"
-                >
-                  ▶
-                </Button>
+              <Button
+                onClick={() => {
+                  setShowPlayOverlay(false);
+                  if (videoRef.current) videoRef.current.play();
+                }}
+                className="w-28 h-28 p-0 rounded-full bg-white/20 text-white border-4 border-white/50 shadow-2xl text-4xl font-bold"
+              >
+                Play
+              </Button>
               </motion.div>
             )}
           </div>
