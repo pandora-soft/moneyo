@@ -19,7 +19,7 @@ const translations = {
     days: 'días',
     weeks: 'semanas',
     months: 'meses',
-    confirmDelete: '¿Est��s seguro?',
+    confirmDelete: '¿Estás seguro?',
     filteredXOfY: (filtered: number, total: number) => `Mostrando ${filtered} de ${total} transacciones.`,
     paginationReset: 'Mostrar todo',
   },
@@ -105,7 +105,7 @@ const translations = {
   },
   budget: {
     list: 'Presupuestos',
-    description: 'Define y sigue tus l��mites de gasto mensuales.',
+    description: 'Define y sigue tus límites de gasto mensuales.',
     create: 'Crear Presupuesto',
     summary: 'Resumen de Presupuestos',
     summaryDesc: 'Planificado vs. Gasto real para el mes seleccionado.',
@@ -156,7 +156,7 @@ const translations = {
     gemini: {
       key: 'Clave API de Gemini (opcional)',
       model: 'Modelo Gemini (ej. gemini-1.5-flash-latest)',
-      prompt: 'Prompt personalizado IA (default + categories)',
+      prompt: 'Prompt personalizado IA (predeterminado + categorías)',
     },
     users: {
       title: 'Usuarios',

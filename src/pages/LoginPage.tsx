@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { setSettings } = useAppStore.getState();
+  const { setSettings } = useAppStore();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { username: '', password: '' },
@@ -33,7 +33,7 @@ export default function LoginPage() {
         body: JSON.stringify(values),
       });
       localStorage.setItem('casaconta_token', token);
-      setSettings({ user }); // Store user info in settings
+      setSettings({ user } as any); // Store user info in settings
       toast.success(t('auth.loginSuccess'));
       navigate('/');
     } catch (error) {
@@ -51,7 +51,7 @@ export default function LoginPage() {
           <CardHeader className="text-center">
             <Wallet className="mx-auto size-10 text-orange-500" />
             <CardTitle className="text-2xl font-bold">{t('app.name')}</CardTitle>
-            <CardDescription>Ingresa a tu cuenta para continuar.</CardDescription>
+            <CardDescription>{t('auth.loginPrompt')}</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -63,7 +63,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>{t('auth.username')}</FormLabel>
                       <FormControl>
-                        <Input placeholder="admin" {...field} />
+                        <Input placeholder="" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -89,11 +89,6 @@ export default function LoginPage() {
               </form>
             </Form>
           </CardContent>
-          <CardFooter className="text-center text-sm">
-            <p className="w-full">
-              Default admin: username: admin, password: admin
-            </p>
-          </CardFooter>
         </Card>
       </motion.div>
     </div>
