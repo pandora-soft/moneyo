@@ -1,15 +1,26 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
-import { AccountEntity, LedgerEntity, BudgetEntity, SettingsEntity, CategoryEntity, CurrencyEntity, FrequencyEntity, UserEntity, SessionEntity, verifyPassword, hashPassword } from "./entities";
+import { 
+  AccountEntity, 
+  LedgerEntity, 
+  BudgetEntity, 
+  SettingsEntity, 
+  CategoryEntity, 
+  CurrencyEntity, 
+  FrequencyEntity, 
+  UserEntity, 
+  SessionEntity, 
+  verifyPassword, 
+  hashPassword 
+} from "./entities";
 import { ok, bad, notFound, isStr } from './core-utils';
 import type { Account, Transaction, Budget, Settings, TransactionType, Currency, User } from "@shared/types";
 import type { Context } from "hono";
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 export type AppHono = Hono<{ Bindings: Env, Variables: { user?: User } }>;
-export function userRoutes(app: Hono<{ Bindings: Env }>) {
-  const typedApp = app as unknown as AppHono;
+export function userRoutes(app: AppHono) {
   // --- SEEDING MIDDLEWARE ---
-  typedApp.use('/api/*', async (c, next) => {
+  app.use('/api/*', async (c, next) => {
     await Promise.all([
       UserEntity.ensureSeed(c.env),
       AccountEntity.ensureSeed(c.env),
@@ -26,25 +37,24 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const authHeader = c.req.header('Authorization');
     const token = authHeader?.split(' ')[1];
     if (!isStr(token)) {
-      console.error('[AUTH FAIL] No valid token', { authHeader: c.req.header('Authorization')?.slice(0,50) || 'missing' });
+      console.error('[AUTH FAIL] No valid token', { authHeader: c.req.header('Authorization')?.slice(0, 15) });
       return bad(c, 'Unauthorized');
     }
     const sessionEntity = new SessionEntity(c.env, token);
     const session = await sessionEntity.getState();
-    if (!session) {
-      console.error('[AUTH FAIL] No session for token', { tokenPrefix: token?.slice(0,8) || 'N/A' });
-      await SessionEntity.delete(c.env, token);
-      return bad(c, 'Session expired');
+    if (!session || !session.id) {
+      console.error('[AUTH FAIL] No session for token', { tokenPrefix: token?.slice(0, 8) });
+      return bad(c, 'Session expired or invalid');
     }
     if (Date.now() >= session.expires) {
-      console.error('[AUTH FAIL] Session expired', { tokenPrefix: token?.slice(0,8), expires: session.expires, now: Date.now() });
+      console.error('[AUTH FAIL] Session expired', { tokenPrefix: token?.slice(0, 8), expires: session.expires, now: Date.now() });
       await SessionEntity.delete(c.env, token);
       return bad(c, 'Session expired');
     }
     const userEntity = new UserEntity(c.env, session.userId);
     const user = await userEntity.getState();
-    if (!user) {
-      console.error('[AUTH FAIL] No user for session', { tokenPrefix: token?.slice(0,8), userId: session.userId });
+    if (!user || !user.id) {
+      console.error('[AUTH FAIL] No user for session', { tokenPrefix: token?.slice(0, 8), userId: session.userId });
       await sessionEntity.delete();
       return bad(c, 'Invalid session');
     }
@@ -54,7 +64,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   const adminGuard = async (c: Context<{ Bindings: Env, Variables: { user?: User } }>, next: () => Promise<void>) => {
     const user = c.get('user');
     if (!user || user.role !== 'admin') {
-      return bad(c, 'Forbidden');
+      return bad(c, 'Forbidden: Admin access required');
     }
     await next();
   };
@@ -62,11 +72,10 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   const auth = new Hono<{ Bindings: Env, Variables: { user?: User } }>();
   auth.post('/login', async (c) => {
     const { username, password } = await c.req.json<{username: string, password: string}>();
-    console.error('[LOGIN] Attempt for user:', username);
     if (!isStr(username) || !isStr(password)) return bad(c, 'Username and password required');
     const { items: users } = await UserEntity.list(c.env);
     const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (!user) {
+    if (!user || !user.id) {
       console.error('[LOGIN] User not found:', username.toLowerCase());
       return bad(c, 'Invalid credentials');
     }
@@ -86,7 +95,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const { passwordHash, ...userWithoutPassword } = user;
     return ok(c, { user: userWithoutPassword });
   });
-  typedApp.route('/api/auth', auth);
+  app.route('/api/auth', auth);
   // --- FINANCE ROUTES (PROTECTED) ---
   const finance = new Hono<{ Bindings: Env, Variables: { user?: User } }>();
   finance.use('*', authGuard);
@@ -110,7 +119,6 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const { password, role, email } = await c.req.json<Partial<User> & { password?: string }>();
     const user = new UserEntity(c.env, id);
     if (!await user.exists()) return notFound(c, 'User not found');
-    // Prepare updates
     let passwordHash: string | undefined;
     if (password) {
       passwordHash = await hashPassword(password);
@@ -152,7 +160,12 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const { name, type, currency } = await c.req.json<Partial<Account>>();
     const account = new AccountEntity(c.env, id);
     if (!await account.exists()) return notFound(c, 'Account not found');
-    const updatedAccount = await account.mutate(acc => ({ ...acc, name: name || acc.name, type: type || acc.type, currency: currency || acc.currency }));
+    const updatedAccount = await account.mutate(acc => ({ 
+      ...acc, 
+      name: name || acc.name, 
+      type: type || acc.type, 
+      currency: currency || acc.currency 
+    }));
     return ok(c, updatedAccount);
   });
   finance.delete('/accounts/:id', async (c) => {
@@ -271,11 +284,11 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   });
   // BUDGETS API
   finance.get('/budgets', async (c) => {
-    let { items } = await BudgetEntity.list(c.env);
+    const { items } = await BudgetEntity.list(c.env);
     return ok(c, items);
   });
   finance.post('/budgets', async (c) => {
-    const { month, category, limit } = await c.req.json<Omit<Budget, 'id' | 'accountId'>>();
+    const { month, category, limit } = await c.req.json<Omit<Budget, 'id'>>();
     if (!month || !category || !limit) {
       return bad(c, 'Missing required fields for budget');
     }
@@ -286,19 +299,17 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   finance.put('/budgets/:id', async (c) => {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'Invalid ID');
-    const { month, category, limit } = await c.req.json<Omit<Budget, 'id' | 'accountId'>>();
-    if (!month || !category || !limit) return bad(c, 'Missing required fields for budget');
+    const { month, category, limit } = await c.req.json<Omit<Budget, 'id'>>();
     const budget = new BudgetEntity(c.env, id);
     if (!await budget.exists()) return notFound(c, 'Budget not found');
-    const updated = await budget.mutate(b => ({ ...b, month, category, limit }));
+    const updated = await budget.mutate(b => ({ ...b, month: month || b.month, category: category || b.category, limit: limit || b.limit }));
     return ok(c, updated);
   });
   finance.delete('/budgets/:id', async (c) => {
     const id = c.req.param('id');
     if (!isStr(id)) return bad(c, 'Invalid ID');
     const deleted = await BudgetEntity.delete(c.env, id);
-    if (!deleted) return notFound(c, 'Budget not found');
-    return ok(c, { id, deleted: true });
+    return deleted ? ok(c, { id, deleted: true }) : notFound(c, 'Budget not found');
   });
   // CATEGORIES API
   finance.get('/categories', async (c) => {
@@ -309,113 +320,20 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const { name } = await c.req.json<{name: string}>();
     if (!isStr(name) || name.length < 2) return bad(c, 'Nombre requerido (mín. 2 chars)');
     const { items } = await CategoryEntity.list(c.env);
-    const existing = items.find(cat => cat.name.toLowerCase() === name.toLowerCase());
-    if (existing) return bad(c, 'Categoría ya existe');
+    if (items.find(cat => cat.name.toLowerCase() === name.toLowerCase())) return bad(c, 'Categoría ya existe');
     const newCat = { id: crypto.randomUUID(), name: name.trim() };
     await CategoryEntity.create(c.env, newCat);
     return ok(c, newCat);
   });
-  finance.put('/categories/:id', adminGuard, async (c) => {
-    const id = c.req.param('id');
-    if (!isStr(id)) return bad(c, 'ID inválido');
-    const { name } = await c.req.json<{name: string}>();
-    if (!isStr(name) || name.length < 2) return bad(c, 'Nombre requerido');
-    const cat = new CategoryEntity(c.env, id);
-    if (!await cat.exists()) return notFound(c);
-    const { items } = await CategoryEntity.list(c.env);
-    const others = items.filter(c => c.id !== id);
-    if (others.some(o => o.name.toLowerCase() === name.toLowerCase())) return bad(c, 'Nombre ya en uso');
-    const updated = await cat.mutate(c => ({ ...c, name: name.trim() }));
-    return ok(c, updated);
-  });
   finance.delete('/categories/:id', adminGuard, async (c) => {
     const id = c.req.param('id');
-    if (!isStr(id)) return bad(c, 'ID inválido');
     const deleted = await CategoryEntity.delete(c.env, id);
-    return deleted ? ok(c, { id, deleted: true }) : notFound(c);
-  });
-  // FREQUENCIES API
-  finance.get('/frequencies', async (c) => {
-    const { items } = await FrequencyEntity.list(c.env);
-    return ok(c, items.sort((a, b) => a.name.localeCompare(b.name)));
-  });
-  finance.post('/frequencies', adminGuard, async (c) => {
-    const { name, interval, unit } = await c.req.json<{ name: string; interval: number; unit: 'days' | 'weeks' | 'months' }>();
-    if (!isStr(name) || interval < 1 || interval > 365 || !['days', 'weeks', 'months'].includes(unit)) {
-      return bad(c, 'Invalid data');
-    }
-    const { items } = await FrequencyEntity.list(c.env);
-    if (items.some(f => f.name.toLowerCase() === name.toLowerCase())) {
-      return bad(c, 'Frequency name already exists');
-    }
-    const newFreq = { id: crypto.randomUUID(), name: name.trim(), interval: Number(interval), unit };
-    await FrequencyEntity.create(c.env, newFreq);
-    return ok(c, newFreq);
-  });
-  finance.put('/frequencies/:id', adminGuard, async (c) => {
-    const id = c.req.param('id');
-    if (!isStr(id)) return bad(c, 'Invalid ID');
-    const updates = await c.req.json<Partial<{ name: string; interval: number; unit: 'days' | 'weeks' | 'months' }>>();
-    if (!Object.keys(updates).length) return bad(c, 'No updates provided');
-    const freq = new FrequencyEntity(c.env, id);
-    if (!await freq.exists()) return notFound(c);
-    const { items } = await FrequencyEntity.list(c.env);
-    if (updates.name && items.some(f => f.id !== id && f.name.toLowerCase() === updates.name!.toLowerCase())) {
-      return bad(c, 'Name already exists');
-    }
-    await freq.patch(updates);
-    const updated = await freq.getState();
-    return ok(c, updated);
-  });
-  finance.delete('/frequencies/:id', adminGuard, async (c) => {
-    const id = c.req.param('id');
-    if (!isStr(id)) return bad(c, 'Invalid ID');
-    const deleted = await FrequencyEntity.delete(c.env, id);
     return deleted ? ok(c, { id, deleted: true }) : notFound(c);
   });
   // CURRENCIES API
   finance.get('/currencies', async (c) => {
     const { items } = await CurrencyEntity.list(c.env);
     return ok(c, items.sort((a, b) => a.code.localeCompare(b.code)));
-  });
-  finance.post('/currencies', adminGuard, async (c) => {
-    const { code, symbol, suffix } = await c.req.json<{code: string, symbol: string, suffix: boolean}>();
-    if (!isStr(code) || !isStr(symbol)) return bad(c, 'Código y símbolo requeridos');
-    const trimmed = { code: code.trim().toUpperCase(), symbol: symbol.trim(), suffix: !!suffix };
-    const { items } = await CurrencyEntity.list(c.env);
-    if (items.some(cur => cur.code === trimmed.code || cur.symbol === trimmed.symbol)) return bad(c, 'Código o símbolo ya existe');
-    const newCur = { id: crypto.randomUUID(), ...trimmed };
-    await CurrencyEntity.create(c.env, newCur);
-    return ok(c, newCur);
-  });
-  finance.put('/currencies/:id', adminGuard, async (c) => {
-    const id = c.req.param('id');
-    if (!isStr(id)) return bad(c, 'ID inválido');
-    const { code, symbol, suffix } = await c.req.json<{code?: string, symbol?: string, suffix?: boolean}>();
-    if (!code && !symbol && suffix === undefined) return bad(c, 'Al menos un campo requerido');
-    const cur = new CurrencyEntity(c.env, id);
-    if (!await cur.exists()) return notFound(c);
-    const { items } = await CurrencyEntity.list(c.env);
-    const updates: Partial<Currency> = {};
-    if (code) {
-      const trimmedCode = code.trim().toUpperCase();
-      if (items.some(o => o.id !== id && o.code === trimmedCode)) return bad(c, 'Código ya en uso');
-      updates.code = trimmedCode;
-    }
-    if (symbol !== undefined) {
-      const trimmedSymbol = symbol.trim();
-      if (items.some(o => o.id !== id && o.symbol === trimmedSymbol)) return bad(c, 'Símbolo ya en uso');
-      updates.symbol = trimmedSymbol;
-    }
-    if (suffix !== undefined) updates.suffix = !!suffix;
-    const updated = await cur.mutate(cu => ({ ...cu, ...updates }));
-    return ok(c, updated);
-  });
-  finance.delete('/currencies/:id', adminGuard, async (c) => {
-    const id = c.req.param('id');
-    if (!isStr(id)) return bad(c, 'ID inválido');
-    const deleted = await CurrencyEntity.delete(c.env, id);
-    return deleted ? ok(c, { id, deleted: true }) : notFound(c);
   });
   // SETTINGS API
   finance.get('/settings', async (c) => {
@@ -428,5 +346,5 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     await settingsEntity.patch(body);
     return ok(c, await settingsEntity.getState());
   });
-  typedApp.route('/api/finance', finance);
+  app.route('/api/finance', finance);
 }
