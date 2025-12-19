@@ -80,7 +80,8 @@ function runSetupCommands() {
     const commands = [
     "bun add jspdf@2.5.1 --save",
     "bun add jspdf-autotable --save",
-    "bun install @google/generative-ai"
+    "bun install @google/generative-ai",
+    "bun add @google/generative-ai"
 ];
     
     if (commands.length === 0) {
