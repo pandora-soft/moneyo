@@ -87,13 +87,13 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     const authStatus = await verifyAuth();
     setIsAuthenticated(authStatus);
     if (!authStatus) {
-      navigate('/login', { replace: true, state: { from: location } });
+      navigate('/login', { replace: true });
     }
-  }, [navigate, location]);
+  }, [navigate]);
 
   useEffect(() => {
     checkAuth();
-  }, [checkAuth, location]);
+  }, [checkAuth]);
   if (isAuthenticated === null) {
     return (
       <div className="flex h-screen w-full items-center justify-center">

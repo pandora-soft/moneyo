@@ -25,20 +25,26 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   const authGuard = async (c: Context<{ Bindings: Env, Variables: { user?: User } }>, next: () => Promise<void>) => {
     const authHeader = c.req.header('Authorization');
     const token = authHeader?.split(' ')[1];
-    if (!isStr(token)) return bad(c, 'Unauthorized');
+    if (!isStr(token)) {
+      console.error('[AUTH FAIL] No valid token', { authHeader: c.req.header('Authorization')?.slice(0,50) || 'missing' });
+      return bad(c, 'Unauthorized');
+    }
     const sessionEntity = new SessionEntity(c.env, token);
     const session = await sessionEntity.getState();
     if (!session) {
+      console.error('[AUTH FAIL] No session for token', { tokenPrefix: token?.slice(0,8) || 'N/A' });
       await SessionEntity.delete(c.env, token);
       return bad(c, 'Session expired');
     }
     if (Date.now() >= session.expires) {
+      console.error('[AUTH FAIL] Session expired', { tokenPrefix: token?.slice(0,8), expires: session.expires, now: Date.now() });
       await SessionEntity.delete(c.env, token);
       return bad(c, 'Session expired');
     }
     const userEntity = new UserEntity(c.env, session.userId);
     const user = await userEntity.getState();
     if (!user) {
+      console.error('[AUTH FAIL] No user for session', { tokenPrefix: token?.slice(0,8), userId: session.userId });
       await sessionEntity.delete();
       return bad(c, 'Invalid session');
     }
@@ -56,10 +62,16 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   const auth = new Hono<{ Bindings: Env, Variables: { user?: User } }>();
   auth.post('/login', async (c) => {
     const { username, password } = await c.req.json<{username: string, password: string}>();
+    console.error('[LOGIN] Attempt for user:', username);
     if (!isStr(username) || !isStr(password)) return bad(c, 'Username and password required');
     const { items: users } = await UserEntity.list(c.env);
     const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (!user || !await verifyPassword(password, user.passwordHash)) {
+    if (!user) {
+      console.error('[LOGIN] User not found:', username.toLowerCase());
+      return bad(c, 'Invalid credentials');
+    }
+    if (!await verifyPassword(password, user.passwordHash)) {
+      console.error('[LOGIN] Password verify failed for user:', user.username);
       return bad(c, 'Invalid credentials');
     }
     const token = crypto.randomUUID();
@@ -172,13 +184,13 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const fromAccountState = await fromAccount.getState();
     const currency = fromAccountState.currency;
     if (body.type === 'transfer') {
-      body.recurrent = false;
-      if (!body.accountTo) return bad(c, 'Destination account is required for transfers');
-      const toAccount = new AccountEntity(c.env, body.accountTo);
+      const transferBody = { ...body, recurrent: false };
+      if (!transferBody.accountTo) return bad(c, 'Destination account is required for transfers');
+      const toAccount = new AccountEntity(c.env, body.accountTo!);
       if (!await toAccount.exists()) return notFound(c, 'Destination account not found');
       const amount = Math.abs(body.amount);
-      const expenseTxData: Omit<Transaction, 'id'> = { ...body, type: 'transfer', amount: -amount, currency };
-      const incomeTxData: Omit<Transaction, 'id'> = { ...body, accountId: body.accountTo, accountTo: body.accountId, type: 'transfer', amount, currency };
+      const expenseTxData: Omit<Transaction, 'id'> = { ...transferBody, type: 'transfer', amount: -amount, currency };
+      const incomeTxData: Omit<Transaction, 'id'> = { ...transferBody, accountId: transferBody.accountTo, accountTo: transferBody.accountId, type: 'transfer', amount, currency };
       const [expenseTx, incomeTx] = await Promise.all([
         ledger.addTransaction(expenseTxData),
         ledger.addTransaction(incomeTxData),
@@ -188,7 +200,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
       return ok(c, { expenseTx, incomeTx });
     }
     const amount = body.type === 'income' ? Math.abs(body.amount) : -Math.abs(body.amount);
-    const newTxData: Omit<Transaction, 'id'> = { ...body, amount: body.type === 'income' ? Math.abs(body.amount) : body.amount, currency };
+    const newTxData: Omit<Transaction, 'id'> = { ...body, amount, currency };
     const newTx = await ledger.addTransaction(newTxData);
     if (!body.recurrent) {
         await fromAccount.mutate(acc => ({ ...acc, balance: acc.balance + amount }));
@@ -210,8 +222,10 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         if (!account) continue;
         const parsedAmount = parseFloat(amount);
         if (isNaN(parsedAmount)) continue;
+        const ts = new Date(date).getTime();
+        if (isNaN(ts)) continue;
         txs.push({
-            ts: new Date(date).getTime(),
+            ts,
             accountId: account.id,
             type: type.trim() as TransactionType,
             amount: parsedAmount,
