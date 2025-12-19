@@ -3,7 +3,7 @@ import { enableMapSet } from "immer";
 enableMapSet();
 import React, { StrictMode, useEffect, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css';
@@ -82,7 +82,6 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  
   const checkAuth = useCallback(async () => {
     const authStatus = await verifyAuth();
     setIsAuthenticated(authStatus);
@@ -90,7 +89,6 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       navigate('/login', { replace: true });
     }
   }, [navigate]);
-
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
@@ -106,18 +104,34 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   }
   return isAuthenticated ? <>{children}</> : null;
 };
+const RoleGuard = ({ children }: { children: React.ReactNode }) => {
+  const navigate = useNavigate();
+  const t = useTranslations();
+  const userRole = useAppStore(s => s.settings.user?.role);
+  useEffect(() => {
+    if (userRole && userRole !== 'admin') {
+      toast.error(t('access.adminOnly'));
+      navigate('/transactions', { replace: true });
+    }
+  }, [userRole, navigate, t]);
+  if (userRole === 'admin') return <>{children}</>;
+  return null;
+};
 export const AppRoot = () => {
   const navigate = useNavigate();
   const t = useTranslations();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const userRole = useAppStore(s => s.settings.user?.role);
   const navItems = [
-    { href: '/accounts', label: t('pages.accounts'), icon: Wallet },
-    { href: '/transactions', label: t('pages.transactions'), icon: List },
-    { href: '/budgets', label: t('pages.budgets'), icon: PiggyBank },
-    { href: '/reports', label: t('pages.reports'), icon: BarChart },
-    { href: '/ia', label: 'IA', icon: Brain },
-    { href: '/settings', label: t('pages.settings'), icon: Settings },
+    { href: '/', label: t('pages.dashboard'), icon: Home, adminOnly: true },
+    { href: '/accounts', label: t('pages.accounts'), icon: Wallet, adminOnly: true },
+    { href: '/transactions', label: t('pages.transactions'), icon: List, adminOnly: false },
+    { href: '/budgets', label: t('pages.budgets'), icon: PiggyBank, adminOnly: true },
+    { href: '/reports', label: t('pages.reports'), icon: BarChart, adminOnly: true },
+    { href: '/ia', label: 'IA', icon: Brain, adminOnly: false },
+    { href: '/settings', label: t('pages.settings'), icon: Settings, adminOnly: true },
   ];
+  const filteredNavItems = navItems.filter(item => !item.adminOnly || userRole === 'admin');
   const handleLogout = () => {
     clearToken();
     toast.info('Sesión cerrada.');
@@ -136,12 +150,12 @@ export const AppRoot = () => {
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
           <div className="flex items-center gap-6">
-            <NavLink to="/" className="flex items-center gap-2 font-display text-lg font-semibold">
+            <NavLink to={userRole === 'admin' ? "/" : "/transactions"} className="flex items-center gap-2 font-display text-lg font-semibold">
               <Wallet className="size-6 text-orange-500" />
               Moneyo
             </NavLink>
             <nav className="hidden md:flex items-center gap-4">
-              {navItems.map(item => (
+              {filteredNavItems.map(item => (
                 <NavLink
                   key={item.href}
                   to={item.href}
@@ -188,7 +202,7 @@ export const AppRoot = () => {
             initial="hidden"
             animate="visible"
           >
-            {navItems.map(({ href, label, icon: Icon }) => (
+            {filteredNavItems.map(({ href, label, icon: Icon }) => (
               <motion.li key={href} variants={itemVariants}>
                 <NavLink
                   to={href}
@@ -225,7 +239,7 @@ export const AppRoot = () => {
       <Toaster richColors position="top-right" />
       <footer className="border-t">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-          Built with ❤️ at Cloudflare for Moneyo
+          Built with ❤��� at Cloudflare for Moneyo
         </div>
       </footer>
     </div>
@@ -243,13 +257,13 @@ const router = createBrowserRouter(
       element: <AuthGuard><AppRoot /></AuthGuard>,
       errorElement: <RouteErrorBoundary />,
       children: [
-        { index: true, element: <HomePage /> },
-        { path: "accounts", element: <AccountsPage /> },
+        { index: true, element: <RoleGuard><HomePage /></RoleGuard> },
+        { path: "accounts", element: <RoleGuard><AccountsPage /></RoleGuard> },
         { path: "transactions", element: <TransactionsPage /> },
-        { path: "budgets", element: <BudgetsPage /> },
-        { path: "reports", element: <ReportsPage /> },
+        { path: "budgets", element: <RoleGuard><BudgetsPage /></RoleGuard> },
+        { path: "reports", element: <RoleGuard><ReportsPage /></RoleGuard> },
         { path: "ia", element: <IAPage /> },
-        { path: "settings", element: <SettingsPage /> },
+        { path: "settings", element: <RoleGuard><SettingsPage /></RoleGuard> },
       ],
     },
   ],

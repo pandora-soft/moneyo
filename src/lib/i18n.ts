@@ -23,6 +23,9 @@ const translations = {
     filteredXOfY: (filtered: number, total: number) => `Mostrando ${filtered} de ${total} transacciones.`,
     paginationReset: 'Mostrar todo',
   },
+  access: {
+    adminOnly: 'Acceso restringido: Se requieren permisos de administrador.',
+  },
   pages: {
     dashboard: 'Dashboard',
     accounts: 'Cuentas',
@@ -35,7 +38,7 @@ const translations = {
     summary: 'Resumen de tus finanzas.',
     totalBalance: 'Balance Total',
     allAccounts: 'En todas tus cuentas',
-    incomeLast30: 'Ingresos (Últ. 30 días)',
+    incomeLast30: 'Ingresos (��lt. 30 días)',
     expensesLast30: 'Gastos (Últ. 30 días)',
     inflow: 'Flujo de entrada',
     outflow: 'Flujo de salida',
@@ -134,7 +137,7 @@ const translations = {
   auth: {
     login: 'Iniciar Sesión',
     username: 'Usuario',
-    password: 'Contraseña',
+    password: 'Contrase��a',
     loginSuccess: 'Sesión iniciada correctamente. ¡Bienvenido!',
     loginError: 'Credenciales inválidas. Por favor, inténtalo de nuevo.',
     register: 'Registrarse',
@@ -264,7 +267,7 @@ const translations = {
     allTime: 'Todo el tiempo',
     dateRange: 'Rango de Fechas',
     thisMonth: 'Este Mes',
-    last3Months: 'Últimos 3 Meses',
+    last3 Months: 'Últimos 3 Meses',
     clear: 'Limpiar filtros',
   },
   table: {
@@ -306,7 +309,5 @@ const t = (key: TranslationKey, ...args: any[]): string => {
   }
   return typeof current === 'string' ? current : key;
 };
-export const useTranslations = () => {
-  return useCallback(t, []);
-};
+
 export default t;

@@ -24,10 +24,10 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCategoryColor } from '@/hooks/useCategoryColor';
-const accountIcons = { 
-  cash: <Banknote className="size-4 text-muted-foreground" />, 
-  bank: <Landmark className="size-4 text-muted-foreground" />, 
-  credit_card: <CreditCard className="size-4 text-muted-foreground" /> 
+const accountIcons = {
+  cash: <Banknote className="size-4 text-muted-foreground" />,
+  bank: <Landmark className="size-4 text-muted-foreground" />,
+  credit_card: <CreditCard className="size-4 text-muted-foreground" />
 };
 interface TransactionRowProps {
   tx: Transaction;
@@ -128,47 +128,53 @@ export function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, accounts.length, pagination.rowsPerPage]);
+  }, [filters, accounts, pagination.rowsPerPage]);
   useEffect(() => {
     fetchData(0);
   }, [filters, refetchData, isRecurrentView, fetchData]);
   const filteredTransactions = useMemo(() => {
     return isRecurrentView ? transactions.filter(tx => tx.recurrent) : transactions;
   }, [transactions, isRecurrentView]);
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!deletingId) return;
     try {
       await api(`/api/finance/transactions/${deletingId}`, { method: 'DELETE' });
       toast.success('Transacción eliminada.');
-      fetchData(pagination.cursor);
+      fetchData(0);
     } catch (e) {
       toast.error('Error al eliminar la transacción.');
     } finally {
       setDeletingId(null);
       setDeleteDialogOpen(false);
     }
-  };
+  }, [deletingId, fetchData]);
   const handleCopy = useCallback((tx: Transaction) => {
     const { id, ...copy } = tx;
     openModal({ ...copy, ts: Date.now(), recurrent: false, frequency: undefined, parentId: undefined });
   }, [openModal]);
-  const handleRowsPerPageChange = (value: string) => {
+  const handleRowsPerPageChange = useCallback((value: string) => {
     const newRows = value === 'all' ? 10000 : parseInt(value, 10);
     setPagination(p => ({ ...p, rowsPerPage: newRows, cursor: 0, history: [0] }));
     fetchData(0, newRows);
-  };
-  const handleNextPage = () => {
-    const nextCursor = pagination.cursor + pagination.rowsPerPage;
-    setPagination(p => ({ ...p, history: [...p.history, nextCursor] }));
-    fetchData(nextCursor);
-  };
-  const handlePrevPage = () => {
+  }, [fetchData]);
+  const handleNextPage = useCallback(() => {
+    setPagination(p => {
+      const nextCursor = p.cursor + p.rowsPerPage;
+      return { ...p, history: [...p.history, nextCursor] };
+    });
+  }, []);
+  const handlePrevPage = useCallback(() => {
+    setPagination(p => {
+      const newHistory = [...p.history];
+      newHistory.pop();
+      const prevCursor = newHistory[newHistory.length - 1] ?? 0;
+      return { ...p, history: newHistory };
+    });
     const newHistory = [...pagination.history];
     newHistory.pop();
     const prevCursor = newHistory[newHistory.length - 1] ?? 0;
-    setPagination(p => ({ ...p, history: newHistory }));
     fetchData(prevCursor);
-  };
+  }, [pagination.history, fetchData]);
   const pageStart = pagination.cursor + 1;
   const pageEnd = Math.min(pagination.cursor + pagination.rowsPerPage, pagination.totalCount);
   return (
@@ -200,10 +206,10 @@ export function TransactionsPage() {
               <TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>{t('table.account')}</TableHead><TableHead>{t('table.category')}</TableHead><TableHead>{t('table.date')}</TableHead><TableHead className="text-right">{t('table.amount')}</TableHead><TableHead className="w-[100px] text-right">Acciones</TableHead></TableRow></TableHeader>
               <TableBody>
                 {loading ? ( Array.from({ length: 10 }).map((_, i) => ( <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow> )) ) : filteredTransactions.length > 0 ? ( filteredTransactions.map((tx) => (
-                  <TransactionRow 
-                    key={tx.id} 
-                    tx={tx} 
-                    account={accountsById.get(tx.accountId)} 
+                  <TransactionRow
+                    key={tx.id}
+                    tx={tx}
+                    account={accountsById.get(tx.accountId)}
                     formatCurrency={formatCurrency}
                     onEdit={openModal}
                     onCopy={handleCopy}
