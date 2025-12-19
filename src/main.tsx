@@ -1,7 +1,7 @@
 import '@/lib/errorReporter';
 import { enableMapSet } from "immer";
 enableMapSet();
-import React, { StrictMode, useEffect, useState } from 'react';
+import React, { StrictMode, useEffect, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -67,7 +67,6 @@ const GlobalTransactionSheet = () => {
             accounts={accounts}
             onSubmit={handleFormSubmit}
             onFinished={closeModal}
-            /* Guard against undefined modalInitialValues */
             defaultValues={modalInitialValues ? {
               ...modalInitialValues,
               ts: new Date(modalInitialValues.ts || Date.now()),
@@ -83,16 +82,18 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  
+  const checkAuth = useCallback(async () => {
+    const authStatus = await verifyAuth();
+    setIsAuthenticated(authStatus);
+    if (!authStatus) {
+      navigate('/login', { replace: true, state: { from: location } });
+    }
+  }, [navigate]);
+
   useEffect(() => {
-    const check = async () => {
-      const authStatus = await verifyAuth();
-      setIsAuthenticated(authStatus);
-      if (!authStatus) {
-        navigate('/login', { replace: true, state: { from: location } });
-      }
-    };
-    check();
-  }, [navigate, location]);
+    checkAuth();
+  }, [checkAuth, location]);
   if (isAuthenticated === null) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
