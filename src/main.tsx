@@ -89,7 +89,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     if (!authStatus) {
       navigate('/login', { replace: true, state: { from: location } });
     }
-  }, [navigate]);
+  }, [navigate, location]);
 
   useEffect(() => {
     checkAuth();
