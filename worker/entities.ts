@@ -1,8 +1,7 @@
 import { IndexedEntity, Entity, Env, Index } from "./core-utils";
-import type { Account, Transaction, Budget, Settings, Currency, User, TransactionType } from "@shared/types";
+import { Account, Transaction, Budget, Settings, Currency, User, TransactionType } from "@shared/types";
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@shared/mock-data";
 import { addDays, addMonths, addWeeks, isBefore, startOfToday, isWithinInterval } from 'date-fns';
-// --- UTILITY FUNCTIONS FOR HASHING ---
 export async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -12,7 +11,6 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   const newHash = await hashPassword(password);
   return newHash === hash;
 }
-// --- ENTITIES ---
 export class UserEntity extends IndexedEntity<User> {
   static readonly entityName = "user";
   static readonly indexName = "users";
@@ -104,10 +102,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
       const generatedTxs: Omit<Transaction, 'id'>[] = [];
       for (const template of recurrentTemplates) {
         const freq = freqMap.get(template.frequency!);
-        if (!freq) {
-          console.warn(`Frequency "${template.frequency}" not found for transaction ${template.id}. Skipping.`);
-          continue;
-        }
+        if (!freq) continue;
         let nextDate = new Date(template.ts);
         while (isBefore(nextDate, today)) {
           let nextDueDate: Date;
@@ -115,7 +110,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
             case 'days': nextDueDate = addDays(nextDate, freq.interval); break;
             case 'weeks': nextDueDate = addWeeks(nextDate, freq.interval); break;
             case 'months': nextDueDate = addMonths(nextDate, freq.interval); break;
-            default: nextDueDate = addMonths(nextDate, 1); // Fallback
+            default: nextDueDate = addMonths(nextDate, 1);
           }
           if (isBefore(nextDueDate, today)) {
             const alreadyGenerated = transactions.some(t => t.parentId === template.id && t.ts === nextDueDate.getTime());
@@ -133,9 +128,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
           nextDate = nextDueDate;
         }
       }
-      if (generatedTxs.length > 0) {
-        return this.bulkAddTransactions(generatedTxs);
-      }
+      if (generatedTxs.length > 0) return this.bulkAddTransactions(generatedTxs);
       return [];
     } catch (e) {
       console.error('Error generating recurrent transactions:', e);
@@ -178,12 +171,21 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const oldTx = transactions.find(t => t.id === id);
     if (!oldTx) throw new Error("Transaction not found");
     const newTx: Transaction = { ...oldTx, ...updates };
-    const oldAmount = oldTx.type === 'income' ? Math.abs(oldTx.amount) : -Math.abs(oldTx.amount);
-    const newAmount = newTx.type === 'income' ? Math.abs(newTx.amount) : -Math.abs(newTx.amount);
-    const balanceChange = newAmount - oldAmount;
-    if (balanceChange !== 0 && !newTx.recurrent) { // Don't adjust balance for recurrent templates
-      const account = new AccountEntity(this.env, oldTx.accountId);
-      await account.mutate(acc => ({ ...acc, balance: acc.balance + balanceChange }));
+    // Skip balance updates for templates
+    if (!oldTx.recurrent && !newTx.recurrent) {
+      const oldAmount = oldTx.type === 'income' ? Math.abs(oldTx.amount) : -Math.abs(oldTx.amount);
+      const newAmount = newTx.type === 'income' ? Math.abs(newTx.amount) : -Math.abs(newTx.amount);
+      const mutations: Promise<any>[] = [];
+      if (oldTx.accountId !== newTx.accountId) {
+        // Account switched: Reverse old amount from old account, Apply new amount to new account
+        mutations.push(new AccountEntity(this.env, oldTx.accountId).mutate(acc => ({ ...acc, balance: acc.balance - oldAmount })));
+        mutations.push(new AccountEntity(this.env, newTx.accountId).mutate(acc => ({ ...acc, balance: acc.balance + newAmount })));
+      } else if (oldAmount !== newAmount) {
+        // Same account, different amount
+        const balanceChange = newAmount - oldAmount;
+        mutations.push(new AccountEntity(this.env, oldTx.accountId).mutate(acc => ({ ...acc, balance: acc.balance + balanceChange })));
+      }
+      await Promise.all(mutations);
     }
     await this.mutate(s => ({
       ...s,
@@ -196,18 +198,24 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const txToDelete = transactions.find(t => t.id === id);
     if (!txToDelete) return;
     const mutations: Promise<any>[] = [];
-    if (!txToDelete.recurrent) { // Don't adjust balance if it's a template
-        const amountToReverse = txToDelete.type === 'income' ? -Math.abs(txToDelete.amount) : Math.abs(txToDelete.amount);
-        mutations.push(new AccountEntity(this.env, txToDelete.accountId).mutate(acc => ({ ...acc, balance: acc.balance + amountToReverse })));
-    }
-    let idsToDelete = [id];
+    const idsToRemove = [id];
+    const processTxDelete = (tx: Transaction) => {
+      if (!tx.recurrent) {
+        const amountToReverse = tx.type === 'income' ? -Math.abs(tx.amount) : Math.abs(tx.amount);
+        mutations.push(new AccountEntity(this.env, tx.accountId).mutate(acc => ({ ...acc, balance: acc.balance + amountToReverse })));
+      }
+    };
+    processTxDelete(txToDelete);
     if (txToDelete.recurrent) {
-        const children = transactions.filter(t => t.parentId === id);
-        idsToDelete.push(...children.map(c => c.id));
+      const children = transactions.filter(t => t.parentId === id);
+      children.forEach(child => {
+        idsToRemove.push(child.id);
+        processTxDelete(child);
+      });
     }
     mutations.push(this.mutate(s => ({
       ...s,
-      transactions: s.transactions.filter(t => !idsToDelete.includes(t.id))
+      transactions: s.transactions.filter(t => !idsToRemove.includes(t.id))
     })));
     await Promise.all(mutations);
   }
@@ -237,11 +245,10 @@ export class CurrencyEntity extends IndexedEntity<Currency> {
     static seedData = [
         { id: 'usd', code: 'USD', symbol: '$', suffix: false },
         { id: 'eur', code: 'EUR', symbol: '€', suffix: true },
-        { id: 'ars', code: 'ARS', symbol: '$', suffix: false },
     ];
 }
 export interface Session {
-  id: string; // token UUID
+  id: string; 
   userId: string;
   expires: number;
 }

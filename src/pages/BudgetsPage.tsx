@@ -21,37 +21,21 @@ import t from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
- // Mapping Tailwind CSS background color classes to HEX values for Recharts
- const tailwindColorToHex: Record<string, string> = {
-   'bg-emerald-500': '#10b981',
-   'bg-orange-500': '#f97316',
-   'bg-blue-500': '#3b82f6',
-   'bg-purple-500': '#8b5cf6',
-   'bg-red-500': '#ef4444',
-   'bg-yellow-500': '#eab308',
-   'bg-green-500': '#22c55e',
-   'bg-indigo-500': '#6366f1',
-   'bg-rose-500': '#f43f5e',
-   'bg-slate-500': '#64748b',
-   'bg-gray-500': '#6b7280',
- };
 import { getCategoryColor } from '@/hooks/useCategoryColor';
+const tailwindColorToHex: Record<string, string> = {
+  'bg-emerald-500': '#10b981', 'bg-orange-500': '#f97316', 'bg-blue-500': '#3b82f6',
+  'bg-purple-500': '#8b5cf6', 'bg-red-500': '#ef4444', 'bg-yellow-500': '#eab308',
+  'bg-green-500': '#22c55e', 'bg-indigo-500': '#6366f1', 'bg-rose-500': '#f43f5e',
+  'bg-slate-500': '#64748b', 'bg-gray-500': '#6b7280',
+};
 type BudgetWithColor = Budget & { computedActual: number; color: string };
-const BudgetCard = ({ budget }: { budget: BudgetWithColor }) => {
+const BudgetCard = ({ budget, onEdit, onDuplicate, onDelete }: { 
+  budget: BudgetWithColor; 
+  onEdit: (b: Budget) => void; 
+  onDuplicate: (b: Budget) => void;
+  onDelete: (id: string) => void;
+}) => {
   const formatCurrency = useFormatCurrency();
-  const [isSheetOpen, setSheetOpen] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<Partial<Budget> | null>(null);
-  const [deletingBudget, setDeletingBudget] = useState<string | null>(null);
-  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const { triggerRefetch } = useAppStore.getState();
-  const handleDuplicate = (budgetToDuplicate: Budget) => {
-    const { id, computedActual, ...newBudget } = budgetToDuplicate;
-    let nextMonth = addMonths(new Date(budgetToDuplicate.month), 1);
-    // This logic should ideally be server-side or use a full list of budgets,
-    // but for client-side duplication, this is a reasonable approach.
-    setEditingBudget({ ...newBudget, month: nextMonth.getTime(), computedActual: undefined });
-    setSheetOpen(true);
-  };
   return (
     <Card className="hover:shadow-lg transition-shadow duration-200">
       <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -70,9 +54,9 @@ const BudgetCard = ({ budget }: { budget: BudgetWithColor }) => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => { setEditingBudget(budget); setSheetOpen(true); }}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDuplicate(budget)}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive" onClick={() => { setDeletingBudget(budget.id); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(budget)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDuplicate(budget)}><Copy className="mr-2 h-4 w-4" /> {t('budget.duplicate')}</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={() => onDelete(budget.id)}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -83,6 +67,7 @@ const BudgetCard = ({ budget }: { budget: BudgetWithColor }) => {
 export function BudgetsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setSheetOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Partial<Budget> | null>(null);
@@ -90,58 +75,40 @@ export function BudgetsPage() {
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [filterDate, setFilterDate] = useState<Date>(startOfMonth(new Date()));
   const formatCurrency = useFormatCurrency();
-  const refetchTrigger = useAppStore((state) => state.refetchData);
+  const refetchData = useAppStore(s => s.refetchData);
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [txs, bgs] = await Promise.all([
+      const [txs, bgs, cats] = await Promise.all([
         api<{ items: Transaction[] }>('/api/finance/transactions?limit=1000').then(p => p.items),
         api<Budget[]>('/api/finance/budgets'),
+        api<{ id: string; name: string }[]>('/api/finance/categories'),
       ]);
       setTransactions(txs);
       setBudgets(bgs);
+      setCategories(cats.map(c => c.name));
     } catch (error) {
-      toast.error("Error al cargar los datos de presupuestos.");
+      toast.error("Error al cargar los datos.");
     } finally {
       setLoading(false);
     }
   }, []);
   useEffect(() => {
     fetchData();
-  }, [fetchData, refetchTrigger]);
-  const { uniqueMonths, uniqueCategories, filteredBudgetsWithActuals, chartData } = useMemo(() => {
+  }, [fetchData, refetchData]);
+  const { uniqueMonths, filteredBudgetsWithActuals, chartData } = useMemo(() => {
     const allDates = [...budgets.map(b => b.month), ...transactions.map(t => t.ts)];
     const uniqueMonthKeys = [...new Set(allDates.map(d => format(new Date(d), 'yyyy-MM')))].sort().reverse();
-    const allCategories = [...new Set([...transactions.filter(t => t.type === 'expense').map(t => t.category), 'Salario', 'Alquiler', 'Comida', 'Transporte', 'Ocio'])];
-    const uniqueCategories = [...new Set(allCategories)];
     const currentMonthBudgets = budgets.filter(b => format(new Date(b.month), 'yyyy-MM') === format(filterDate, 'yyyy-MM'));
     const budgetsWithActuals = currentMonthBudgets.map(b => {
       const monthStart = new Date(b.month);
       const actual = transactions
         .filter(t => t.type === 'expense' && getMonth(new Date(t.ts)) === getMonth(monthStart) && getYear(new Date(t.ts)) === getYear(monthStart) && t.category === b.category)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      return { ...b, computedActual: actual };
+      return { ...b, computedActual: actual, color: getCategoryColor(b.category) };
     }).sort((a, b) => a.category.localeCompare(b.category));
-    const chartData = budgetsWithActuals.map(b => ({
-      name: b.category,
-      limit: b.limit,
-      actual: b.computedActual,
-    }));
-    return { uniqueMonths: uniqueMonthKeys, uniqueCategories, filteredBudgetsWithActuals: budgetsWithActuals, chartData };
+    return { uniqueMonths: uniqueMonthKeys, filteredBudgetsWithActuals: budgetsWithActuals, chartData: budgetsWithActuals };
   }, [budgets, transactions, filterDate]);
- // Removed: const categoryColors = useCategoryColor(); // Not needed; using getCategoryColor directly
-  const budgetsWithColors = useMemo(() => {
-    return filteredBudgetsWithActuals.map(b => ({
-      ...b,
-      color: getCategoryColor(b.category)
-    }));
-  }, [filteredBudgetsWithActuals]);
-  const chartDataWithColors = useMemo(() => {
-    return chartData.map(d => ({
-      ...d,
-      color: getCategoryColor(d.name)
-    }));
-  }, [chartData]);
   const handleFormSubmit = async (values: Omit<Budget, 'id' | 'computedActual'>) => {
     try {
       if (editingBudget?.id) {
@@ -172,126 +139,62 @@ export function BudgetsPage() {
       setDeleteDialogOpen(false);
     }
   };
-  const exportFilteredBudgets = () => {
-    const headers = "Mes,Categoría,Límite,Gasto Real,Estado\n";
-    const csvContent = filteredBudgetsWithActuals.map(b => {
-      const status = b.computedActual > b.limit ? t('budget.over') : t('budget.under');
-      return `${format(new Date(b.month), 'yyyy-MM')},"${b.category}",${b.limit},${b.computedActual},${status}`;
-    }).join("\n");
-    const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `moneyo_presupuestos_${format(filterDate, 'yyyy-MM')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
-          <div>
-            <h1 className="text-4xl font-display font-bold">{t('budget.list')}</h1>
-            <p className="text-muted-foreground mt-1">{t('budget.description')}</p>
-          </div>
-          <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingBudget(null); setSheetOpen(true); }}>
-            <PlusCircle className="mr-2 size-5" /> {t('budget.create')}
-          </Button>
+          <div><h1 className="text-4xl font-display font-bold">{t('budget.list')}</h1><p className="text-muted-foreground mt-1">{t('budget.description')}</p></div>
+          <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingBudget(null); setSheetOpen(true); }}><PlusCircle className="mr-2 size-5" /> {t('budget.create')}</Button>
         </header>
         <Card className="mb-8 overflow-hidden">
-          <CardHeader className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4">
-            <div className="w-full sm:w-auto">
-              <CardTitle>{t('budget.summary')}</CardTitle>
-              <CardDescription>{t('budget.summaryDesc')}</CardDescription>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-              <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(`${val}-01T12:00:00Z`))}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Seleccionar mes" />
-                </SelectTrigger>
-                <SelectContent>
-                  {uniqueMonths.map(monthKey => (
-                    <SelectItem key={monthKey} value={monthKey}>
-                      {format(new Date(`${monthKey}-01T12:00:00Z`), 'MMMM yyyy', { locale: es })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" onClick={exportFilteredBudgets} disabled={filteredBudgetsWithActuals.length === 0} className="w-full sm:w-auto">
-                <Download className="mr-2 size-4" /> {t('common.exportBudgets')}
-              </Button>
-            </div>
+          <CardHeader className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="w-full sm:w-auto"><CardTitle>{t('budget.summary')}</CardTitle><CardDescription>{t('budget.summaryDesc')}</CardDescription></div>
+            <Select value={format(filterDate, 'yyyy-MM')} onValueChange={(val) => setFilterDate(new Date(`${val}-01T12:00:00Z`))}>
+              <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Mes" /></SelectTrigger>
+              <SelectContent>{uniqueMonths.map(m => <SelectItem key={m} value={m}>{format(new Date(`${m}-01T12:00:00Z`), 'MMMM yyyy', { locale: es })}</SelectItem>)}</SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-[300px]" /> : (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartDataWithColors}>
-                  <XAxis dataKey="name" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
-                    cursor={{ fill: 'hsl(var(--muted))' }}
-                    formatter={(value: number, name, props) => {
-                      const safeName = typeof name === 'string' ? name : String(name);
-                      const { payload } = props;
-                      if (!payload) return [formatCurrency(value), safeName];
-                      const status = payload.actual > payload.limit ? `(${t('budget.over')})` : `(${t('budget.under')})`;
-                      return [formatCurrency(value), `${safeName.charAt(0).toUpperCase() + safeName.slice(1)} ${status}`];
-                    }}
-                  />
-                  <Legend />
+                <BarChart data={chartData}>
+                  <XAxis dataKey="category" stroke="#888888" fontSize={12} /><YAxis stroke="#888888" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
+                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                   <Bar dataKey="limit" fill="#8884d8" name={t('budget.limit')} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="actual" name={t('budget.actual')} radius={[4, 4, 0, 0]}>
-                    {chartDataWithColors.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={tailwindColorToHex[entry.color] || '#8884d8'} />
-                    ))}
+                  <Bar dataKey="computedActual" name={t('budget.actual')} radius={[4, 4, 0, 0]}>
+                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={tailwindColorToHex[getCategoryColor(entry.category)] || '#8884d8'} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
-        {loading ? (
+        {loading ? <Skeleton className="h-40 w-full" /> : filteredBudgetsWithActuals.length > 0 ? (
           <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
+            {filteredBudgetsWithActuals.map(b => (
+              <BudgetCard 
+                key={b.id} 
+                budget={b as BudgetWithColor} 
+                onEdit={setEditingBudget} 
+                onDuplicate={(dup) => { setEditingBudget({ ...dup, id: undefined, month: addMonths(new Date(dup.month), 1).getTime() }); setSheetOpen(true); }}
+                onDelete={(id) => { setDeletingBudget(id); setDeleteDialogOpen(true); }}
+              />
+            ))}
           </div>
-        ) : budgetsWithColors.length > 0 ? (
-          <motion.div className="space-y-4" variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }} initial="hidden" animate="show">
-            <AnimatePresence>
-              {budgetsWithColors.map(budget => (
-                <motion.div key={budget.id} layout variants={{ hidden: { y: 20, opacity: 0 }, show: { y: 0, opacity: 1 } }} exit={{ opacity: 0, y: -20 }}>
-                  <BudgetCard budget={budget} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
-        ) : (
-          <div className="text-center py-20 border-2 border-dashed rounded-lg">
-            <h3 className="text-xl font-semibold">{t('labels.emptyBudgets')}</h3>
-            <p className="text-muted-foreground mt-2 mb-4">Crea un presupuesto para empezar a controlar tus gastos.</p>
-            <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => { setEditingBudget(null); setSheetOpen(true); }}>
-              <PlusCircle className="mr-2 size-5" /> {t('budget.create')}
-            </Button>
-          </div>
-        )}
+        ) : <p className="text-center py-10 border border-dashed rounded-lg">No hay presupuestos para este mes.</p>}
       </div>
-      <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) { setSheetOpen(false); setEditingBudget(null); } else { setSheetOpen(true); } }}>
+      <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="sm:max-w-lg w-full p-0" aria-describedby="budget-sheet-desc">
           <SheetHeader className="p-6 border-b"><SheetTitle>{editingBudget?.id ? t('budget.sheet.editTitle') : t('budget.sheet.newTitle')}</SheetTitle><SheetDescription id="budget-sheet-desc">{t('budget.sheet.description')}</SheetDescription></SheetHeader>
           <BudgetForm
-            categories={uniqueCategories}
+            categories={categories}
             onSubmit={handleFormSubmit}
-            onFinished={() => { setSheetOpen(false); setEditingBudget(null); }}
+            onFinished={() => setSheetOpen(false)}
             defaultValues={editingBudget ? {...editingBudget, month: new Date(editingBudget.month || Date.now())} : { month: filterDate }}
           />
         </SheetContent>
       </Sheet>
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent aria-describedby="delete-budget-desc">
-          <AlertDialogHeader><AlertDialogTitle>{t('budget.deleteConfirm')}</AlertDialogTitle><AlertDialogDescription id="delete-budget-desc">{t('budget.deleteWarning')}</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDeleteBudget}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}><AlertDialogContent aria-describedby="delete-budget-desc"><AlertDialogHeader><AlertDialogTitle>{t('budget.deleteConfirm')}</AlertDialogTitle><AlertDialogDescription id="delete-budget-desc">{t('budget.deleteWarning')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDeleteBudget}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }
