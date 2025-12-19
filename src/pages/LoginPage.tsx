@@ -37,7 +37,9 @@ export default function LoginPage() {
       toast.success(t('auth.loginSuccess'));
       navigate('/');
     } catch (error) {
-      toast.error(t('auth.loginError'));
+      const errMsg = error instanceof Error ? error.message : t('auth.loginError');
+      form.setError('root', { message: errMsg });
+      toast.error(errMsg);
     }
   };
   return (
@@ -82,6 +84,11 @@ export default function LoginPage() {
                     </FormItem>
                   )}
                 />
+                {form.formState.errors.root && (
+                  <div className="border bg-destructive/5 border-destructive/30 text-destructive rounded-md p-3 text-sm">
+                    {form.formState.errors.root.message}
+                  </div>
+                )}
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {t('auth.login')}

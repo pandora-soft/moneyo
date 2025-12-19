@@ -21,7 +21,9 @@ export class UserEntity extends IndexedEntity<User> {
   static async ensureSeed(env: Env): Promise<void> {
     const idx = new Index<string>(env, this.indexName);
     const ids = await idx.list();
-    if (ids.length === 0) {
+    const users = await Promise.all(ids.map(id => new UserEntity(env, id).getState()));
+    const hasAdmin = users.some(u => u.username.toLowerCase() === 'admin');
+    if (!hasAdmin) {
       const adminPasswordHash = await hashPassword('admin');
       const adminUser: User = {
         id: crypto.randomUUID(),
@@ -30,7 +32,7 @@ export class UserEntity extends IndexedEntity<User> {
         role: 'admin',
         email: 'admin@example.com'
       };
-      await this.create(env, adminUser);
+      await UserEntity.create(env, adminUser);
     }
   }
 }
@@ -156,7 +158,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
       if (filters.accountId && filters.accountId !== 'all' && tx.accountId !== filters.accountId) return false;
       if (filters.type && filters.type !== 'all' && tx.type !== (filters.type as TransactionType)) return false;
       if (filters.dateFrom && filters.dateTo) {
-        if (!isWithinInterval(new Date(tx.ts), { start: filters.dateFrom, end: filters.dateTo })) return false;
+        if (!isWithinInterval(new Date(tx.ts), { start: new Date(filters.dateFrom), end: new Date(filters.dateTo) })) return false;
       }
       if (filters.query) {
         const q = filters.query.toLowerCase();
