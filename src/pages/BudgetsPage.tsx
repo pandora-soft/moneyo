@@ -97,7 +97,7 @@ export function BudgetsPage() {
     fetchData();
   }, [fetchData, refetchData]);
   const { uniqueMonths, filteredBudgetsWithActuals, chartData } = useMemo(() => {
-    const allDates = [...budgets.map(b => b.month), ...transactions.map(t => t.ts)];
+    const allDates = [...budgets.map(b => b.month), ...transactions.map(t => t.ts), filterDate.getTime()];
     const uniqueMonthKeys = [...new Set(allDates.map(d => format(new Date(d), 'yyyy-MM')))].sort().reverse();
     const currentMonthBudgets = budgets.filter(b => format(new Date(b.month), 'yyyy-MM') === format(filterDate, 'yyyy-MM'));
     const budgetsWithActuals = currentMonthBudgets.map(b => {

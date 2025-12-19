@@ -71,8 +71,8 @@ export function HomePage() {
   }, [accounts, transactions]);
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="py-8 md:py-10 lg:py-12">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
+      <div className="py-8 md:py-10 lg:py-12 relative">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 p-6 rounded-2xl bg-gradient-to-br from-orange-50/50 via-transparent to-transparent dark:from-orange-950/10 dark:to-transparent border border-orange-100/20">
           <div>
             <h1 className="text-4xl font-display font-bold">{t('pages.dashboard')}</h1>
             <p className="text-muted-foreground mt-1">{t('dashboard.summary')}</p>

@@ -18,13 +18,14 @@ export function formatCurrency(value: number, currencyCode?: string): string {
 }
 export function useFormatCurrency() {
   const currencyCode = useAppStore((state) => state.currency);
-  // The 'currencies' state is not needed as a dependency because formatCurrency
-  // reads the latest value directly from the store via getState().
+  const currenciesMap = useAppStore((state) => state.currencies);
   const format = useCallback(
     (value: number, overrideCurrencyCode?: string) => {
+      // Re-read from state for latest values, but hook subscribes to currencyCode and currenciesMap
+      // so components re-render when Settings change.
       return formatCurrency(value, overrideCurrencyCode || currencyCode);
     },
-    [currencyCode]
+    [currencyCode, currenciesMap]
   );
   return format;
 }
