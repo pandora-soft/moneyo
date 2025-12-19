@@ -230,27 +230,30 @@ export const AppRoot = () => {
     </div>
   );
 };
-const router = createBrowserRouter([
-  {
-    path: "/login",
-    element: <LoginPage />,
-    errorElement: <RouteErrorBoundary />,
-  },
-  {
-    path: "/",
-    element: <AuthGuard><AppRoot /></AuthGuard>,
-    errorElement: <RouteErrorBoundary />,
-    children: [
-      { index: true, element: <HomePage /> },
-      { path: "accounts", element: <AccountsPage /> },
-      { path: "transactions", element: <TransactionsPage /> },
-      { path: "budgets", element: <BudgetsPage /> },
-      { path: "reports", element: <ReportsPage /> },
-      { path: "ia", element: <IAPage /> },
-      { path: "settings", element: <SettingsPage /> },
-    ],
-  },
-]);
+const router = createBrowserRouter(
+  [
+    {
+      path: "/login",
+      element: <LoginPage />,
+      errorElement: <RouteErrorBoundary />,
+    },
+    {
+      path: "/",
+      element: <AuthGuard><AppRoot /></AuthGuard>,
+      errorElement: <RouteErrorBoundary />,
+      children: [
+        { index: true, element: <HomePage /> },
+        { path: "accounts", element: <AccountsPage /> },
+        { path: "transactions", element: <TransactionsPage /> },
+        { path: "budgets", element: <BudgetsPage /> },
+        { path: "reports", element: <ReportsPage /> },
+        { path: "ia", element: <IAPage /> },
+        { path: "settings", element: <SettingsPage /> },
+      ],
+    },
+  ],
+  { future: {} }
+);
 const rootElement = document.getElementById('root');
 if (rootElement) {
   if (!rootElement.innerHTML) {

@@ -33,7 +33,7 @@ export default function LoginPage() {
         body: JSON.stringify(values),
       });
       localStorage.setItem('casaconta_token', token);
-      setSettings({ user } as any); // Store user info in settings
+      setSettings({ user }); // Store user info in settings
       toast.success(t('auth.loginSuccess'));
       navigate('/');
     } catch (error) {
@@ -63,7 +63,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>{t('auth.username')}</FormLabel>
                       <FormControl>
-                        <Input placeholder="" {...field} />
+                        <Input autoComplete="username" placeholder="" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -76,7 +76,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>{t('auth.password')}</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
+                        <Input autoComplete="current-password" type="password" placeholder="••••••••" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
