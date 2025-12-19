@@ -38,7 +38,7 @@ const translations = {
     summary: 'Resumen de tus finanzas.',
     totalBalance: 'Balance Total',
     allAccounts: 'En todas tus cuentas',
-    incomeLast30: 'Ingresos (��lt. 30 días)',
+    incomeLast30: 'Ingresos (Últ. 30 días)',
     expensesLast30: 'Gastos (Últ. 30 días)',
     inflow: 'Flujo de entrada',
     outflow: 'Flujo de salida',
@@ -129,7 +129,7 @@ const translations = {
     sheet: {
       editTitle: 'Editar Presupuesto',
       newTitle: 'Nuevo Presupuesto',
-      description: 'Define un límite de gasto para una categoría en un mes específico.',
+      description: 'Define un límite de gasto para una categoría en un mes espec��fico.',
     },
     deleteConfirm: '¿Confirmar eliminación?',
     deleteWarning: 'Esta acción no se puede deshacer. Se eliminará el presupuesto permanentemente.',
@@ -137,7 +137,7 @@ const translations = {
   auth: {
     login: 'Iniciar Sesión',
     username: 'Usuario',
-    password: 'Contrase��a',
+    password: 'Contraseña',
     loginSuccess: 'Sesión iniciada correctamente. ¡Bienvenido!',
     loginError: 'Credenciales inválidas. Por favor, inténtalo de nuevo.',
     register: 'Registrarse',
@@ -267,7 +267,7 @@ const translations = {
     allTime: 'Todo el tiempo',
     dateRange: 'Rango de Fechas',
     thisMonth: 'Este Mes',
-    last3 Months: 'Últimos 3 Meses',
+    last3Months: 'Últimos 3 Meses',
     clear: 'Limpiar filtros',
   },
   table: {
@@ -309,5 +309,7 @@ const t = (key: TranslationKey, ...args: any[]): string => {
   }
   return typeof current === 'string' ? current : key;
 };
-
+export const useTranslations = () => {
+  return useCallback((key: TranslationKey, ...args: any[]) => t(key, ...args), []);
+};
 export default t;

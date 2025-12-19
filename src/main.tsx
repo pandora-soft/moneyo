@@ -3,7 +3,7 @@ import { enableMapSet } from "immer";
 enableMapSet();
 import React, { StrictMode, useEffect, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css';
@@ -33,6 +33,7 @@ const GlobalTransactionSheet = () => {
   const isModalOpen = useAppStore(s => s.isModalOpen);
   const modalInitialValues = useAppStore(s => s.modalInitialValues);
   const closeModal = useAppStore(s => s.closeModal);
+  const triggerRefetch = useAppStore(s => s.triggerRefetch);
   const [accounts, setAccounts] = useState<Account[]>([]);
   useEffect(() => {
     if (isModalOpen) {
@@ -47,7 +48,7 @@ const GlobalTransactionSheet = () => {
       const url = values.id ? `/api/finance/transactions/${values.id}` : '/api/finance/transactions';
       await api(url, { method, body: JSON.stringify(values) });
       toast.success(values.id ? 'Transacción actualizada.' : 'Transacción creada.');
-      useAppStore.getState().triggerRefetch();
+      triggerRefetch();
       closeModal();
     } catch (e) {
       toast.error('Error al guardar la transacción.');
@@ -80,7 +81,6 @@ const GlobalTransactionSheet = () => {
 };
 const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const checkAuth = useCallback(async () => {
     const authStatus = await verifyAuth();
@@ -107,7 +107,8 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 const RoleGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const t = useTranslations();
-  const userRole = useAppStore(s => s.settings.user?.role);
+  const userSettings = useAppStore(s => s.settings);
+  const userRole = userSettings?.user?.role;
   useEffect(() => {
     if (userRole && userRole !== 'admin') {
       toast.error(t('access.adminOnly'));
@@ -121,7 +122,8 @@ export const AppRoot = () => {
   const navigate = useNavigate();
   const t = useTranslations();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const userRole = useAppStore(s => s.settings.user?.role);
+  const userSettings = useAppStore(s => s.settings);
+  const userRole = userSettings?.user?.role;
   const navItems = [
     { href: '/', label: t('pages.dashboard'), icon: Home, adminOnly: true },
     { href: '/accounts', label: t('pages.accounts'), icon: Wallet, adminOnly: true },
@@ -239,7 +241,7 @@ export const AppRoot = () => {
       <Toaster richColors position="top-right" />
       <footer className="border-t">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-          Built with ❤��� at Cloudflare for Moneyo
+          Built with ❤️ at Cloudflare for Moneyo
         </div>
       </footer>
     </div>
@@ -281,6 +283,4 @@ if (rootElement) {
       </StrictMode>
     );
   }
-} else {
-    console.warn("Root element with id 'root' not found in the document. App could not be mounted.");
 }

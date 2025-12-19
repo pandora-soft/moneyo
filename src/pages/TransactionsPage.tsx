@@ -83,13 +83,11 @@ export function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>({ query: '', accountId: 'all', type: 'all', dateRange: undefined });
+  const [filters, setFilters] = useState<Filters>({ query: '', accountId: 'all', type: 'all', dateRange: undefined, preset: 'all' });
   const [isImportSheetOpen, setImportSheetOpen] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importPreview, setImportPreview] = useState<any[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isRecurrentView, setIsRecurrentView] = useState(false);
   const [attachmentModal, setAttachmentModal] = useState<{ open: boolean; url: string | null }>({ open: false, url: null });
   const [pagination, setPagination] = useState({
@@ -103,6 +101,7 @@ export function TransactionsPage() {
   const formatCurrency = useFormatCurrency();
   const openModal = useAppStore(s => s.openModal);
   const refetchData = useAppStore(s => s.refetchData);
+  const triggerRefetch = useAppStore(s => s.triggerRefetch);
   const accountsById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
   const fetchData = useCallback(async (newCursor = 0, newRowsPerPage?: number) => {
     setLoading(true);
@@ -152,27 +151,49 @@ export function TransactionsPage() {
     const { id, ...copy } = tx;
     openModal({ ...copy, ts: Date.now(), recurrent: false, frequency: undefined, parentId: undefined });
   }, [openModal]);
+  const handleGenerateRecurrents = async () => {
+    setIsGenerating(true);
+    try {
+      const res = await api<{ generated: number }>('/api/finance/transactions/generate', { method: 'POST' });
+      toast.success(`Se han generado ${res.generated} transacciones recurrentes.`);
+      triggerRefetch();
+    } catch (e) {
+      toast.error('Error al generar transacciones recurrentes.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  const handleExportCSV = () => {
+    if (filteredTransactions.length === 0) return;
+    const headers = "Fecha,Cuenta,Tipo,Monto,Moneda,Categoría,Nota,Recurrente\n";
+    const csvContent = filteredTransactions.map(tx => {
+      const acc = accountsById.get(tx.accountId);
+      return `${format(new Date(tx.ts), 'yyyy-MM-dd')},${acc?.name || 'N/A'},${tx.type},${tx.amount},${tx.currency},"${tx.category}","${tx.note || ''}",${tx.recurrent || false}`;
+    }).join("\n");
+    const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `moneyo-transacciones-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   const handleRowsPerPageChange = useCallback((value: string) => {
-    const newRows = value === 'all' ? 10000 : parseInt(value, 10);
+    const newRows = parseInt(value, 10);
     setPagination(p => ({ ...p, rowsPerPage: newRows, cursor: 0, history: [0] }));
     fetchData(0, newRows);
   }, [fetchData]);
   const handleNextPage = useCallback(() => {
-    setPagination(p => {
-      const nextCursor = p.cursor + p.rowsPerPage;
-      return { ...p, history: [...p.history, nextCursor] };
-    });
-  }, []);
+    const nextCursor = pagination.cursor + pagination.rowsPerPage;
+    setPagination(p => ({ ...p, history: [...p.history, nextCursor] }));
+    fetchData(nextCursor);
+  }, [pagination.cursor, pagination.rowsPerPage, fetchData]);
   const handlePrevPage = useCallback(() => {
-    setPagination(p => {
-      const newHistory = [...p.history];
-      newHistory.pop();
-      const prevCursor = newHistory[newHistory.length - 1] ?? 0;
-      return { ...p, history: newHistory };
-    });
     const newHistory = [...pagination.history];
     newHistory.pop();
     const prevCursor = newHistory[newHistory.length - 1] ?? 0;
+    setPagination(p => ({ ...p, history: newHistory }));
     fetchData(prevCursor);
   }, [pagination.history, fetchData]);
   const pageStart = pagination.cursor + 1;
@@ -182,19 +203,21 @@ export function TransactionsPage() {
       <div className="py-8 md:py-10 lg:py-12">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <div><h1 className="text-4xl font-display font-bold">{t('pages.transactions')}</h1><p className="text-muted-foreground mt-1">{t('transactions.history')}</p></div>
-          <div className="flex flex-wrap gap-2"><input type="file" ref={fileInputRef} onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            setImportFile(file);
-            const text = await file.text();
-            const lines = text.split('\n').slice(1).filter(l => l.trim());
-            setImportPreview(lines.map(line => {
-              const [date, accountName, type, amount, category, note] = line.split(',');
-              return { date, accountName, type, amount, category, note, isDateValid: isValid(new Date(date)) };
-            }));
-            setImportSheetOpen(true);
-            e.target.value = '';
-          }} accept=".csv" className="hidden" /><Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 size-4" /> {t('transactions.importCSV')}</Button><Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => openModal()}><PlusCircle className="mr-2 size-5" /> {t('common.addTransaction')}</Button></div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={handleExportCSV} disabled={loading || filteredTransactions.length === 0}>
+              <Download className="mr-2 size-4" /> {t('transactions.exportCSV')}
+            </Button>
+            <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating || loading}>
+              {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />} {t('common.generateAll')}
+            </Button>
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2 size-4" /> {t('transactions.importCSV')}
+            </Button>
+            <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => openModal()}>
+              <PlusCircle className="mr-2 size-5" /> {t('common.addTransaction')}
+            </Button>
+            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" />
+          </div>
         </header>
         <TransactionFilters filters={filters} setFilters={setFilters} accounts={accounts} />
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
