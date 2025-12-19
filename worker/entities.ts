@@ -32,6 +32,23 @@ export class UserEntity extends IndexedEntity<User> {
       };
       await UserEntity.create(env, adminUser);
     }
+
+    // Refresh users list after potential admin creation
+    const refreshedIdx = new Index<string>(env, this.indexName);
+    const refreshedIds = await refreshedIdx.list();
+    const refreshedUsers = await Promise.all(refreshedIds.map(id => new UserEntity(env, id).getState()));
+    const hasDavid = refreshedUsers.some(u => u.username.toLowerCase() === 'david');
+    if (!hasDavid) {
+      const davidPasswordHash = await hashPassword('david');
+      const davidUser: User = {
+        id: crypto.randomUUID(),
+        username: 'david',
+        passwordHash: davidPasswordHash,
+        role: 'user',
+        email: 'david@example.com'
+      };
+      await UserEntity.create(env, davidUser);
+    }
   }
 }
 export class AccountEntity extends IndexedEntity<Account> {
@@ -200,6 +217,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const mutations: Promise<any>[] = [];
     const idsToRemove = [id];
     const processTxDelete = (tx: Transaction) => {
+      // Skip balance updates for templates (recurrent=true)
       if (!tx.recurrent) {
         const amountToReverse = tx.type === 'income' ? -Math.abs(tx.amount) : Math.abs(tx.amount);
         mutations.push(new AccountEntity(this.env, tx.accountId).mutate(acc => ({ ...acc, balance: acc.balance + amountToReverse })));
@@ -213,10 +231,11 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
         processTxDelete(child);
       });
     }
-    mutations.push(this.mutate(s => ({
+    const ledgerMutation = this.mutate(s => ({
       ...s,
       transactions: s.transactions.filter(t => !idsToRemove.includes(t.id))
-    })));
+    }));
+    mutations.push(ledgerMutation);
     await Promise.all(mutations);
   }
 }

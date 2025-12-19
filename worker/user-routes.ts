@@ -335,6 +335,12 @@ export function userRoutes(app: AppHono) {
     const { items } = await CurrencyEntity.list(c.env);
     return ok(c, items.sort((a, b) => a.code.localeCompare(b.code)));
   });
+
+  // FREQUENCIES API
+  finance.get('/frequencies', async (c) => {
+    const { items } = await FrequencyEntity.list(c.env);
+    return ok(c, items);
+  });
   // SETTINGS API
   finance.get('/settings', async (c) => {
     const settings = await new SettingsEntity(c.env).getState();
