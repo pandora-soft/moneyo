@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/useAppStore';
-import { analyzeReceipt } from '@/lib/gemini-client';
+import { analyzeReceipt, isAiEnabled } from '@/lib/gemini-client';
 import { cn } from '@/lib/utils';
 import t from '@/lib/i18n';
 const containerVariants = {
@@ -29,6 +29,7 @@ export function IAPage() {
   const [firstShot, setFirstShot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showPlayOverlay, setShowPlayOverlay] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -44,6 +45,11 @@ export function IAPage() {
     }
     setShowPlayOverlay(false);
   }, []);
+
+  useEffect(() => {
+    isAiEnabled().then(setHasApiKey);
+  }, []);
+
   const startStream = useCallback(async () => {
     try {
       const constraints = {
@@ -65,14 +71,8 @@ export function IAPage() {
   }, []);
   const handleAnalysis = async (base64Image: string) => {
     setIsLoading(true);
-    const apiKey = localStorage.getItem('gemini_api_key');
-    if (!apiKey) {
-      toast.error('Configura tu clave API de Gemini en Ajustes.');
-      setIsLoading(false);
-      return;
-    }
     try {
-      const result = await analyzeReceipt(base64Image, apiKey);
+      const result = await analyzeReceipt(base64Image);
       openModal({
         type: 'expense',
         amount: result.amount || 0,
@@ -83,6 +83,7 @@ export function IAPage() {
       });
       toast.success('Recibo analizado con éxito.');
     } catch (error: any) {
+      console.error('AI Analysis error:', error);
       toast.error('Error al analizar la imagen.');
     } finally {
       setIsLoading(false);
@@ -151,6 +152,18 @@ export function IAPage() {
           <h1 className="mt-4 text-4xl font-display font-bold tracking-tight">IA Moneyo</h1>
           <p className="mt-4 text-lg text-muted-foreground">Digitaliza tus recibos al instante.</p>
         </header>
+
+        {hasApiKey === false && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-12">
+            <Card className="border-destructive/30 bg-destructive/5">
+              <CardContent className="pt-6 text-center">
+                <p className="text-destructive font-medium">No se ha detectado una Clave API de Gemini válida.</p>
+                <p className="text-sm text-muted-foreground mt-1">Configure una clave en los ajustes de la aplicación o consulte con su administrador.</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {isLoading ? (
           <div className="flex flex-col items-center justify-center space-y-4">
             <Loader2 className="h-12 w-12 animate-spin text-orange-500" />
@@ -170,11 +183,11 @@ export function IAPage() {
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileSelect(e.dataTransfer.files[0]); }}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => hasApiKey !== false && fileInputRef.current?.click()}
               >
                 <CardHeader>
                   <Upload className="h-8 w-8 text-orange-500" />
-                  <CardTitle>Subir Foto</CardTitle>
+                  <CardTitle className={cn(hasApiKey === false && "opacity-50")}>Subir Foto</CardTitle>
                   <CardDescription>Sube o arrastra el archivo aquí.</CardDescription>
                 </CardHeader>
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e.target.files?.[0] || null)} />
@@ -188,7 +201,7 @@ export function IAPage() {
                   <CardDescription>Captura el recibo ahora mismo.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" onClick={() => openCamera(false)} disabled={cameraLoading}>Abrir Cámara</Button>
+                  <Button className="w-full" onClick={() => openCamera(false)} disabled={cameraLoading || hasApiKey === false}>Abrir Cámara</Button>
                 </CardContent>
               </Card>
             </motion.div>
@@ -200,7 +213,7 @@ export function IAPage() {
                   <CardDescription>Para recibos largos o complejos.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" onClick={() => openCamera(true)} disabled={cameraLoading}>Iniciar Doble Captura</Button>
+                  <Button className="w-full" onClick={() => openCamera(true)} disabled={cameraLoading || hasApiKey === false}>Iniciar Doble Captura</Button>
                 </CardContent>
               </Card>
             </motion.div>

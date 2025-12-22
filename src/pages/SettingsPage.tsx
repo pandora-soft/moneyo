@@ -22,6 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CategoryForm } from '@/components/accounting/CategoryForm';
 import { CurrencyForm } from '@/components/accounting/CurrencyForm';
 import { FrequencyForm } from '@/components/accounting/FrequencyForm';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { UserForm } from '@/components/accounting/UserForm';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -217,6 +218,13 @@ export function SettingsPage() {
               <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.2 }} className="md:col-span-2">
                 <Card>
                   <CardHeader><CardTitle className="flex items-center gap-2"><BrainCircuit className="size-5 text-orange-500" /> AI & Gemini IA</CardTitle><CardDescription>Digitaliza tus recibos.</CardDescription></CardHeader>
+                  <div className="px-6 pb-2">
+                    <Alert className="bg-muted/50 border-none">
+                      <AlertDescription className="text-xs text-muted-foreground italic">
+                        Nota: Los valores definidos en el archivo del servidor <code className="font-mono">config/gemini.json</code> tienen prioridad sobre los ajustes manuales de esta página. Guardar cambios aquí solo actualizará su configuración local del navegador.
+                      </AlertDescription>
+                    </Alert>
+                  </div>
                   <CardContent className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-4">
                       <FormField control={form.control} name="geminiApiKey" render={({ field }) => (

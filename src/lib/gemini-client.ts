@@ -6,18 +6,47 @@ export interface ReceiptAnalysisResult {
   date: string;
   category: string;
 }
+interface ExternalGeminiConfig {
+  claveApi?: string;
+  modeloIa?: string;
+  instruccionesIa?: string;
+}
+const DEFAULT_MODEL = "gemini-2.5-flash-image";
+const CONFIG_URL = "/config/gemini.json";
+/**
+ * Resolves the configuration hierarchy for the Gemini AI.
+ * Priority: 1. External JSON file, 2. Local Browser Settings, 3. Hardcoded Defaults.
+ */
+async function resolveConfig(): Promise<{ apiKey: string; model: string; prompt: string }> {
+  let externalConfig: ExternalGeminiConfig = {};
+  try {
+    const response = await fetch(CONFIG_URL);
+    if (response.ok) {
+      externalConfig = await response.json();
+    }
+  } catch (error) {
+    console.warn("Could not fetch external Gemini config, falling back to local settings.");
+  }
+  // Hierarchical resolution
+  const apiKey = externalConfig.claveApi || localStorage.getItem('gemini_api_key') || '';
+  const model = externalConfig.modeloIa || localStorage.getItem('gemini_model') || DEFAULT_MODEL;
+  const prompt = externalConfig.instruccionesIa || localStorage.getItem('gemini_prompt') || '';
+  return { apiKey, model, prompt };
+}
 export const structuredPrompt = `
 Eres un experto en contabilidad. Analiza la imagen del recibo y extrae:
 1. merchant: Nombre del comercio.
 2. amount: Importe total (solo número).
 3. date: Fecha en formato YYYY-MM-DD.
 4. category: La mejor categoría que encaje del sistema.
-Responde solo con un JSON v��lido.
+Responde solo con un JSON válido.
 `;
-const DEFAULT_MODEL = "gemini-1.5-flash";
-export async function analyzeReceipt(imageBase64: string, apiKey: string): Promise<ReceiptAnalysisResult> {
-  const model = localStorage.getItem('gemini_model') || DEFAULT_MODEL;
-  const customPrompt = localStorage.getItem('gemini_prompt') || '';
+export async function analyzeReceipt(imageBase64: string, apiKeyOverride?: string): Promise<ReceiptAnalysisResult> {
+  const config = await resolveConfig();
+  const effectiveApiKey = apiKeyOverride || config.apiKey;
+  if (!effectiveApiKey) {
+    throw new Error("No API Key found for Gemini AI.");
+  }
   let categoriesStr = "Comida, Transporte, Alquiler, Salario, Otro";
   try {
     const cats = await api<{ id: string; name: string }[]>('/api/finance/categories');
@@ -25,9 +54,12 @@ export async function analyzeReceipt(imageBase64: string, apiKey: string): Promi
   } catch (e) {
     console.warn("Using fallback categories for AI prompt.");
   }
-  console.log(`Using AI Model: ${model}`);
-  console.log(`System Prompt: ${structuredPrompt} ${customPrompt} Categorías: ${categoriesStr}`);
-  // Mock implementation for demo/dev purposes
+  console.log(`Using AI Model: ${config.model}`);
+  console.log(`Resolved Prompt: ${structuredPrompt} ${config.prompt} Categorías: ${categoriesStr}`);
+  // This is a placeholder for actual Gemini API call logic using fetch
+  // In a real environment, you would use:
+  // const genAI = new GoogleGenerativeAI(effectiveApiKey);
+  // const model = genAI.getGenerativeModel({ model: config.model });
   await new Promise(resolve => setTimeout(resolve, 2000));
   return {
     merchant: 'Comercio Detectado',
@@ -41,7 +73,6 @@ export async function validateApiKey(key: string): Promise<boolean> {
     toast.error('Clave API no válida estructuralmente.');
     return false;
   }
-  // In a real app, you'd make a call to Google's listModels to verify the key
   return true;
 }
 export async function testPrompt(key: string, model: string, prompt: string): Promise<ReceiptAnalysisResult> {
@@ -53,4 +84,11 @@ export async function testPrompt(key: string, model: string, prompt: string): Pr
     date: '2025-01-01',
     category: 'Otro'
   };
+}
+/**
+ * Checks if a valid API key is available anywhere in the configuration chain.
+ */
+export async function isAiEnabled(): Promise<boolean> {
+  const config = await resolveConfig();
+  return !!config.apiKey;
 }
