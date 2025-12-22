@@ -25,7 +25,7 @@ export function useFormatCurrency() {
       // subscribing to currencyCode and currencies ensures re-renders on change
       return formatCurrency(value, overrideCurrencyCode || currencyCode);
     },
-    [currencyCode, currencies]
+    [currencyCode]
   );
   return format;
 }

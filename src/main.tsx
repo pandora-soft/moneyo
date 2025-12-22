@@ -123,7 +123,6 @@ export const AppRoot = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const userRole = useAppStore(s => s.settings?.user?.role);
   const navItems = [
-    { href: '/', label: t('pages.dashboard'), icon: Home, adminOnly: false },
     { href: '/accounts', label: t('pages.accounts'), icon: Wallet, adminOnly: true },
     { href: '/transactions', label: t('pages.transactions'), icon: List, adminOnly: false },
     { href: '/budgets', label: t('pages.budgets'), icon: PiggyBank, adminOnly: false },
