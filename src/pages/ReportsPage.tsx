@@ -201,6 +201,10 @@ export function ReportsPage() {
     return `${base}-completo.${extension}`;
   };
   const handleExport = async (type: 'csv' | 'pdf') => {
+    if (filteredTransactions.length === 0) {
+      toast.info('No hay datos disponibles para exportar.');
+      return;
+    }
     if (type === 'csv') {
       const headers = "Fecha,Cuenta ID,Tipo,Monto,Moneda,Categoría,Nota,Recurrente\n";
       const csvContent = filteredTransactions.map(tx => `${new Date(tx.ts).toISOString()},${tx.accountId},${tx.type},${tx.amount},${tx.currency},"${tx.category}","${tx.note || ''}",${tx.recurrent || false}`).join("\n");
@@ -217,7 +221,7 @@ export function ReportsPage() {
       try {
         const doc = new jsPDF({ unit: 'pt', format: 'a4' });
         doc.setFontSize(18);
-        doc.text('Reporte Financiero - Moneyo', 40, 40);
+        doc.text('Reporte Financiero Moneyo', 40, 40);
         doc.setFontSize(11);
         doc.text(`Generado el: ${format(new Date(), 'PPP', { locale: es })}`, 40, 60);
         doc.setFontSize(12);
@@ -239,10 +243,7 @@ export function ReportsPage() {
           formatCurrency(row.income),
           formatCurrency(row.expense),
         ]);
-        if (monthlyBody.length === 0) {
-          doc.text('No hay datos para este período.', 40, chartY, { maxWidth: 400 });
-          chartY += 40;
-        } else {
+        if (monthlyBody.length > 0) {
           autoTable(doc, {
             startY: chartY,
             head: [['Mes', t('finance.income'), t('finance.expense')]],
@@ -261,10 +262,7 @@ export function ReportsPage() {
           pieY += imgHeight + 10;
         }
         const categoryBody = categorySpending.slice(0, 10);
-        if (categoryBody.length === 0) {
-          doc.text('No hay datos para este período.', 40, pieY, { maxWidth: 400 });
-          pieY += 40;
-        } else {
+        if (categoryBody.length > 0) {
           autoTable(doc, {
             startY: pieY,
             head: [['Categoría', 'Gasto', 'Límite']],
@@ -274,10 +272,9 @@ export function ReportsPage() {
               row.limit > 0 ? formatCurrency(row.limit) : 'N/A',
             ]),
           });
-          pieY = (doc as any).lastAutoTable?.finalY ?? (pieY + 10);
         }
         doc.save(getExportFilename('pdf'));
-        toast.success('Reporte PDF generado.');
+        toast.success('Reporte PDF generado correctamente.');
       } catch (e) {
         console.error('PDF generation error:', e);
         toast.error('Error al generar el PDF.');

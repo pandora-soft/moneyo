@@ -53,7 +53,7 @@ export const useAppStore = create<AppState>()(
       triggerRefetch: () => set(state => ({ refetchData: state.refetchData + 1 })),
     }),
     {
-      name: 'casaconta-app-storage',
+      name: 'moneyo-app-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ currency: state.currency, settings: state.settings, currencies: state.currencies }),
     }

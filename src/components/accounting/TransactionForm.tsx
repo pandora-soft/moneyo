@@ -15,7 +15,6 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Account, Transaction } from '@shared/types';
 import { useEffect, useState } from 'react';
-import { useAppStore } from '@/stores/useAppStore';
 import { api } from '@/lib/api-client';
 import { Combobox } from '@/components/ui/combobox';
 import t from '@/lib/i18n';
@@ -67,6 +66,12 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   });
   const type = form.watch('type');
   const isRecurrent = form.watch('recurrent');
+  // Reactive cleanup logic for transfer-specific fields
+  useEffect(() => {
+    if (type !== 'transfer') {
+      form.setValue('accountToId', undefined);
+    }
+  }, [type, form]);
   const handleSubmit: SubmitHandler<TransactionFormValues> = async (values) => {
     const acc = accounts.find(a => a.id === values.accountId);
     const finalValues: Partial<Transaction> & { id?: string } = {
