@@ -1,9 +1,8 @@
 import '@/lib/errorReporter';
 import { enableMapSet } from "immer";
 import React, { StrictMode, useEffect, useState, useCallback } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, Root } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate } from "react-router-dom";
-import { useShallow } from 'zustand/react/shallow';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css';
@@ -17,7 +16,7 @@ import { IAPage } from '@/pages/IAPage';
 import LoginPage from '@/pages/LoginPage';
 import { Toaster } from '@/components/ui/sonner';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Home, Wallet, List, BarChart, Settings, PiggyBank, LogOut, Menu, Brain } from 'lucide-react';
+import { Wallet, List, BarChart, Settings, PiggyBank, LogOut, Menu, Brain } from 'lucide-react';
 import { useTranslations } from '@/lib/i18n';
 import { cn } from './lib/utils';
 import { useAppStore } from './stores/useAppStore';
@@ -29,9 +28,14 @@ import { toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Skeleton } from './components/ui/skeleton';
 enableMapSet();
+declare global {
+  interface Window {
+    __reactRoot?: Root;
+  }
+}
 const GlobalTransactionSheet = () => {
   const isModalOpen = useAppStore(s => s.isModalOpen);
-  const modalInitialValues = useAppStore(useShallow(s => s.modalInitialValues));
+  const modalInitialValues = useAppStore(s => s.modalInitialValues);
   const closeModal = useAppStore(s => s.closeModal);
   const triggerRefetch = useAppStore(s => s.triggerRefetch);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -234,7 +238,10 @@ const router = createBrowserRouter(
 );
 const rootElement = document.getElementById('root');
 if (rootElement) {
-  createRoot(rootElement).render(
+  if (!window.__reactRoot) {
+    window.__reactRoot = createRoot(rootElement);
+  }
+  window.__reactRoot.render(
     <StrictMode>
       <ErrorBoundary>
         <RouterProvider router={router} />

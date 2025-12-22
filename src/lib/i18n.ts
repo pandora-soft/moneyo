@@ -37,6 +37,7 @@ const translations = {
   },
   access: {
     adminOnly: 'Acceso restringido: Se requieren permisos de administrador.',
+    unauthorized: 'No tienes autorización para ver esta página.',
   },
   labels: {
     monthlySummary: 'Resumen Mensual',
@@ -49,6 +50,7 @@ const translations = {
     budgets: 'Presupuestos',
     reports: 'Reportes',
     settings: 'Ajustes',
+    ia: 'IA Moneyo',
   },
   dashboard: {
     summary: 'Resumen de tus finanzas.',
@@ -69,6 +71,8 @@ const translations = {
       openIA: 'Escanear con IA',
       addTransaction: 'Nueva Transacción',
       spendingVsBudget: (spent: string, total: string) => `${spent} de ${total} presupuestado`,
+      history: 'Últimos Movimientos',
+      description: 'Gestiona tus gastos personales de forma sencilla.',
     }
   },
   accounts: {
