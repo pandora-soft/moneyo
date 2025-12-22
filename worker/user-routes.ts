@@ -94,12 +94,13 @@ export function userRoutes(app: AppHono) {
   });
   finance.put('/users/:id', adminGuard, async (c) => {
     const id = c.req.param('id');
-    const body = await c.req.json<Partial<User> & { password?: string }>();
+    const { password, ...bodyUpdates } = await c.req.json<Partial<User> & { password?: string }>();
     const user = new UserEntity(c.env, id);
     if (!await user.exists()) return notFound(c);
-    const updates: Partial<User> = { ...body };
-    if (body.password) updates.passwordHash = await hashPassword(body.password);
-    delete updates.password;
+    const updates: Partial<User> = { ...bodyUpdates };
+    if (password) {
+      updates.passwordHash = await hashPassword(password);
+    }
     const updated = await user.mutate(u => ({ ...u, ...updates }));
     return ok(c, updated);
   });

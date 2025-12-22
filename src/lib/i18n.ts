@@ -3,6 +3,15 @@ const translations = {
   app: {
     name: 'Moneyo',
   },
+  auth: {
+    login: 'Iniciar Sesión',
+    logout: 'Cerrar Sesión',
+    username: 'Nombre de usuario',
+    password: 'Contraseña',
+    loginPrompt: 'Ingresa tus credenciales para continuar.',
+    loginSuccess: 'Sesión iniciada correctamente.',
+    loginError: 'Error al iniciar sesión. Revisa tus credenciales.',
+  },
   common: {
     add: 'Agregar',
     edit: 'Editar',
@@ -29,6 +38,10 @@ const translations = {
   access: {
     adminOnly: 'Acceso restringido: Se requieren permisos de administrador.',
   },
+  labels: {
+    monthlySummary: 'Resumen Mensual',
+    categorySpending: 'Gasto por Categoría',
+  },
   pages: {
     dashboard: 'Dashboard',
     accounts: 'Cuentas',
@@ -47,6 +60,8 @@ const translations = {
     accounts: 'Cuentas',
     view: 'Ver',
     emptyAccountsCTA: '¡Comienza a controlar tus finanzas hoy!',
+    inflow: 'Entradas de dinero',
+    outflow: 'Salidas de dinero',
   },
   accounts: {
     description: 'Administra tus cuentas de efectivo, banco y tarjetas.',
@@ -91,7 +106,7 @@ const translations = {
     month: 'Mes',
     progress: 'Progreso',
     save: 'Guardar Presupuesto',
-    spendingLimit: 'L��mite de Gasto',
+    spendingLimit: 'Límite de Gasto',
     overview: 'Resumen de Presupuestos',
     overviewDesc: 'Límites activos este mes.',
     viewAll: 'Ver todos',

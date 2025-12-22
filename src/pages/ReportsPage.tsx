@@ -16,7 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { useFormatCurrency } from '@/lib/formatCurrency';
 import { useAppStore } from '@/stores/useAppStore';
-import t from '@/lib/i18n';
+import { useTranslations } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
 import { getCategoryColor } from '@/hooks/useCategoryColor';
@@ -55,6 +55,7 @@ export function ReportsPage() {
   const [sortConfig, setSortConfig] = useState<{ key: 'category' | 'month'; direction: 'asc' | 'desc' }>({ key: 'month', direction: 'desc' });
   const [filters, setFilters] = useState<Filters>({ query: '', accountId: 'all', type: 'all', dateRange: undefined, preset: 'all' });
   const formatCurrency = useFormatCurrency();
+  const t = useTranslations();
   const barChartRef = useRef<HTMLDivElement | null>(null);
   const pieChartRef = useRef<HTMLDivElement | null>(null);
   const refetchTrigger = useAppStore(s => s.refetchData);
@@ -67,10 +68,10 @@ export function ReportsPage() {
       if (!cloned.getAttribute('xmlns')) cloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
       const rect = svgEl.getBoundingClientRect();
       if (!cloned.getAttribute('viewBox')) {
-        cloned.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+        cloned.setAttribute('viewBox', `0 0 ${rect.width || defaultWidth} ${rect.height || defaultHeight}`);
       }
-      cloned.setAttribute('width', `${rect.width}`);
-      cloned.setAttribute('height', `${rect.height}`);
+      cloned.setAttribute('width', `${rect.width || defaultWidth}`);
+      cloned.setAttribute('height', `${rect.height || defaultHeight}`);
       const inlineComputedStyles = (original: Element, clone: Element) => {
         const computed = getComputedStyle(original);
         let styleStr = '';
@@ -181,8 +182,8 @@ export function ReportsPage() {
     computedBudgets.sort((a, b) => {
       const key = sortConfig.key;
       const direction = sortConfig.direction === 'asc' ? 1 : -1;
-      if (a[key] < b[key]) return -1 * direction;
-      if (a[key] > b[key]) return 1 * direction;
+      if (a[key]! < b[key]!) return -1 * direction;
+      if (a[key]! > b[key]!) return 1 * direction;
       return 0;
     });
     return { monthlySummary: monthlyChartData, categorySpending: categoryChartData, budgetsWithActuals: computedBudgets };
@@ -242,8 +243,6 @@ export function ReportsPage() {
           doc.text('No hay datos para este período.', 40, chartY, { maxWidth: 400 });
           chartY += 40;
         } else {
-          doc.setFont('helvetica');
-          doc.setFontSize(11);
           autoTable(doc, {
             startY: chartY,
             head: [['Mes', t('finance.income'), t('finance.expense')]],
@@ -266,8 +265,6 @@ export function ReportsPage() {
           doc.text('No hay datos para este período.', 40, pieY, { maxWidth: 400 });
           pieY += 40;
         } else {
-          doc.setFont('helvetica');
-          doc.setFontSize(11);
           autoTable(doc, {
             startY: pieY,
             head: [['Categoría', 'Gasto', 'Límite']],
@@ -276,47 +273,8 @@ export function ReportsPage() {
               formatCurrency(row.value),
               row.limit > 0 ? formatCurrency(row.limit) : 'N/A',
             ]),
-            didParseCell: (data: any) => {
-              if (data.section === 'body') {
-                const item = categoryBody[data.row.index];
-                if (item && item.limit > 0 && item.computedActual > item.limit) {
-                  data.cell.styles.textColor = [255, 0, 0];
-                }
-              }
-            },
           });
           pieY = (doc as any).lastAutoTable?.finalY ?? (pieY + 10);
-        }
-        doc.addPage();
-        doc.setFontSize(16);
-        doc.text('Resumen de Presupuestos', 40, 40);
-        let budgetsY = 70;
-        doc.setFont('helvetica');
-        doc.setFontSize(11);
-        const budgetsBody = budgetsWithActuals.slice(0, 10).map(b => [
-          b.category,
-          format(new Date(b.month), 'MMM yyyy', { locale: es }),
-          formatCurrency(b.computedActual),
-          formatCurrency(b.limit),
-        ]);
-        if (budgetsBody.length === 0) {
-          doc.text('No hay datos para este período.', 40, budgetsY, { maxWidth: 400 });
-          budgetsY += 40;
-        } else {
-          autoTable(doc, {
-            startY: budgetsY,
-            head: [['Categoría', 'Mes', 'Actual', 'Límite']],
-            body: budgetsBody,
-            didParseCell: (data: any) => {
-              if (data.section === 'body') {
-                const budget = budgetsWithActuals[data.row.index];
-                if (budget && budget.computedActual > budget.limit) {
-                  data.cell.styles.textColor = [255, 0, 0];
-                }
-              }
-            },
-          });
-          budgetsY = (doc as any).lastAutoTable?.finalY ?? (budgetsY + 120);
         }
         doc.save(getExportFilename('pdf'));
         toast.success('Reporte PDF generado.');
@@ -327,18 +285,6 @@ export function ReportsPage() {
         setGeneratingPDF(false);
       }
     }
-  };
-  const exportBudgets = () => {
-    const headers = "Mes,Categoría,Límite,Gasto Real\n";
-    const csvContent = budgetsWithActuals.map(b => `${format(new Date(b.month), 'yyyy-MM')},"${b.category}",${b.limit},${b.computedActual}`).join("\n");
-    const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `moneyo-presupuestos-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -393,7 +339,7 @@ export function ReportsPage() {
                             return <Cell key={`cell-${index}`} fill={tailwindColorToHex[colorKey] || '#6b7280'} />;
                           })}
                         </Pie>
-                        <Tooltip formatter={(value: number, name, props) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.computedActual)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
+                        <Tooltip formatter={(value: number, name, props: any) => [formatCurrency(value), `${name} ${props.payload.limit > 0 ? `(${t('budget.actual')}: ${formatCurrency(props.payload.computedActual)} / ${t('budget.limit')}: ${formatCurrency(props.payload.limit)})` : ''}`]} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -409,8 +355,10 @@ export function ReportsPage() {
                     <CardTitle>{t('budget.overview')}</CardTitle>
                     <CardDescription>{t('budget.overviewDesc')}</CardDescription>
                   </div>
-                  <Button variant="outline" onClick={exportBudgets} disabled={budgetsWithActuals.length === 0}>
-                    <Download className="mr-2 size-4" /> {t('common.exportBudgets')}
+                  <Button variant="outline" asChild>
+                    <Link to="/budgets">
+                      {t('budget.viewAll')}
+                    </Link>
                   </Button>
                 </div>
               </CardHeader>
@@ -422,12 +370,9 @@ export function ReportsPage() {
                     <div className="w-1/2">{t('budget.progress')}</div>
                   </div>
                   {budgetsWithActuals.slice(0, 5).map(b => (
-                    <BudgetRow key={b.id} budget={b} />
+                    <BudgetRow key={b.id} budget={b as any} />
                   ))}
                   {budgetsWithActuals.length === 0 && !loading && <p className="text-center text-muted-foreground py-4">No hay presupuestos para mostrar.</p>}
-                  <Button asChild variant="link" className="mt-4 w-full p-0 h-auto">
-                    <Link to="/budgets">{t('budget.viewAll')}</Link>
-                  </Button>
                 </div>
               </CardContent>
             </Card>
