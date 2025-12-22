@@ -24,21 +24,19 @@ const itemVariants = {
 export function IAPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCameraOpen, setCameraOpen] = useState(false);
-const [cameraLoading, setCameraLoading] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
   const [isMultiShot, setIsMultiShot] = useState(false);
   const [firstShot, setFirstShot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showPlayOverlay, setShowPlayOverlay] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-
-const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const openModal = useAppStore((s) => s.openModal);
   const stopCamera = useCallback(() => {
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.srcObject = null;
-      videoRef.current.load();
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -46,133 +44,46 @@ const fileInputRef = useRef<HTMLInputElement>(null);
     }
     setShowPlayOverlay(false);
   }, []);
-
-  // New effect: bind the stream to the video element and handle autoplay
-  useEffect(() => {
-    if (isCameraOpen && streamRef.current && videoRef.current && !(videoRef.current.srcObject)) {
-      const video = videoRef.current;
-      video.srcObject = streamRef.current;
-      video.muted = true;
-      video.playsInline = true;
-      // Trigger loading of the new stream
-      video.load();
-      // Attempt to play once metadata is ready
-      const handleLoadedMetadata = () => {
-        console.log(
-          `Video metadata loaded: ${video.videoWidth}x${video.videoHeight}, readyState: ${video.readyState}`
-        );
-        video.play().catch(() => {
-          // Autoplay failed – overlay visibility will be managed by the new effect
-        });
-      };
-      video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
-      // Cleanup listener on effect cleanup
-      return () => {
-        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      };
-    }
-    // No cleanup needed when condition is false
-    return undefined;
-  }, [isCameraOpen]);
-
-// New effect: dynamically control overlay visibility based on video readiness
-useEffect(() => {
-    let rafId: number;
-    const updateOverlay = () => {
-      if (isCameraOpen && videoRef.current) {
-        const video = videoRef.current;
-        setShowPlayOverlay(video.readyState < 2 || video.paused);
-        rafId = requestAnimationFrame(updateOverlay);
-      } else {
-        setShowPlayOverlay(false);
-      }
-    };
-
-    if (isCameraOpen && videoRef.current) {
-      updateOverlay();
-    } else {
-      setShowPlayOverlay(false);
-    }
-
-    return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-  }, [isCameraOpen]);
   const startStream = useCallback(async () => {
     try {
-      let stream: MediaStream | null = null;
-      const commonConstraints = {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        aspectRatio: 1.777,
-      };
-      // 1. Try rear camera
-      try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { ...commonConstraints, facingMode: 'environment' },
-          });
-      } catch (e) {
-        console.warn('Rear camera failed, trying front camera.', e);
-        // 2. Try front camera
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { ...commonConstraints, facingMode: 'user' },
-          });
-        } catch (e2) {
-          console.warn('Front camera failed, trying any camera.', e2);
-          // 3. Try any camera as a last resort
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { ...commonConstraints } });
-          } catch (e3) {
-            console.error('All camera attempts failed.', e3);
-            toast.error('No se pudo acceder a ninguna cámara.');
-            return;
-          }
+      const constraints = {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: { ideal: 'environment' }
         }
-      }
-      if (!stream) {
-        toast.error('No se pudo inicializar la cámara.');
-        return;
-      }
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-      const track = stream.getVideoTracks()[0];
-      const trackLabel = track.label || 'Cámara Desconocida';
-      console.log('Stream success:', trackLabel);
-      toast.success(
-        /back|rear|environment/i.test(trackLabel)
-          ? 'Cámara trasera activada'
-          : 'Cámara frontal activada',
-        { description: trackLabel }
-      );
-
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
     } catch (error) {
-      console.error('Error general en startStream:', error, navigator.userAgent);
-      toast.error('Error al inicializar la cámara.');
+      console.error('Camera error:', error);
+      toast.error('No se pudo acceder a la cámara.');
     }
   }, []);
-
   const handleAnalysis = async (base64Image: string) => {
     setIsLoading(true);
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
-      toast.error('Clave API de Gemini no encontrada.', { description: 'Por favor, configúrala en la página de Ajustes.' });
+      toast.error('Configura tu clave API de Gemini en Ajustes.');
       setIsLoading(false);
       return;
     }
     try {
       const result = await analyzeReceipt(base64Image, apiKey);
-      const transactionData = {
-        type: 'expense' as const,
+      openModal({
+        type: 'expense',
         amount: result.amount || 0,
         category: result.category || 'Otro',
         note: result.merchant || 'Recibo analizado',
         ts: result.date ? new Date(result.date).getTime() : Date.now(),
         attachmentDataUrl: base64Image,
-      };
-      openModal(transactionData);
-      toast.success('Recibo analizado con éxito.', { description: 'Revisa y guarda la nueva transacción.' });
+      });
+      toast.success('Recibo analizado con éxito.');
     } catch (error: any) {
-      toast.error('Error al analizar la imagen.', { description: error.message || 'Inténtalo de nuevo.' });
+      toast.error('Error al analizar la imagen.');
     } finally {
       setIsLoading(false);
     }
@@ -180,62 +91,45 @@ useEffect(() => {
   const handleFileSelect = (file: File | null) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => {
-      handleAnalysis(reader.result as string);
-    };
+    reader.onloadend = () => handleAnalysis(reader.result as string);
     reader.readAsDataURL(file);
-    // Reset the input so the same file can be selected again
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
   const openCamera = async (multiShot = false) => {
-    console.log('openCamera called', multiShot);
     setCameraLoading(true);
     setIsMultiShot(multiShot);
     setFirstShot(null);
-    await startStream(); // start the stream first
-
-    if (!streamRef.current) {
-      // Camera could not be started; abort opening the sheet
-      setCameraLoading(false);
-      return;
-    }
-
-    setCameraOpen(true); // then open the sheet
-    setCameraLoading(false); // finally clear loading state
+    setCameraOpen(true);
+    await startStream();
+    setCameraLoading(false);
   };
   const takePicture = () => {
-    if (showPlayOverlay || !videoRef.current || videoRef.current.readyState < 2) {
-      toast.warning('La vista previa no está lista. Toca el botón Play primero.');
-      return;
-    }
+    if (!videoRef.current || videoRef.current.readyState < 2) return;
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg');
+    ctx.drawImage(videoRef.current, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     if (isMultiShot && !firstShot) {
       setFirstShot(dataUrl);
-      toast.info('Primera parte capturada.', { description: 'Ahora captura la segunda parte del recibo.' });
+      toast.info('Primera parte capturada. Ahora captura la segunda.');
     } else if (isMultiShot && firstShot) {
       combineAndAnalyze(firstShot, dataUrl);
-      stopCamera();
       setCameraOpen(false);
+      stopCamera();
     } else {
       handleAnalysis(dataUrl);
-      stopCamera();
       setCameraOpen(false);
+      stopCamera();
     }
   };
   const combineAndAnalyze = (base64A: string, base64B: string) => {
     const imgA = new Image();
+    const imgB = new Image();
     imgA.src = base64A;
     imgA.onload = () => {
-      const imgB = new Image();
       imgB.src = base64B;
       imgB.onload = () => {
         const canvas = document.createElement('canvas');
@@ -245,7 +139,7 @@ useEffect(() => {
         if (!ctx) return;
         ctx.drawImage(imgA, 0, 0);
         ctx.drawImage(imgB, 0, imgA.height);
-        handleAnalysis(canvas.toDataURL('image/jpeg'));
+        handleAnalysis(canvas.toDataURL('image/jpeg', 0.85));
       };
     };
   };
@@ -254,17 +148,13 @@ useEffect(() => {
       <div className="py-8 md:py-10 lg:py-12">
         <header className="text-center mb-12">
           <BrainCircuit className="mx-auto h-16 w-16 text-orange-500" />
-          <h1 className="mt-4 text-4xl font-display font-bold tracking-tight sm:text-5xl">
-            Analizar Recibo con IA
-          </h1>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Sube o toma una foto de tu recibo y deja que la IA extraiga los datos por ti.
-          </p>
+          <h1 className="mt-4 text-4xl font-display font-bold tracking-tight">IA Moneyo</h1>
+          <p className="mt-4 text-lg text-muted-foreground">Digitaliza tus recibos al instante.</p>
         </header>
         {isLoading ? (
           <div className="flex flex-col items-center justify-center space-y-4">
             <Loader2 className="h-12 w-12 animate-spin text-orange-500" />
-            <p className="text-muted-foreground">Analizando imagen... esto puede tardar un momento.</p>
+            <p className="text-muted-foreground">Analizando con Gemini...</p>
             <Skeleton className="h-64 w-full max-w-md" />
           </div>
         ) : (
@@ -275,67 +165,30 @@ useEffect(() => {
             animate="visible"
           >
             <motion.div variants={itemVariants}>
-              <Card
-                className={cn(
-                  "h-full transition-all duration-300",
-                  isDragging && "border-primary ring-2 ring-primary"
-                )}
+              <Card 
+                className={cn("h-full cursor-pointer transition-all", isDragging && "border-orange-500 ring-2 ring-orange-500")}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                  handleFileSelect(e.dataTransfer.files[0] ?? null);
-                }}
+                onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileSelect(e.dataTransfer.files[0]); }}
+                onClick={() => fileInputRef.current?.click()}
               >
                 <CardHeader>
                   <Upload className="h-8 w-8 text-orange-500" />
-                  <CardTitle>Mandar Foto</CardTitle>
-                  <CardDescription>Sube una imagen de tu recibo desde tu dispositivo.</CardDescription>
+                  <CardTitle>Subir Foto</CardTitle>
+                  <CardDescription>Sube o arrastra el archivo aquí.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                <div className="w-full block cursor-pointer">
-                  <Button
-                    type="button"
-                    className="w-full"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      fileInputRef.current?.click();
-                    }}
-                  >
-                    Seleccionar Archivo
-                  </Button>
-                </div>
-                <input
-                  type="file"
-                  id="receipt-upload"
-                  ref={fileInputRef}
-                  className="hidden"
-                  accept="image/*"
-                  onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
-                />
-                </CardContent>
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e.target.files?.[0] || null)} />
               </Card>
             </motion.div>
             <motion.div variants={itemVariants}>
               <Card className="h-full">
                 <CardHeader>
                   <Camera className="h-8 w-8 text-orange-500" />
-                  <CardTitle>Tomar Foto</CardTitle>
-                  <CardDescription>Usa la cámara de tu dispositivo para capturar el recibo.</CardDescription>
+                  <CardTitle>Cámara</CardTitle>
+                  <CardDescription>Captura el recibo ahora mismo.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button
-                    type="button"
-                    className="w-full"
-                    disabled={cameraLoading || isCameraOpen || isLoading}
-                    onClick={async (e) => {
-                      e.preventDefault();
-                      await openCamera(false);
-                    }}
-                  >
-                    Abrir Cámara
-                  </Button>
+                  <Button className="w-full" onClick={() => openCamera(false)} disabled={cameraLoading}>Abrir Cámara</Button>
                 </CardContent>
               </Card>
             </motion.div>
@@ -343,88 +196,41 @@ useEffect(() => {
               <Card className="h-full">
                 <CardHeader>
                   <Layers className="h-8 w-8 text-orange-500" />
-                  <CardTitle>Tomar por Partes</CardTitle>
-                  <CardDescription>Captura recibos largos en dos fotos separadas.</CardDescription>
+                  <CardTitle>Multicaptura</CardTitle>
+                  <CardDescription>Para recibos largos o complejos.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button
-                    type="button"
-                    className="w-full"
-                    disabled={cameraLoading || isCameraOpen || isLoading}
-                    onClick={async (e) => {
-                      e.preventDefault();
-                      await openCamera(true);
-                    }}
-                  >
-                    Iniciar Captura Doble
-                  </Button>
+                  <Button className="w-full" onClick={() => openCamera(true)} disabled={cameraLoading}>Iniciar Doble Captura</Button>
                 </CardContent>
               </Card>
             </motion.div>
           </motion.div>
         )}
       </div>
-      <Sheet
-        open={isCameraOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setCameraLoading(false);
-            stopCamera();
-            setCameraOpen(false);
-          }
-        }}
-      >
-        <SheetContent
-          className="fixed inset-0 z-[9999] w-screen h-screen p-0 flex flex-col sm:relative sm:inset-auto sm:w-[400px] sm:h-[90vh] sm:max-w-md sm:rounded-lg sm:shadow-2xl"
-          aria-describedby="camera-sheet-desc"
-        >
-          <SheetHeader className="p-4 border-b flex-shrink-0">
-            <SheetTitle>{isMultiShot ? (firstShot ? 'Captura la 2ª Parte' : 'Captura la 1ª Parte') : 'Capturar Recibo'}</SheetTitle>
-            <SheetDescription id="camera-sheet-desc">Apunta al recibo y asegúrate de que sea legible.</SheetDescription>
+      <Sheet open={isCameraOpen} onOpenChange={(open) => { if (!open) { stopCamera(); setCameraOpen(false); } }}>
+        <SheetContent side="bottom" className="h-[90vh] p-0 overflow-hidden flex flex-col">
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle>{isMultiShot ? 'Captura por partes' : 'Capturar Recibo'}</SheetTitle>
           </SheetHeader>
-          <div className="relative flex-grow bg-black min-h-0 overflow-hidden">
-            <video
-  ref={videoRef}
-  playsInline
-  muted
-  className="absolute inset-0 w-full h-full object-cover z-0 bg-black"
-/>
-            {firstShot && isMultiShot && (
-              <img
-  src={firstShot}
-  alt="Primera captura"
-  className="absolute top-4 left-4 w-24 h-auto border-2 border-white rounded-md opacity-80 z-[5]"
-/>
-            )}
+          <div className="flex-1 relative bg-black flex items-center justify-center">
+            <video 
+              ref={videoRef} 
+              autoPlay 
+              playsInline 
+              muted 
+              onPlay={() => setShowPlayOverlay(false)}
+              onWaiting={() => setCameraLoading(true)}
+              onPlaying={() => setCameraLoading(false)}
+              className="max-h-full max-w-full object-contain"
+            />
             {showPlayOverlay && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10"
-              >
-<Button
-  onClick={() => {
-    if (videoRef.current) {
-      videoRef.current
-        .play()
-        .catch((e) =>
-          toast.error(
-            'No se pudo reproducir la vista previa: ' +
-              ((e as Error)?.message ?? 'Error desconocido')
-          )
-        );
-    }
-  }}
-  className="w-28 h-28 p-0 rounded-full bg-white hover:bg-white/90 text-black font-bold shadow-2xl hover:scale-110 transition-transform"
->
-  Play
-</Button>
-              </motion.div>
+              <Button variant="secondary" onClick={() => videoRef.current?.play()}>Play Vista Previa</Button>
             )}
+            {firstShot && <img src={firstShot} className="absolute top-4 left-4 w-20 border-2 border-white rounded shadow-lg opacity-80" />}
           </div>
-          <div className="p-4 border-t flex-shrink-0 flex justify-center">
-            <Button size="lg" className="rounded-full w-20 h-20" onClick={takePicture}>
-              <Camera className="h-8 w-8" />
+          <div className="p-8 flex justify-center border-t bg-background">
+            <Button size="lg" className="rounded-full w-20 h-20 shadow-xl" onClick={takePicture}>
+              <Camera className="h-10 w-10" />
             </Button>
           </div>
         </SheetContent>

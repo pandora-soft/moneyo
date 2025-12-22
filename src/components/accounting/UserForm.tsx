@@ -13,12 +13,6 @@ const userSchema = z.object({
   password: z.string().optional(),
   role: z.enum(['user', 'admin']),
   email: z.string().email(t('form.email')).optional().or(z.literal('')),
-}).superRefine((data, ctx) => {
-  // If not editing, password is required
-  if (!ctx.path.includes('isEditingFlag') && !data.password) {
-    // Note: superRefine doesn't have easy access to external props like 'isEditing'
-    // but we can handle this logic in the schema or during submission.
-  }
 });
 type UserFormValues = z.infer<typeof userSchema>;
 interface UserFormProps {
@@ -38,6 +32,7 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
   });
   const { isSubmitting } = form.formState;
   const handleSubmit: SubmitHandler<UserFormValues> = async (values) => {
+    // Manual validation logic based on editing state
     if (!isEditing && (!values.password || values.password.length < 5)) {
       form.setError('password', { message: t('form.minChars', 5) });
       return;
@@ -82,8 +77,8 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
                 <Input type="password" placeholder="••••••••" {...field} />
               </FormControl>
               <FormDescription>
-                {isEditing 
-                  ? "Deja en blanco para mantener la contraseña actual (mín. 5 caracteres)." 
+                {isEditing
+                  ? "Deja en blanco para mantener la contraseña actual (mín. 5 caracteres)."
                   : "Mínimo 5 caracteres."}
               </FormDescription>
               <FormMessage />

@@ -21,38 +21,33 @@ import { Combobox } from '@/components/ui/combobox';
 import t from '@/lib/i18n';
 import { toast } from 'sonner';
 type Frequency = { id: string; name: string; interval: number; unit: 'days' | 'weeks' | 'months' };
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const formSchema = z.object({
   id: z.string().optional(),
   accountId: z.string().min(1, t('form.requiredAccount')),
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
-  amount: z.number().min(0, t('form.positive')), // Adjusted to allow 0 for edge cases
-  category: z.string().min(2, t('form.requiredCategory')).max(50),
+  amount: z.coerce.number().min(0.01, t('form.positive')),
+  category: z.string().min(2, t('form.requiredCategory')),
   ts: z.date(),
-  note: z.string().max(100).optional(),
+  note: z.string().max(200).optional(),
   recurrent: z.boolean().optional(),
   frequency: z.string().optional(),
   attachmentDataUrl: z.string().optional().or(z.literal('')),
 }).refine((data) => {
   if (data.type === 'transfer') return !!data.accountToId && data.accountToId !== data.accountId;
   return true;
-}, { message: t('form.transferAccountError'), path: ["accountToId"] })
-.refine((data) => {
-    if (data.recurrent) return !!data.frequency && data.frequency.length > 0;
-    return true;
-}, { message: t('form.recurrentFreqError'), path: ["frequency"] });
+}, { message: t('form.transferAccountError'), path: ["accountToId"] });
 type TransactionFormValues = z.infer<typeof formSchema>;
-export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues }: { 
-  accounts: Account[]; 
-  onSubmit: (values: Partial<Transaction> & { id?: string }) => Promise<void>; 
-  onFinished: () => void; 
+export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues }: {
+  accounts: Account[];
+  onSubmit: (values: Partial<Transaction> & { id?: string }) => Promise<void>;
+  onFinished: () => void;
   defaultValues?: Partial<TransactionFormValues>;
 }) {
   const refetchData = useAppStore(s => s.refetchData);
   const [categories, setCategories] = useState<{ value: string; label: string }[]>([]);
   const [frequencies, setFrequencies] = useState<Frequency[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
   useEffect(() => {
     api<{ id: string; name: string }[]>('/api/finance/categories')
       .then(cats => setCategories(cats.map(c => ({ value: c.name, label: c.name }))))
@@ -63,38 +58,17 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   }, [refetchData]);
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(formSchema),
-    mode: 'onChange',
     defaultValues: {
       amount: 0,
       type: 'expense',
-      accountId: '',
-      accountToId: '',
-      category: '',
       ts: new Date(),
-      note: '',
-      recurrent: false,
-      frequency: '',
-      attachmentDataUrl: '',
       ...defaultValues,
     }
   });
-  const transactionType = form.watch('type');
-  const isRecurrent = form.watch('recurrent');
-  const handleFileChange = useCallback((file: File | null, onValueChange: (url: string) => void) => {
-    if (!file) return;
-    if (file.size > MAX_FILE_SIZE) {
-      toast.error('El archivo es demasiado grande (máx 5MB).');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onloadend = () => onValueChange(reader.result as string);
-    reader.readAsDataURL(file);
-  }, []);
   const handleSubmit: SubmitHandler<TransactionFormValues> = async (values) => {
     const acc = accounts.find(a => a.id === values.accountId);
     const finalValues: Partial<Transaction> & { id?: string } = {
       ...values,
-      amount: Number(values.amount),
       ts: values.ts.getTime(),
       accountTo: values.accountToId,
       currency: acc?.currency || 'EUR',
@@ -102,44 +76,59 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
     await onSubmit(finalValues);
     onFinished();
   };
+  const handleFile = (file: File | null, callback: (url: string) => void) => {
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE) return toast.error('Archivo demasiado grande.');
+    const reader = new FileReader();
+    reader.onloadend = () => callback(reader.result as string);
+    reader.readAsDataURL(file);
+  };
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6">
-        <FormField control={form.control} name="type" render={({ field }) => ( <FormItem><FormLabel>{t('form.transaction.type')}</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="expense">{t('finance.expense')}</SelectItem><SelectItem value="income">{t('finance.income')}</SelectItem><SelectItem value="transfer">{t('finance.transfer')}</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
-        <FormField control={form.control} name="accountId" render={({ field }) => ( <FormItem><FormLabel>{t('form.transaction.account')}</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl><SelectContent>{accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-        {transactionType === 'transfer' && ( <FormField control={form.control} name="accountToId" render={({ field }) => ( <FormItem><FormLabel>{t('form.transaction.destinationAccount')}</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="Seleccione una cuenta" /></SelectTrigger></FormControl><SelectContent>{accounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} /> )}
-        <FormField control={form.control} name="amount" render={({ field }) => ( <FormItem><FormLabel>{t('form.transaction.amount')}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )} />
-        <FormField control={form.control} name="category" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>{t('form.transaction.category')}</FormLabel><Combobox options={categories} value={field.value} onChange={field.onChange} placeholder="Seleccione categoría..." disabled={transactionType === 'transfer'} /><FormMessage /></FormItem> )} />
-        <FormField control={form.control} name="ts" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>{t('form.transaction.date')}</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus locale={es} /></PopoverContent></Popover><FormMessage /></FormItem> )} />
-        <FormField control={form.control} name="note" render={({ field }) => ( <FormItem><FormLabel>{t('form.transaction.note')}</FormLabel><FormControl><Textarea placeholder="Detalles..." {...field} /></FormControl><FormMessage /></FormItem> )} />
-        <FormField control={form.control} name="attachmentDataUrl" render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel>Adjunto</FormLabel>
-              {field.value ? (
-                <div className="relative group">
-                  {field.value.startsWith('data:application/pdf') ? (
-                    <div className="flex items-center justify-center h-48 w-full bg-muted rounded-lg border-2 border-dashed"><FileText className="size-16 text-muted-foreground" /></div>
-                  ) : <img src={field.value} alt="Preview" className="w-full h-48 object-cover rounded-lg shadow-md" />}
-                  <Button variant="destructive" size="icon" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => field.onChange('')}><X className="size-4" /></Button>
-                </div>
-              ) : (
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileChange(e.dataTransfer.files[0] ?? null, field.onChange); }}
-                  className={cn("flex justify-center items-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer", isDragging && "border-primary bg-primary/10")}
-                  onClick={() => document.getElementById('attachment-input')?.click()}
-                >
-                  <div className="text-center"><UploadCloud className="mx-auto size-8 text-muted-foreground" /><p className="mt-2 text-sm text-muted-foreground">Sube o arrastra un archivo</p></div>
-                  <Input id="attachment-input" type="file" className="hidden" accept="image/*,application/pdf" onChange={(e) => handleFileChange(e.target.files?.[0] ?? null, field.onChange)} />
-                </div>
-              )}
-              <FormMessage />
-            </FormItem>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-6 overflow-y-auto max-h-[75vh]">
+        <FormField control={form.control} name="type" render={({ field }) => (
+          <FormItem><FormLabel>Tipo</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="expense">Gasto</SelectItem><SelectItem value="income">Ingreso</SelectItem><SelectItem value="transfer">Transferencia</SelectItem></SelectContent></Select></FormItem>
+        )} />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField control={form.control} name="accountId" render={({ field }) => (
+            <FormItem><FormLabel>Cuenta {form.watch('type') === 'transfer' ? 'Origen' : ''}</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select></FormItem>
+          )} />
+          {form.watch('type') === 'transfer' && (
+            <FormField control={form.control} name="accountToId" render={({ field }) => (
+              <FormItem><FormLabel>Cuenta Destino</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select></FormItem>
+            )} />
           )}
-        />
-        {transactionType !== 'transfer' && ( <> <FormField control={form.control} name="recurrent" render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>{t('form.transaction.recurrent')}</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem> )} /> {isRecurrent && ( <FormField control={form.control} name="frequency" render={({ field }) => ( <FormItem><FormLabel>{t('form.transaction.frequency')}</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="Frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} /> )} </> )}
-        <div className="flex justify-end pt-4"><Button type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {defaultValues?.id ? t('common.save') : t('common.add')}</Button></div>
+        </div>
+        <FormField control={form.control} name="amount" render={({ field }) => (
+          <FormItem><FormLabel>Importe</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="category" render={({ field }) => (
+          <FormItem><FormLabel>Categoría</FormLabel><Combobox options={categories} value={field.value} onChange={field.onChange} disabled={form.watch('type') === 'transfer'} /></FormItem>
+        )} />
+        <FormField control={form.control} name="ts" render={({ field }) => (
+          <FormItem className="flex flex-col"><FormLabel>Fecha</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full text-left font-normal">{field.value ? format(field.value, "PPP", { locale: es }) : <span>Elegir fecha</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={d => d > new Date()} locale={es} initialFocus /></PopoverContent></Popover></FormItem>
+        )} />
+        <FormField control={form.control} name="attachmentDataUrl" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Adjunto</FormLabel>
+            {field.value ? (
+              <div className="relative border rounded-lg overflow-hidden group">
+                {field.value.includes('pdf') ? <div className="p-8 flex items-center justify-center bg-muted"><FileText className="h-12 w-12" /></div> : <img src={field.value} className="max-h-48 w-full object-cover" />}
+                <Button variant="destructive" size="icon" className="absolute top-2 right-2" onClick={() => field.onChange('')}><X className="h-4 w-4" /></Button>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted" onClick={() => document.getElementById('file-up')?.click()}>
+                <UploadCloud className="mx-auto h-8 w-8 text-muted-foreground" />
+                <p className="text-sm mt-2">Arrastra o sube una foto</p>
+                <input id="file-up" type="file" className="hidden" onChange={e => handleFile(e.target.files?.[0] || null, field.onChange)} />
+              </div>
+            )}
+          </FormItem>
+        )} />
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button type="button" variant="ghost" onClick={onFinished}>Cancelar</Button>
+          <Button type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Guardar</Button>
+        </div>
       </form>
     </Form>
   );
