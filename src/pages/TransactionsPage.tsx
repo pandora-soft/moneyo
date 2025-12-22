@@ -101,6 +101,12 @@ export function TransactionsPage() {
   const refetchData = useAppStore(s => s.refetchData);
   const triggerRefetch = useAppStore(s => s.triggerRefetch);
   const accountsById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
+  // Dedicated useEffect to load accounts once
+  useEffect(() => {
+    api<Account[]>('/api/finance/accounts')
+      .then(setAccounts)
+      .catch(() => toast.error('Error al cargar cuentas.'));
+  }, []);
   const fetchData = useCallback(async (newCursor = 0, newRowsPerPage?: number) => {
     setLoading(true);
     const rpp = newRowsPerPage ?? pagination.rowsPerPage;
@@ -113,19 +119,17 @@ export function TransactionsPage() {
       if (filters.query) params.append('query', filters.query);
       if (filters.dateRange?.from) params.append('dateFrom', String(filters.dateRange.from.getTime()));
       if (filters.dateRange?.to) params.append('dateTo', String(filters.dateRange.to.getTime()));
-      const [txsData, accs] = await Promise.all([
-        api<PaginatedTransactions>(`/api/finance/transactions?${params.toString()}`),
-        accounts.length === 0 ? api<Account[]>('/api/finance/accounts') : Promise.resolve(accounts),
-      ]);
+      const txsData = await api<PaginatedTransactions>(`/api/finance/transactions?${params.toString()}`);
       setTransactions(txsData.items);
       setPagination(prev => ({ ...prev, cursor: newCursor, totalCount: txsData.totalCount, hasNextPage: txsData.next !== null, rowsPerPage: rpp }));
-      if (accounts.length === 0) setAccounts(accs);
     } catch (error) {
-      toast.error('Error al cargar los datos.');
+      toast.error('Error al cargar las transacciones.');
     } finally {
       setLoading(false);
     }
-  }, [filters, accounts, pagination.rowsPerPage]);
+    // We explicitly exclude 'accounts' here to avoid re-renders when account data updates
+    // if it's already fetched once.
+  }, [filters, pagination.rowsPerPage]);
   useEffect(() => {
     fetchData(0);
   }, [filters, refetchData, isRecurrentView, fetchData]);

@@ -40,16 +40,26 @@ export function IAPage() {
       videoRef.current.srcObject = null;
     }
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (e) {
+          console.warn('Error stopping track:', e);
+        }
+      });
       streamRef.current = null;
     }
     setShowPlayOverlay(false);
   }, []);
-
+  // Ensure camera is stopped when component unmounts
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
   useEffect(() => {
     isAiEnabled().then(setHasApiKey);
   }, []);
-
   const startStream = useCallback(async () => {
     try {
       const constraints = {
@@ -81,7 +91,7 @@ export function IAPage() {
         ts: result.date ? new Date(result.date).getTime() : Date.now(),
         attachmentDataUrl: base64Image,
       });
-      toast.success('Recibo analizado con éxito.');
+      toast.success('Recibo analizado con ��xito.');
     } catch (error: any) {
       console.error('AI Analysis error:', error);
       toast.error('Error al analizar la imagen.');
@@ -152,7 +162,6 @@ export function IAPage() {
           <h1 className="mt-4 text-4xl font-display font-bold tracking-tight">IA Moneyo</h1>
           <p className="mt-4 text-lg text-muted-foreground">Digitaliza tus recibos al instante.</p>
         </header>
-
         {hasApiKey === false && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-12">
             <Card className="border-destructive/30 bg-destructive/5">
@@ -163,7 +172,6 @@ export function IAPage() {
             </Card>
           </motion.div>
         )}
-
         {isLoading ? (
           <div className="flex flex-col items-center justify-center space-y-4">
             <Loader2 className="h-12 w-12 animate-spin text-orange-500" />
@@ -178,7 +186,7 @@ export function IAPage() {
             animate="visible"
           >
             <motion.div variants={itemVariants}>
-              <Card 
+              <Card
                 className={cn("h-full cursor-pointer transition-all", isDragging && "border-orange-500 ring-2 ring-orange-500")}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
@@ -226,11 +234,11 @@ export function IAPage() {
             <SheetTitle>{isMultiShot ? 'Captura por partes' : 'Capturar Recibo'}</SheetTitle>
           </SheetHeader>
           <div className="flex-1 relative bg-black flex items-center justify-center">
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              playsInline 
-              muted 
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
               onPlay={() => setShowPlayOverlay(false)}
               onWaiting={() => setCameraLoading(true)}
               onPlaying={() => setCameraLoading(false)}

@@ -3,6 +3,7 @@ import { enableMapSet } from "immer";
 import React, { StrictMode, useEffect, useState, useCallback } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate } from "react-router-dom";
+import { useShallow } from 'zustand/react/shallow';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css';
@@ -35,7 +36,7 @@ declare global {
 }
 const GlobalTransactionSheet = () => {
   const isModalOpen = useAppStore(s => s.isModalOpen);
-  const modalInitialValues = useAppStore(s => s.modalInitialValues);
+  const modalInitialValues = useAppStore(useShallow(s => s.modalInitialValues));
   const closeModal = useAppStore(s => s.closeModal);
   const triggerRefetch = useAppStore(s => s.triggerRefetch);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -142,7 +143,8 @@ export const AppRoot = () => {
   const handleLogout = () => {
     clearToken();
     toast.info('Sesión cerrada.');
-    navigate('/login');
+    // Force a complete navigation to ensure store reset logic if applicable
+    navigate('/login', { replace: true });
   };
   return (
     <div className="min-h-screen bg-background font-sans antialiased">
@@ -173,7 +175,7 @@ export const AppRoot = () => {
             </Button>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleLogout}><LogOut className="size-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Cerrar sesión"><LogOut className="size-4" /></Button>
             <ThemeToggle className="relative top-0 right-0" />
           </div>
         </div>
