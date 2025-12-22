@@ -3,17 +3,17 @@ import { motion } from 'framer-motion';
 import { PlusCircle, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, Download, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TransactionFilters, Filters } from '@/components/accounting/TransactionFilters';
 import { api } from '@/lib/api-client';
 import type { Account, Transaction, PaginatedTransactions } from '@shared/types';
-import { format, isValid } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -87,7 +87,6 @@ export function TransactionsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>({ query: '', accountId: 'all', type: 'all', dateRange: undefined, preset: 'all' });
-  const [isImportSheetOpen, setImportSheetOpen] = useState(false);
   const [isRecurrentView, setIsRecurrentView] = useState(false);
   const [attachmentModal, setAttachmentModal] = useState<{ open: boolean; url: string | null }>({ open: false, url: null });
   const [pagination, setPagination] = useState({
@@ -154,8 +153,8 @@ export function TransactionsPage() {
   const handleGenerateRecurrents = async () => {
     setIsGenerating(true);
     try {
-      const res = await api<{ generated: number }>('/api/finance/transactions/generate', { method: 'POST' });
-      toast.success(`Se han generado ${res.generated} transacciones recurrentes.`);
+      await api('/api/finance/transactions/generate', { method: 'POST' });
+      toast.success(`Transacciones recurrentes generadas.`);
       triggerRefetch();
     } catch (e) {
       toast.error('Error al generar transacciones recurrentes.');
@@ -210,13 +209,9 @@ export function TransactionsPage() {
             <Button variant="outline" onClick={handleGenerateRecurrents} disabled={isGenerating || loading}>
               {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Repeat className="mr-2 size-4" />} {t('common.generateAll')}
             </Button>
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 size-4" /> {t('transactions.importCSV')}
-            </Button>
             <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => openModal()}>
               <PlusCircle className="mr-2 size-5" /> {t('common.addTransaction')}
             </Button>
-            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" />
           </div>
         </header>
         <TransactionFilters filters={filters} setFilters={setFilters} accounts={accounts} />
@@ -252,9 +247,26 @@ export function TransactionsPage() {
           </CardFooter>
         </Card>
       </div>
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}><AlertDialogContent aria-describedby="delete-transaction-desc"><AlertDialogHeader><AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle><AlertDialogDescription id="delete-transaction-desc">{t('transactions.deleteWarning')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent aria-describedby="delete-transaction-desc">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogDescription id="delete-transaction-desc">
+              {t('transactions.deleteWarning')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Dialog open={attachmentModal.open} onOpenChange={(open) => setAttachmentModal({ open, url: open ? attachmentModal.url : null })}>
-        <DialogContent className="max-w-4xl w-full h-[90vh] p-2">
+        <DialogContent className="max-w-4xl w-full h-[90vh] p-2" aria-describedby="attachment-dialog-desc">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Previsualización de Adjunto</DialogTitle>
+            <DialogDescription id="attachment-dialog-desc">Muestra la imagen o documento adjunto a la transacción.</DialogDescription>
+          </DialogHeader>
           {attachmentModal.url && (
             attachmentModal.url.startsWith('data:application/pdf') ? (
               <iframe src={attachmentModal.url} className="w-full h-full" title="Attachment Preview" />

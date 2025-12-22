@@ -28,7 +28,6 @@ const tailwindColorToHex: Record<string, string> = {
   'bg-green-500': '#22c55e', 'bg-indigo-500': '#6366f1', 'bg-rose-500': '#f43f5e',
   'bg-slate-500': '#64748b', 'bg-gray-500': '#6b7280',
 };
-type BudgetWithColor = Budget & { computedActual: number; color: string };
 export function BudgetsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -61,7 +60,6 @@ export function BudgetsPage() {
   useEffect(() => { fetchData(); }, [fetchData, refetchData]);
   const { uniqueMonths, filteredBudgetsWithActuals } = useMemo(() => {
     const monthsSet = new Set<string>();
-    // Always include current, next, and previous months
     const today = startOfMonth(new Date());
     monthsSet.add(format(today, 'yyyy-MM'));
     monthsSet.add(format(addMonths(today, 1), 'yyyy-MM'));
@@ -157,14 +155,29 @@ export function BudgetsPage() {
         </div>
       </div>
       <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent>
-          <SheetHeader><SheetTitle>{editingBudget?.id ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</SheetTitle></SheetHeader>
-          <BudgetForm categories={categories} onSubmit={handleFormSubmit} onFinished={() => setSheetOpen(false)} defaultValues={editingBudget ? { ...editingBudget, month: new Date(editingBudget.month!) } : { month: filterDate }} />
+        <SheetContent aria-describedby="budget-sheet-desc">
+          <SheetHeader>
+            <SheetTitle>{editingBudget?.id ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</SheetTitle>
+            <SheetDescription id="budget-sheet-desc">
+              Define los límites de gasto para tus categorías preferidas.
+            </SheetDescription>
+          </SheetHeader>
+          <BudgetForm 
+            categories={categories} 
+            onSubmit={handleFormSubmit} 
+            onFinished={() => setSheetOpen(false)} 
+            defaultValues={editingBudget ? { ...editingBudget, month: new Date(editingBudget.month!) } : { month: filterDate }} 
+          />
         </SheetContent>
       </Sheet>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogContent aria-describedby="delete-budget-desc">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
+            <AlertDialogDescription id="delete-budget-desc">
+              Esta acción no se puede deshacer y el presupuesto será eliminado de tus registros mensuales.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={async () => { if (deletingBudget) { await api(`/api/finance/budgets/${deletingBudget}`, { method: 'DELETE' }); fetchData(); setDeleteDialogOpen(false); } }}>Eliminar</AlertDialogAction>

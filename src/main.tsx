@@ -1,9 +1,8 @@
 import '@/lib/errorReporter';
 import { enableMapSet } from "immer";
-enableMapSet();
 import React, { StrictMode, useEffect, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css';
@@ -29,6 +28,7 @@ import type { Account, Transaction } from '@shared/types';
 import { toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Skeleton } from './components/ui/skeleton';
+enableMapSet();
 const GlobalTransactionSheet = () => {
   const isModalOpen = useAppStore(s => s.isModalOpen);
   const modalInitialValues = useAppStore(s => s.modalInitialValues);
@@ -60,7 +60,7 @@ const GlobalTransactionSheet = () => {
         <SheetHeader className="p-6 border-b">
           <SheetTitle>{modalInitialValues?.id ? 'Editar Transacción' : 'Nueva Transacción'}</SheetTitle>
           <SheetDescription id="global-transaction-sheet-desc">
-            Completa los campos para registrar un nuevo movimiento.
+            Completa los campos para registrar un nuevo movimiento en tus finanzas.
           </SheetDescription>
         </SheetHeader>
         {accounts.length > 0 && (
@@ -107,8 +107,8 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 const RoleGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const t = useTranslations();
-  const userSettings = useAppStore(s => s.settings);
-  const userRole = userSettings?.user?.role;
+  const settings = useAppStore(s => s.settings);
+  const userRole = settings?.user?.role;
   useEffect(() => {
     if (userRole && userRole !== 'admin') {
       toast.error(t('access.adminOnly'));
@@ -122,13 +122,13 @@ export const AppRoot = () => {
   const navigate = useNavigate();
   const t = useTranslations();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const userSettings = useAppStore(s => s.settings);
-  const userRole = userSettings?.user?.role;
+  const settings = useAppStore(s => s.settings);
+  const userRole = settings?.user?.role;
   const navItems = [
-    { href: '/', label: t('pages.dashboard'), icon: Home, adminOnly: true },
+    { href: '/', label: t('pages.dashboard'), icon: Home, adminOnly: false },
     { href: '/accounts', label: t('pages.accounts'), icon: Wallet, adminOnly: true },
     { href: '/transactions', label: t('pages.transactions'), icon: List, adminOnly: false },
-    { href: '/budgets', label: t('pages.budgets'), icon: PiggyBank, adminOnly: true },
+    { href: '/budgets', label: t('pages.budgets'), icon: PiggyBank, adminOnly: false },
     { href: '/reports', label: t('pages.reports'), icon: BarChart, adminOnly: true },
     { href: '/ia', label: 'IA', icon: Brain, adminOnly: false },
     { href: '/settings', label: t('pages.settings'), icon: Settings, adminOnly: true },
@@ -139,20 +139,12 @@ export const AppRoot = () => {
     toast.info('Sesión cerrada.');
     navigate('/login');
   };
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
-  };
-  const itemVariants = {
-    hidden: { opacity: 0, x: -20 },
-    visible: { opacity: 1, x: 0 },
-  };
   return (
     <div className="min-h-screen bg-background font-sans antialiased">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
           <div className="flex items-center gap-6">
-            <NavLink to={userRole === 'admin' ? "/" : "/transactions"} className="flex items-center gap-2 font-display text-lg font-semibold">
+            <NavLink to="/" className="flex items-center gap-2 font-display text-lg font-semibold">
               <Wallet className="size-6 text-orange-500" />
               Moneyo
             </NavLink>
@@ -171,13 +163,7 @@ export const AppRoot = () => {
                 </NavLink>
               ))}
             </nav>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Abrir menú de navegación"
-            >
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">
               <Menu className="h-5 w-5" />
             </Button>
           </div>
@@ -191,49 +177,28 @@ export const AppRoot = () => {
         <Outlet />
       </main>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side="right" className="p-0 sm:max-w-sm" aria-describedby="mobile-menu-desc">
-            <SheetHeader className="p-6 border-b">
-              <SheetTitle>Menú</SheetTitle>
-              <SheetDescription id="mobile-menu-desc">
-                Menú de navegación móvil
-              </SheetDescription>
+        <SheetContent side="right" className="p-0 sm:max-w-sm" aria-describedby="mobile-menu-desc">
+          <SheetHeader className="p-6 border-b">
+            <SheetTitle>Menú Principal</SheetTitle>
+            <SheetDescription id="mobile-menu-desc">Navegación móvil del sistema.</SheetDescription>
           </SheetHeader>
-          <motion.ul
-            className="mt-6 flex flex-col space-y-2 px-6"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-          >
+          <div className="mt-6 flex flex-col space-y-2 px-6">
             {filteredNavItems.map(({ href, label, icon: Icon }) => (
-              <motion.li key={href} variants={itemVariants}>
-                <NavLink
-                  to={href}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex h-12 items-center gap-3 px-4 rounded-lg hover:bg-accent w-full justify-start text-base",
-                      isActive ? "bg-accent text-foreground" : "text-muted-foreground"
-                    )
-                  }
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span>{label}</span>
-                </NavLink>
-              </motion.li>
+              <NavLink
+                key={href}
+                to={href}
+                className={({ isActive }) =>
+                  cn(
+                    "flex h-12 items-center gap-3 px-4 rounded-lg hover:bg-accent w-full justify-start text-base",
+                    isActive ? "bg-accent text-foreground" : "text-muted-foreground"
+                  )
+                }
+                onClick={() => setMobileOpen(false)}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{label}</span>
+              </NavLink>
             ))}
-          </motion.ul>
-          <div className="border-t p-6 pt-0">
-            <Button
-              variant="ghost"
-              className="w-full h-12 justify-start gap-3 px-4 hover:bg-destructive/20 text-destructive font-medium"
-              onClick={() => {
-                setMobileOpen(false);
-                handleLogout();
-              }}
-            >
-              <LogOut className="h-5 w-5" />
-              <span>{t('auth.logout')}</span>
-            </Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -241,7 +206,7 @@ export const AppRoot = () => {
       <Toaster richColors position="top-right" />
       <footer className="border-t">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-          Built with ❤️ at Cloudflare for Moneyo
+          Moneyo © 2025 - Built with ❤️ at Cloudflare
         </div>
       </footer>
     </div>
@@ -259,28 +224,24 @@ const router = createBrowserRouter(
       element: <AuthGuard><AppRoot /></AuthGuard>,
       errorElement: <RouteErrorBoundary />,
       children: [
-        { index: true, element: <RoleGuard><HomePage /></RoleGuard> },
+        { index: true, element: <HomePage /> },
         { path: "accounts", element: <RoleGuard><AccountsPage /></RoleGuard> },
         { path: "transactions", element: <TransactionsPage /> },
-        { path: "budgets", element: <RoleGuard><BudgetsPage /></RoleGuard> },
+        { path: "budgets", element: <BudgetsPage /> },
         { path: "reports", element: <RoleGuard><ReportsPage /></RoleGuard> },
         { path: "ia", element: <IAPage /> },
         { path: "settings", element: <RoleGuard><SettingsPage /></RoleGuard> },
       ],
     },
-  ],
-  { future: {} }
+  ]
 );
 const rootElement = document.getElementById('root');
 if (rootElement) {
-  if (!rootElement.innerHTML) {
-    const root = createRoot(rootElement);
-    root.render(
-      <StrictMode>
-        <ErrorBoundary>
-          <RouterProvider router={router} />
-        </ErrorBoundary>
-      </StrictMode>
-    );
-  }
+  createRoot(rootElement).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <RouterProvider router={router} />
+      </ErrorBoundary>
+    </StrictMode>
+  );
 }

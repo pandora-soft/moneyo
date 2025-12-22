@@ -12,18 +12,18 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useFormatCurrency } from '@/lib/formatCurrency';
 import { toast } from 'sonner';
 import t from '@/lib/i18n';
-import { es } from 'date-fns/locale';
+import { UserDashboard } from '@/components/dashboard/UserDashboard';
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 },
 };
-export function HomePage() {
+function AdminDashboard() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const openModal = useAppStore((state) => state.openModal);
-  const formatCurrency = useFormatCurrency();
   const refetchTrigger = useAppStore((state) => state.refetchData);
+  const formatCurrency = useFormatCurrency();
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -43,7 +43,7 @@ export function HomePage() {
   useEffect(() => {
     fetchData();
   }, [refetchTrigger]);
-  const { totalBalance, totalIncome, totalExpenses, balanceTrend } = useMemo(() => {
+  const stats = useMemo(() => {
     const now = new Date();
     const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     const recentTransactions = transactions.filter(tx => new Date(tx.ts) > oneMonthAgo);
@@ -56,17 +56,14 @@ export function HomePage() {
     for (let i = sortedTx.length - 1; i >= 0; i--) {
         historicalBalances[sortedTx[i].ts] = runningBalance;
         const tx = sortedTx[i];
-        if (tx.type === 'income') {
-            runningBalance -= tx.amount;
-        } else if (tx.type === 'expense') {
-            runningBalance += Math.abs(tx.amount);
-        } else if (tx.type === 'transfer' && tx.accountTo) {
-            runningBalance += Math.abs(tx.amount);
-        }
+        if (tx.type === 'income') runningBalance -= tx.amount;
+        else if (tx.type === 'expense') runningBalance += Math.abs(tx.amount);
+        else if (tx.type === 'transfer' && tx.accountTo) runningBalance += Math.abs(tx.amount);
     }
-    const trendData = recentTransactions.sort((a,b) => a.ts - b.ts).map(tx => {
-        return { date: new Date(tx.ts).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }), balance: historicalBalances[tx.ts] || 0 };
-    });
+    const trendData = recentTransactions.sort((a,b) => a.ts - b.ts).map(tx => ({
+        date: new Date(tx.ts).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
+        balance: historicalBalances[tx.ts] || 0 
+    }));
     return { totalBalance: balance, totalIncome: income, totalExpenses: expenses, balanceTrend: trendData };
   }, [accounts, transactions]);
   return (
@@ -92,9 +89,9 @@ export function HomePage() {
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-36" />)
             ) : (
               <>
-                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t('dashboard.totalBalance')}</CardTitle><Wallet className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(totalBalance)}</div><p className="text-xs text-muted-foreground">{t('dashboard.allAccounts')}</p></CardContent></Card></motion.div>
-                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t('dashboard.incomeLast30')}</CardTitle><TrendingUp className="h-4 w-4 text-emerald-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-500">{formatCurrency(totalIncome)}</div><p className="text-xs text-muted-foreground">{t('dashboard.inflow')}</p></CardContent></Card></motion.div>
-                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t('dashboard.expensesLast30')}</CardTitle><TrendingDown className="h-4 w-4 text-red-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-red-500">{formatCurrency(totalExpenses)}</div><p className="text-xs text-muted-foreground">{t('dashboard.outflow')}</p></CardContent></Card></motion.div>
+                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t('dashboard.totalBalance')}</CardTitle><Wallet className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(stats.totalBalance)}</div><p className="text-xs text-muted-foreground">{t('dashboard.allAccounts')}</p></CardContent></Card></motion.div>
+                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t('dashboard.incomeLast30')}</CardTitle><TrendingUp className="h-4 w-4 text-emerald-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-500">{formatCurrency(stats.totalIncome)}</div><p className="text-xs text-muted-foreground">{t('dashboard.inflow')}</p></CardContent></Card></motion.div>
+                <motion.div variants={cardVariants}><Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t('dashboard.expensesLast30')}</CardTitle><TrendingDown className="h-4 w-4 text-red-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-red-500">{formatCurrency(stats.totalExpenses)}</div><p className="text-xs text-muted-foreground">{t('dashboard.outflow')}</p></CardContent></Card></motion.div>
               </>
             )}
           </motion.div>
@@ -103,7 +100,7 @@ export function HomePage() {
               <h2 className="text-2xl font-semibold mb-4">{t('dashboard.accounts')}</h2>
               <motion.div className="space-y-4" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }}>
                 {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)
+                  Array.from({ length: 3 }).map((_, i) => <Skeleton className="h-20" key={i} />)
                 ) : accounts.length > 0 ? (
                   accounts.map(acc => (
                     <motion.div key={acc.id} variants={cardVariants} whileHover={{ y: -2, scale: 1.01 }}>
@@ -135,7 +132,7 @@ export function HomePage() {
                 <CardContent className="pt-6">
                   {loading ? <Skeleton className="h-[250px]" /> : (
                     <ResponsiveContainer width="100%" height={250}>
-                      <LineChart data={balanceTrend}>
+                      <LineChart data={stats.balanceTrend}>
                         <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                         <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value)} domain={['dataMin', 'dataMax']} />
                         <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 2 }} formatter={(value: number) => [formatCurrency(value), t('finance.balance')]} />
@@ -151,4 +148,12 @@ export function HomePage() {
       </div>
     </div>
   );
+}
+export function HomePage() {
+  const settings = useAppStore(s => s.settings);
+  const user = settings?.user;
+  if (user?.role === 'admin') {
+    return <AdminDashboard />;
+  }
+  return <UserDashboard />;
 }

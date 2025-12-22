@@ -341,7 +341,9 @@ export function SettingsPage() {
         <SheetContent className="sm:max-w-md p-0 overflow-y-auto" aria-describedby="mgmt-sheet-desc">
           <SheetHeader className="p-6 border-b">
             <SheetTitle>{mgmtSheet.data ? t('common.edit') : t('common.add')} {t(`settings.${mgmtSheet.type === 'category' ? 'categories' : mgmtSheet.type + 's'}.title` as any)}</SheetTitle>
-            <SheetDescription id="mgmt-sheet-desc">{t(`settings.${mgmtSheet.type === 'category' ? 'categories' : mgmtSheet.type + 's'}.sheet.description` as any)}</SheetDescription>
+            <SheetDescription id="mgmt-sheet-desc">
+              {t(`settings.${mgmtSheet.type === 'category' ? 'categories' : mgmtSheet.type + 's'}.sheet.description` as any)}
+            </SheetDescription>
           </SheetHeader>
           <div className="py-4">
             {mgmtSheet.type === 'category' && <CategoryForm onSubmit={handleMgmtSubmit} defaultValues={mgmtSheet.data || {}} />}

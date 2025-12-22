@@ -62,6 +62,14 @@ const translations = {
     emptyAccountsCTA: '¡Comienza a controlar tus finanzas hoy!',
     inflow: 'Entradas de dinero',
     outflow: 'Salidas de dinero',
+    user: {
+      welcome: 'Bienvenido a Moneyo',
+      budgetTotal: 'Suma de Presupuestos',
+      currentSpending: 'Gasto Mensual',
+      openIA: 'Escanear con IA',
+      addTransaction: 'Nueva Transacción',
+      spendingVsBudget: (spent: string, total: string) => `${spent} de ${total} presupuestado`,
+    }
   },
   accounts: {
     description: 'Administra tus cuentas de efectivo, banco y tarjetas.',
