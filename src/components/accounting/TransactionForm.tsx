@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Account, Transaction } from '@shared/types';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { api } from '@/lib/api-client';
 import { Combobox } from '@/components/ui/combobox';
@@ -27,7 +27,7 @@ const formSchema = z.object({
   accountId: z.string().min(1, t('form.requiredAccount')),
   accountToId: z.string().optional(),
   type: z.enum(['income', 'expense', 'transfer']),
-  amount: z.coerce.number().min(0.01, t('form.positive')),
+  amount: z.preprocess((val: any) => Number(val), z.number().min(0.01, t('form.positive'))),
   category: z.string().min(2, t('form.requiredCategory')),
   ts: z.date(),
   note: z.string().max(200).optional(),
@@ -55,16 +55,18 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
     api<Frequency[]>('/api/finance/frequencies')
       .then(setFrequencies)
       .catch(() => {});
-  }, [refetchData]);
+  }, []);
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      amount: 0,
+      amount: 0 as number,
       type: 'expense',
       ts: new Date(),
       ...defaultValues,
     }
   });
+
+  const type = form.watch('type');
   const handleSubmit: SubmitHandler<TransactionFormValues> = async (values) => {
     const acc = accounts.find(a => a.id === values.accountId);
     const finalValues: Partial<Transaction> & { id?: string } = {
@@ -91,9 +93,9 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         )} />
         <div className="grid grid-cols-2 gap-4">
           <FormField control={form.control} name="accountId" render={({ field }) => (
-            <FormItem><FormLabel>Cuenta {form.watch('type') === 'transfer' ? 'Origen' : ''}</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select></FormItem>
+            <FormItem><FormLabel>Cuenta {type === 'transfer' ? 'Origen' : ''}</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select></FormItem>
           )} />
-          {form.watch('type') === 'transfer' && (
+          {type === 'transfer' && (
             <FormField control={form.control} name="accountToId" render={({ field }) => (
               <FormItem><FormLabel>Cuenta Destino</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select></FormItem>
             )} />
@@ -103,7 +105,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
           <FormItem><FormLabel>Importe</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="category" render={({ field }) => (
-          <FormItem><FormLabel>Categoría</FormLabel><Combobox options={categories} value={field.value} onChange={field.onChange} disabled={form.watch('type') === 'transfer'} /></FormItem>
+          <FormItem><FormLabel>Categoría</FormLabel><Combobox options={categories} value={field.value} onChange={field.onChange} disabled={type === 'transfer'} /></FormItem>
         )} />
         <FormField control={form.control} name="ts" render={({ field }) => (
           <FormItem className="flex flex-col"><FormLabel>Fecha</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full text-left font-normal">{field.value ? format(field.value, "PPP", { locale: es }) : <span>Elegir fecha</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={d => d > new Date()} locale={es} initialFocus /></PopoverContent></Popover></FormItem>
@@ -113,7 +115,7 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
             <FormLabel>Adjunto</FormLabel>
             {field.value ? (
               <div className="relative border rounded-lg overflow-hidden group">
-                {field.value.includes('pdf') ? <div className="p-8 flex items-center justify-center bg-muted"><FileText className="h-12 w-12" /></div> : <img src={field.value} className="max-h-48 w-full object-cover" />}
+                {field.value?.includes('application/pdf') ? <div className="p-8 flex items-center justify-center bg-muted"><FileText className="h-12 w-12" /></div> : <img src={field.value} className="max-h-48 w-full object-cover" />}
                 <Button variant="destructive" size="icon" className="absolute top-2 right-2" onClick={() => field.onChange('')}><X className="h-4 w-4" /></Button>
               </div>
             ) : (

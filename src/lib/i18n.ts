@@ -129,7 +129,7 @@ const translations = {
     sheet: {
       editTitle: 'Editar Presupuesto',
       newTitle: 'Nuevo Presupuesto',
-      description: 'Define un límite de gasto para una categoría en un mes espec��fico.',
+      description: 'Define un límite de gasto para una categoría en un mes específico.',
     },
     deleteConfirm: '¿Confirmar eliminación?',
     deleteWarning: 'Esta acción no se puede deshacer. Se eliminará el presupuesto permanentemente.',
@@ -310,6 +310,6 @@ const t = (key: TranslationKey, ...args: any[]): string => {
   return typeof current === 'string' ? current : key;
 };
 export const useTranslations = () => {
-  return useCallback((key: TranslationKey, ...args: any[]) => t(key, ...args), []);
+  return useCallback(t, []);
 };
 export default t;
