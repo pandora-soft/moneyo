@@ -20,7 +20,7 @@ const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 export type AppHono = Hono<{ Bindings: Env, Variables: { user?: User } }>;
 export function userRoutes(app: AppHono) {
   // --- SEEDING MIDDLEWARE ---
-  app.use('/api/*', async (c, next) => {
+  const seedingMiddleware = async (c: Context<{ Bindings: Env, Variables: { user?: User } }>, next: () => Promise<void>) => {
     await Promise.all([
       UserEntity.ensureSeed(c.env),
       AccountEntity.ensureSeed(c.env),
@@ -31,7 +31,7 @@ export function userRoutes(app: AppHono) {
       FrequencyEntity.ensureSeed(c.env),
     ]);
     await next();
-  });
+  };
   // --- AUTH MIDDLEWARE ---
   const authGuard = async (c: Context<{ Bindings: Env, Variables: { user?: User } }>, next: () => Promise<void>) => {
     const authHeader = c.req.header('Authorization');
@@ -59,6 +59,7 @@ export function userRoutes(app: AppHono) {
   };
   // --- AUTH ROUTES ---
   const auth = new Hono<{ Bindings: Env, Variables: { user?: User } }>();
+  auth.use('*', seedingMiddleware);
   auth.post('/login', async (c) => {
     const { username, password } = await c.req.json<{username: string, password: string}>();
     if (!isStr(username) || !isStr(password)) return bad(c, 'Username and password required');
@@ -78,6 +79,7 @@ export function userRoutes(app: AppHono) {
   app.route('/api/auth', auth);
   // --- FINANCE ROUTES ---
   const finance = new Hono<{ Bindings: Env, Variables: { user?: User } }>();
+  finance.use('*', seedingMiddleware);
   finance.use('*', authGuard);
   // ADMIN: Users
   finance.get('/users', adminGuard, async (c) => {

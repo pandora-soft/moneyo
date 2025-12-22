@@ -32,7 +32,7 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify(values),
       });
-      localStorage.setItem('casaconta_token', token);
+      localStorage.setItem('moneyo_token', token);
       setSettings({ user }); // Store user info in settings
       toast.success(t('auth.loginSuccess'));
       navigate('/');

@@ -1,6 +1,6 @@
 import { ApiResponse } from "../../shared/types"
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('casaconta_token');
+  const token = localStorage.getItem('moneyo_token');
   const headers: HeadersInit = { ...init?.headers };
   if (!(init?.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
@@ -31,5 +31,5 @@ export async function verifyAuth(): Promise<boolean> {
   }
 }
 export function clearToken() {
-  localStorage.removeItem('casaconta_token');
+  localStorage.removeItem('moneyo_token');
 }
