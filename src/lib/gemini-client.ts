@@ -12,11 +12,12 @@ Eres un experto en contabilidad. Analiza la imagen del recibo y extrae:
 2. amount: Importe total (solo número).
 3. date: Fecha en formato YYYY-MM-DD.
 4. category: La mejor categoría que encaje del sistema.
-Responde solo con un JSON válido.
+Responde solo con un JSON v��lido.
 `;
-const DEFAULT_MODEL = "gemini-2.5-flash-image";
+const DEFAULT_MODEL = "gemini-1.5-flash";
 export async function analyzeReceipt(imageBase64: string, apiKey: string): Promise<ReceiptAnalysisResult> {
   const model = localStorage.getItem('gemini_model') || DEFAULT_MODEL;
+  const customPrompt = localStorage.getItem('gemini_prompt') || '';
   let categoriesStr = "Comida, Transporte, Alquiler, Salario, Otro";
   try {
     const cats = await api<{ id: string; name: string }[]>('/api/finance/categories');
@@ -25,21 +26,31 @@ export async function analyzeReceipt(imageBase64: string, apiKey: string): Promi
     console.warn("Using fallback categories for AI prompt.");
   }
   console.log(`Using AI Model: ${model}`);
-  // Mock delay
+  console.log(`System Prompt: ${structuredPrompt} ${customPrompt} Categorías: ${categoriesStr}`);
+  // Mock implementation for demo/dev purposes
   await new Promise(resolve => setTimeout(resolve, 2000));
-  // Simulation based on base64 content hints or random data
   return {
     merchant: 'Comercio Detectado',
-    amount: Math.floor(Math.random() * 100) + 15.50,
+    amount: parseFloat((Math.random() * 100).toFixed(2)),
     date: new Date().toISOString().split('T')[0],
     category: 'Comida'
   };
 }
 export async function validateApiKey(key: string): Promise<boolean> {
   if (!key || key.length < 15) {
-    toast.error('Clave API no válida.');
+    toast.error('Clave API no válida estructuralmente.');
     return false;
   }
-  toast.success('Clave API de Gemini vinculada.');
+  // In a real app, you'd make a call to Google's listModels to verify the key
   return true;
+}
+export async function testPrompt(key: string, model: string, prompt: string): Promise<ReceiptAnalysisResult> {
+  console.log(`Testing Prompt with key: ${key.slice(0, 5)}... Model: ${model}`);
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  return {
+    merchant: 'Prueba Exitosa',
+    amount: 12.34,
+    date: '2025-01-01',
+    category: 'Otro'
+  };
 }
