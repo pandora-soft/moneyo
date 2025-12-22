@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { PlusCircle, Banknote, Landmark, CreditCard, MoreVertical, Pencil, Copy, Trash2, Upload, Repeat, Loader2, Download, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -96,7 +96,6 @@ export function TransactionsPage() {
     totalCount: 0,
     hasNextPage: false,
   });
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const formatCurrency = useFormatCurrency();
   const openModal = useAppStore(s => s.openModal);
   const refetchData = useAppStore(s => s.refetchData);

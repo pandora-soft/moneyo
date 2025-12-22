@@ -20,7 +20,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { setSettings } = useAppStore();
+  const setSettings = useAppStore(s => s.setSettings);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { username: '', password: '' },
@@ -93,7 +93,6 @@ export default function LoginPage() {
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {t('auth.login')}
                 </Button>
-                
                 <div className="mt-4 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 text-xs text-orange-800 dark:text-orange-300">
                   <p className="font-semibold mb-1">Demo Access:</p>
                   <p>User: <span className="font-mono bg-white/50 dark:bg-black/20 px-1 rounded">admin</span></p>

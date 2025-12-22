@@ -47,8 +47,8 @@ export function SettingsPage() {
   const t = useTranslations();
   const setSettings = useAppStore(s => s.setSettings);
   const triggerRefetch = useAppStore(s => s.triggerRefetch);
-  const settings = useAppStore(s => s.settings);
-  const currentUser = settings?.user;
+  const userRole = useAppStore(s => s.settings?.user?.role);
+  const currentUserId = useAppStore(s => s.settings?.user?.id);
   const [loading, setLoading] = useState(true);
   const [testingKey, setTestingKey] = useState(false);
   const [testingPrompt, setTestingPrompt] = useState(false);
@@ -70,7 +70,7 @@ export function SettingsPage() {
         api<Currency[]>('/api/finance/currencies'),
         api<Frequency[]>('/api/finance/frequencies'),
       ]);
-      if (currentUser?.role === 'admin') {
+      if (userRole === 'admin') {
         const fetchedUsers = await api<SafeUser[]>('/api/finance/users');
         setUsers(fetchedUsers);
       }
@@ -85,11 +85,11 @@ export function SettingsPage() {
       setCurrencies(currs);
       setFrequencies(freqs);
     } catch (error) {
-      toast.error(t('settings.errorLoading' as any));
+      toast.error('Error al cargar ajustes');
     } finally {
       setLoading(false);
     }
-  }, [form, setSettings, currentUser?.role, t]);
+  }, [form, setSettings, userRole]);
   useEffect(() => { fetchAllData(); }, [fetchAllData]);
   const onSaveSettings: SubmitHandler<SettingsFormValues> = async (data) => {
     try {
@@ -98,32 +98,32 @@ export function SettingsPage() {
       localStorage.setItem('gemini_api_key', geminiApiKey || '');
       localStorage.setItem('gemini_model', geminiModel || 'gemini-1.5-flash');
       localStorage.setItem('gemini_prompt', geminiPrompt || '');
-      toast.success(t('common.saveSuccess' as any));
+      toast.success('Ajustes guardados');
       setSettings(rest);
       triggerRefetch();
     } catch (e) {
-      toast.error(t('common.errorSaving' as any));
+      toast.error('Error al guardar ajustes');
     }
   };
   const handleTestKey = async () => {
     const key = form.getValues('geminiApiKey');
-    if (!key) return toast.error(t('settings.gemini.keyRequired' as any));
+    if (!key) return toast.error('API Key requerida');
     setTestingKey(true);
     const valid = await validateApiKey(key);
     setTestingKey(false);
-    if (valid) toast.success(t('settings.gemini.validKey' as any));
+    if (valid) toast.success('API Key válida');
   };
   const handleTestPrompt = async () => {
     const key = form.getValues('geminiApiKey');
     const model = form.getValues('geminiModel');
     const prompt = form.getValues('geminiPrompt');
-    if (!key) return toast.error(t('settings.gemini.keyRequired' as any));
+    if (!key) return toast.error('API Key requerida');
     setTestingPrompt(true);
     try {
       const result = await testPrompt(key, model || 'gemini-1.5-flash', prompt || '');
       toast.info(`Prueba exitosa: ${result.merchant} - ${result.amount}`);
     } catch (e) {
-      toast.error(t('settings.gemini.testError' as any));
+      toast.error('Error en prueba de IA');
     } finally {
       setTestingPrompt(false);
     }
@@ -133,11 +133,11 @@ export function SettingsPage() {
     if (!type || !id) return;
     try {
       await api(`/api/finance/${type === 'category' ? 'categories' : type + 's'}/${id}`, { method: 'DELETE' });
-      toast.success(t('common.deleteSuccess' as any));
+      toast.success('Eliminado correctamente');
       fetchAllData();
       triggerRefetch();
     } catch (e) {
-      toast.error(t('common.errorDeleting' as any));
+      toast.error('Error al eliminar');
     } finally {
       setDeleteAlert({ type: null, open: false, id: '', name: '' });
     }
@@ -148,12 +148,12 @@ export function SettingsPage() {
       const method = data?.id ? 'PUT' : 'POST';
       const endpoint = `/api/finance/${type === 'category' ? 'categories' : type + 's'}${data?.id ? `/${data.id}` : ''}`;
       await api(endpoint, { method, body: JSON.stringify(values) });
-      toast.success(t('common.saveSuccess' as any));
+      toast.success('Guardado correctamente');
       setMgmtSheet({ ...mgmtSheet, open: false });
       fetchAllData();
       triggerRefetch();
     } catch (e) {
-      toast.error(t('common.errorSaving' as any));
+      toast.error('Error al guardar');
     }
   };
   if (loading) {
@@ -172,19 +172,19 @@ export function SettingsPage() {
       <div className="py-8 md:py-10 lg:py-12">
         <header className="mb-10">
           <h1 className="text-4xl font-display font-bold">{t('pages.settings')}</h1>
-          <p className="text-muted-foreground mt-1">{t('settings.description' as any)}</p>
+          <p className="text-muted-foreground mt-1">Configura tus preferencias de la aplicación.</p>
         </header>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSaveSettings)} className="space-y-8">
             <div className="grid gap-8 md:grid-cols-2">
               <motion.div variants={cardVariants} initial="hidden" animate="visible">
                 <Card className="h-full">
-                  <CardHeader><CardTitle>{t('settings.visual' as any)}</CardTitle><CardDescription>{t('settings.visualDesc' as any)}</CardDescription></CardHeader>
+                  <CardHeader><CardTitle>Apariencia</CardTitle><CardDescription>Personaliza la interfaz.</CardDescription></CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
-                      <Label>{t('settings.theme' as any)}</Label>
+                      <Label>Tema Visual</Label>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{isDark ? t('settings.themeDark' as any) : t('settings.themeLight' as any)}</span>
+                        <span className="text-xs text-muted-foreground">{isDark ? 'Oscuro' : 'Claro'}</span>
                         <ThemeToggle className="relative top-0 right-0" />
                       </div>
                     </div>
@@ -193,11 +193,11 @@ export function SettingsPage() {
               </motion.div>
               <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>
                 <Card className="h-full">
-                  <CardHeader><CardTitle>{t('settings.finances' as any)}</CardTitle><CardDescription>{t('settings.financesDesc' as any)}</CardDescription></CardHeader>
+                  <CardHeader><CardTitle>Finanzas</CardTitle><CardDescription>Configuración global de moneda.</CardDescription></CardHeader>
                   <CardContent className="space-y-4">
                     <FormField control={form.control} name="currency" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('finance.mainCurrency' as any)}</FormLabel>
+                        <FormLabel>Moneda Principal</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent>{currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}</SelectContent>
@@ -206,7 +206,7 @@ export function SettingsPage() {
                     )} />
                     <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('settings.fiscalMonthStart' as any)}</FormLabel>
+                        <FormLabel>Día de inicio fiscal</FormLabel>
                         <FormControl><Input type="number" min={1} max={28} {...field} onChange={e => field.onChange(parseInt(e.target.value))} /></FormControl>
                         <FormMessage />
                       </FormItem>
@@ -216,21 +216,21 @@ export function SettingsPage() {
               </motion.div>
               <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.2 }} className="md:col-span-2">
                 <Card>
-                  <CardHeader><CardTitle className="flex items-center gap-2"><BrainCircuit className="size-5 text-orange-500" /> AI & Gemini IA</CardTitle><CardDescription>{t('settings.gemini.prompt' as any)}</CardDescription></CardHeader>
+                  <CardHeader><CardTitle className="flex items-center gap-2"><BrainCircuit className="size-5 text-orange-500" /> AI & Gemini IA</CardTitle><CardDescription>Digitaliza tus recibos.</CardDescription></CardHeader>
                   <CardContent className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-4">
                       <FormField control={form.control} name="geminiApiKey" render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t('settings.gemini.key' as any)}</FormLabel>
+                          <FormLabel>Clave API Gemini</FormLabel>
                           <div className="flex gap-2">
                             <FormControl><Input type="password" placeholder="AIza..." {...field} /></FormControl>
-                            <Button type="button" variant="outline" onClick={handleTestKey} disabled={testingKey}>{testingKey ? <Loader2 className="animate-spin size-4" /> : t('settings.gemini.testKey' as any)}</Button>
+                            <Button type="button" variant="outline" onClick={handleTestKey} disabled={testingKey}>{testingKey ? <Loader2 className="animate-spin size-4" /> : 'Probar clave'}</Button>
                           </div>
                         </FormItem>
                       )} />
                       <FormField control={form.control} name="geminiModel" render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t('settings.gemini.model' as any)}</FormLabel>
+                          <FormLabel>Modelo AI</FormLabel>
                           <FormControl><Input placeholder="gemini-1.5-flash" {...field} /></FormControl>
                         </FormItem>
                       )} />
@@ -238,10 +238,10 @@ export function SettingsPage() {
                     <div className="space-y-4">
                       <FormField control={form.control} name="geminiPrompt" render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t('settings.gemini.prompt' as any)}</FormLabel>
-                          <FormControl><Textarea className="min-h-[120px]" placeholder={t('settings.gemini.promptPlaceholder' as any)} {...field} /></FormControl>
+                          <FormLabel>Instrucciones IA (Prompt)</FormLabel>
+                          <FormControl><Textarea className="min-h-[120px]" placeholder="Instrucciones adicionales..." {...field} /></FormControl>
                           <div className="flex justify-end mt-2">
-                            <Button type="button" variant="ghost" size="sm" onClick={handleTestPrompt} disabled={testingPrompt}>{testingPrompt ? <Loader2 className="animate-spin size-4" /> : t('settings.gemini.testPrompt' as any)}</Button>
+                            <Button type="button" variant="ghost" size="sm" onClick={handleTestPrompt} disabled={testingPrompt}>{testingPrompt ? <Loader2 className="animate-spin size-4" /> : 'Probar Prompt'}</Button>
                           </div>
                         </FormItem>
                       )} />
@@ -251,20 +251,20 @@ export function SettingsPage() {
               </motion.div>
             </div>
             <div className="flex justify-end pb-8 border-b">
-              <Button type="submit" size="lg" className="bg-orange-500 hover:bg-orange-600 text-white">{t('common.save')}</Button>
+              <Button type="submit" size="lg" className="bg-orange-500 hover:bg-orange-600 text-white">Guardar</Button>
             </div>
           </form>
         </Form>
-        {currentUser?.role === 'admin' && (
+        {userRole === 'admin' && (
           <div className="mt-12 space-y-12">
             <header>
-              <h2 className="text-2xl font-display font-bold">{t('settings.users.title' as any)}</h2>
-              <p className="text-muted-foreground">{t('settings.users.description' as any)}</p>
+              <h2 className="text-2xl font-display font-bold">Gestión de Sistema</h2>
+              <p className="text-muted-foreground">Administración de usuarios y catálogos.</p>
             </header>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2"><Tags className="size-4" /> {t('settings.categories.title' as any)}</CardTitle>
+                  <CardTitle className="text-sm font-medium flex items-center gap-2"><Tags className="size-4" /> Categorías</CardTitle>
                   <Button variant="ghost" size="icon" onClick={() => setMgmtSheet({ type: 'category', open: true, data: null })}><Plus className="size-4" /></Button>
                 </CardHeader>
                 <CardContent className="max-h-48 overflow-y-auto space-y-2">
@@ -281,7 +281,7 @@ export function SettingsPage() {
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2"><Wallet className="size-4" /> {t('settings.currencies.title' as any)}</CardTitle>
+                  <CardTitle className="text-sm font-medium flex items-center gap-2"><Wallet className="size-4" /> Monedas</CardTitle>
                   <Button variant="ghost" size="icon" onClick={() => setMgmtSheet({ type: 'currency', open: true, data: null })}><Plus className="size-4" /></Button>
                 </CardHeader>
                 <CardContent className="max-h-48 overflow-y-auto space-y-2">
@@ -298,7 +298,7 @@ export function SettingsPage() {
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2"><Repeat className="size-4" /> {t('settings.frequencies.title' as any)}</CardTitle>
+                  <CardTitle className="text-sm font-medium flex items-center gap-2"><Repeat className="size-4" /> Frecuencias</CardTitle>
                   <Button variant="ghost" size="icon" onClick={() => setMgmtSheet({ type: 'frequency', open: true, data: null })}><Plus className="size-4" /></Button>
                 </CardHeader>
                 <CardContent className="max-h-48 overflow-y-auto space-y-2">
@@ -315,7 +315,7 @@ export function SettingsPage() {
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2"><Users className="size-4" /> {t('settings.users.title' as any)}</CardTitle>
+                  <CardTitle className="text-sm font-medium flex items-center gap-2"><Users className="size-4" /> Usuarios</CardTitle>
                   <Button variant="ghost" size="icon" onClick={() => setMgmtSheet({ type: 'user', open: true, data: null })}><Plus className="size-4" /></Button>
                 </CardHeader>
                 <CardContent className="max-h-48 overflow-y-auto space-y-2">
@@ -327,7 +327,7 @@ export function SettingsPage() {
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="icon" className="size-6" onClick={() => setMgmtSheet({ type: 'user', open: true, data: u })}><Edit className="size-3" /></Button>
-                        <Button variant="ghost" size="icon" className="size-6 text-destructive" onClick={() => setDeleteAlert({ type: 'user', open: true, id: u.id, name: u.username })} disabled={u.id === currentUser?.id}><Trash2 className="size-3" /></Button>
+                        <Button variant="ghost" size="icon" className="size-6 text-destructive" onClick={() => setDeleteAlert({ type: 'user', open: true, id: u.id, name: u.username })} disabled={u.id === currentUserId}><Trash2 className="size-3" /></Button>
                       </div>
                     </div>
                   ))}
@@ -340,10 +340,8 @@ export function SettingsPage() {
       <Sheet open={mgmtSheet.open} onOpenChange={(open) => setMgmtSheet(s => ({ ...s, open }))}>
         <SheetContent className="sm:max-w-md p-0 overflow-y-auto" aria-describedby="mgmt-sheet-desc">
           <SheetHeader className="p-6 border-b">
-            <SheetTitle>{mgmtSheet.data ? t('common.edit') : t('common.add')} {t(`settings.${mgmtSheet.type === 'category' ? 'categories' : mgmtSheet.type + 's'}.title` as any)}</SheetTitle>
-            <SheetDescription id="mgmt-sheet-desc">
-              {t(`settings.${mgmtSheet.type === 'category' ? 'categories' : mgmtSheet.type + 's'}.sheet.description` as any)}
-            </SheetDescription>
+            <SheetTitle>{mgmtSheet.data ? 'Editar' : 'Agregar'} {mgmtSheet.type}</SheetTitle>
+            <SheetDescription id="mgmt-sheet-desc">Completa los datos para continuar.</SheetDescription>
           </SheetHeader>
           <div className="py-4">
             {mgmtSheet.type === 'category' && <CategoryForm onSubmit={handleMgmtSubmit} defaultValues={mgmtSheet.data || {}} />}
@@ -356,17 +354,12 @@ export function SettingsPage() {
       <AlertDialog open={deleteAlert.open} onOpenChange={(open) => setDeleteAlert(s => ({ ...s, open }))}>
         <AlertDialogContent aria-describedby="delete-alert-desc">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle>
-            <AlertDialogDescription id="delete-alert-desc">
-              {deleteAlert.type === 'category' && t('settings.categories.confirmDelete' as any, deleteAlert.name)}
-              {deleteAlert.type === 'currency' && t('settings.currencies.confirmDelete' as any, deleteAlert.name)}
-              {deleteAlert.type === 'frequency' && t('settings.frequencies.confirmDelete' as any, deleteAlert.name)}
-              {deleteAlert.type === 'user' && t('settings.users.confirmDelete' as any, deleteAlert.name)}
-            </AlertDialogDescription>
+            <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
+            <AlertDialogDescription id="delete-alert-desc">¿Eliminar a {deleteAlert.name}?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t('common.delete')}</AlertDialogAction>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

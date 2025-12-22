@@ -62,7 +62,7 @@ function AdminDashboard() {
     }
     const trendData = recentTransactions.sort((a,b) => a.ts - b.ts).map(tx => ({
         date: new Date(tx.ts).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
-        balance: historicalBalances[tx.ts] || 0 
+        balance: historicalBalances[tx.ts] || 0
     }));
     return { totalBalance: balance, totalIncome: income, totalExpenses: expenses, balanceTrend: trendData };
   }, [accounts, transactions]);
@@ -150,9 +150,8 @@ function AdminDashboard() {
   );
 }
 export function HomePage() {
-  const settings = useAppStore(s => s.settings);
-  const user = settings?.user;
-  if (user?.role === 'admin') {
+  const userRole = useAppStore(s => s.settings?.user?.role);
+  if (userRole === 'admin') {
     return <AdminDashboard />;
   }
   return <UserDashboard />;

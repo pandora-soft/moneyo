@@ -3,6 +3,7 @@ import { enableMapSet } from "immer";
 import React, { StrictMode, useEffect, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Outlet, NavLink, useNavigate } from "react-router-dom";
+import { useShallow } from 'zustand/react/shallow';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css';
@@ -18,7 +19,6 @@ import { Toaster } from '@/components/ui/sonner';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Home, Wallet, List, BarChart, Settings, PiggyBank, LogOut, Menu, Brain } from 'lucide-react';
 import { useTranslations } from '@/lib/i18n';
-import { motion } from 'framer-motion';
 import { cn } from './lib/utils';
 import { useAppStore } from './stores/useAppStore';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './components/ui/sheet';
@@ -31,7 +31,7 @@ import { Skeleton } from './components/ui/skeleton';
 enableMapSet();
 const GlobalTransactionSheet = () => {
   const isModalOpen = useAppStore(s => s.isModalOpen);
-  const modalInitialValues = useAppStore(s => s.modalInitialValues);
+  const modalInitialValues = useAppStore(useShallow(s => s.modalInitialValues));
   const closeModal = useAppStore(s => s.closeModal);
   const triggerRefetch = useAppStore(s => s.triggerRefetch);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -107,8 +107,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 const RoleGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const t = useTranslations();
-  const settings = useAppStore(s => s.settings);
-  const userRole = settings?.user?.role;
+  const userRole = useAppStore(s => s.settings?.user?.role);
   useEffect(() => {
     if (userRole && userRole !== 'admin') {
       toast.error(t('access.adminOnly'));
@@ -122,8 +121,7 @@ export const AppRoot = () => {
   const navigate = useNavigate();
   const t = useTranslations();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const settings = useAppStore(s => s.settings);
-  const userRole = settings?.user?.role;
+  const userRole = useAppStore(s => s.settings?.user?.role);
   const navItems = [
     { href: '/', label: t('pages.dashboard'), icon: Home, adminOnly: false },
     { href: '/accounts', label: t('pages.accounts'), icon: Wallet, adminOnly: true },
