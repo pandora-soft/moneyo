@@ -207,7 +207,7 @@ export const AppRoot = () => {
       <Toaster richColors position="top-right" />
       <footer className="border-t">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-          Moneyo © 2025 - Built with ❤️ at Cloudflare
+          Moneyo by chdeimos 2025
         </div>
       </footer>
     </div>
