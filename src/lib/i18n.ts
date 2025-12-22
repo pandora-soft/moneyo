@@ -138,11 +138,17 @@ const translations = {
     finances: 'Finanzas',
     financesDesc: 'Configuración global de moneda.',
     fiscalMonthStart: 'Día de inicio fiscal',
+    githubUpdate: {
+      title: 'Actualizar desde GitHub',
+      description: 'Mantén tu instancia de Moneyo al día con las últimas mejoras del repositorio original.',
+      button: 'Instrucciones de Actualización',
+      instructions: '1. Exportar GitHub (botón superior derecho).\n2. Pull latest commits repo.\n3. Redeploy your fork.',
+    },
     gemini: {
       key: 'Clave API Gemini',
       keyRequired: 'Se requiere una Clave API para la prueba.',
       testKey: 'Probar clave',
-      validKey: 'La clave es válida.',
+      validKey: 'La clave es v��lida.',
       invalidKey: 'La clave parece inválida.',
       model: 'Modelo AI',
       modelPlaceholder: 'gemini-1.5-flash',
@@ -172,7 +178,7 @@ const translations = {
     currencies: {
       title: 'Monedas',
       code: 'Código (ISO)',
-      symbol: 'Símbolo',
+      symbol: 'S��mbolo',
       suffix: 'Usar sufijo',
       confirmDelete: (name: string) => `¿Eliminar la moneda '${name}'?`,
       sheet: { description: 'Configura las divisas disponibles.' },

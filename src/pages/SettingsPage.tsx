@@ -14,7 +14,7 @@ import { api } from '@/lib/api-client';
 import { validateApiKey, testPrompt } from '@/lib/gemini-client';
 import type { Settings, Currency, User } from '@shared/types';
 import { toast } from 'sonner';
-import { Loader2, Plus, Edit, Trash2, BrainCircuit, Wallet, Repeat, Tags, Users } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, BrainCircuit, Wallet, Repeat, Tags, Users, Github, Settings2 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useTranslations } from '@/lib/i18n';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CategoryForm } from '@/components/accounting/CategoryForm';
 import { CurrencyForm } from '@/components/accounting/CurrencyForm';
 import { FrequencyForm } from '@/components/accounting/FrequencyForm';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UserForm } from '@/components/accounting/UserForm';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -143,6 +143,14 @@ export function SettingsPage() {
       setDeleteAlert({ type: null, open: false, id: '', name: '' });
     }
   };
+
+  const handleGithubUpdateToast = () => {
+    toast.info(t('settings.githubUpdate.title'), {
+      description: t('settings.githubUpdate.instructions'),
+      duration: 6000,
+      action: { label: t('common.close'), onClick: () => {} },
+    });
+  };
   const handleMgmtSubmit = async (values: any) => {
     const { type, data } = mgmtSheet;
     try {
@@ -212,6 +220,20 @@ export function SettingsPage() {
                         <FormMessage />
                       </FormItem>
                     )} />
+                  </CardContent>
+                </Card>
+              </motion.div>
+              <motion.div variants={cardVariants} initial="hidden" animate="visible" transition={{ delay: 0.15 }}>
+                <Card className="h-full border-blue-100 dark:border-blue-900/20 bg-blue-50/10 dark:bg-blue-950/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Settings2 className="size-5 text-blue-500" />
+                      Mantenimiento
+                    </CardTitle>
+                    <CardDescription>{t('settings.githubUpdate.description')}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button type="button" variant="outline" className="w-full gap-2" onClick={handleGithubUpdateToast}><Github className="size-4" /> {t('settings.githubUpdate.button')}</Button>
                   </CardContent>
                 </Card>
               </motion.div>
