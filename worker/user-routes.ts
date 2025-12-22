@@ -1,17 +1,17 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
-import { 
-  AccountEntity, 
-  LedgerEntity, 
-  BudgetEntity, 
-  SettingsEntity, 
-  CategoryEntity, 
-  CurrencyEntity, 
-  FrequencyEntity, 
-  UserEntity, 
-  SessionEntity, 
-  verifyPassword, 
-  hashPassword 
+import {
+  AccountEntity,
+  LedgerEntity,
+  BudgetEntity,
+  SettingsEntity,
+  CategoryEntity,
+  CurrencyEntity,
+  FrequencyEntity,
+  UserEntity,
+  SessionEntity,
+  verifyPassword,
+  hashPassword
 } from "./entities";
 import { ok, bad, notFound, isStr } from './core-utils';
 import type { Account, Transaction, Budget, Settings, TransactionType, Currency, User } from "@shared/types";
@@ -37,24 +37,20 @@ export function userRoutes(app: AppHono) {
     const authHeader = c.req.header('Authorization');
     const token = authHeader?.split(' ')[1];
     if (!isStr(token)) {
-      console.error('[AUTH FAIL] No valid token', { authHeader: c.req.header('Authorization')?.slice(0, 15) });
       return bad(c, 'Unauthorized');
     }
     const sessionEntity = new SessionEntity(c.env, token);
     const session = await sessionEntity.getState();
     if (!session || !session.id) {
-      console.error('[AUTH FAIL] No session for token', { tokenPrefix: token?.slice(0, 8) });
       return bad(c, 'Session expired or invalid');
     }
     if (Date.now() >= session.expires) {
-      console.error('[AUTH FAIL] Session expired', { tokenPrefix: token?.slice(0, 8), expires: session.expires, now: Date.now() });
       await SessionEntity.delete(c.env, token);
       return bad(c, 'Session expired');
     }
     const userEntity = new UserEntity(c.env, session.userId);
     const user = await userEntity.getState();
     if (!user || !user.id) {
-      console.error('[AUTH FAIL] No user for session', { tokenPrefix: token?.slice(0, 8), userId: session.userId });
       await sessionEntity.delete();
       return bad(c, 'Invalid session');
     }
@@ -75,14 +71,8 @@ export function userRoutes(app: AppHono) {
     if (!isStr(username) || !isStr(password)) return bad(c, 'Username and password required');
     const { items: users } = await UserEntity.list(c.env);
     const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (!user || !user.id) {
-      console.error('[LOGIN] User not found:', username.toLowerCase());
-      return bad(c, 'Invalid credentials');
-    }
-    if (!await verifyPassword(password, user.passwordHash)) {
-      console.error('[LOGIN] Password verify failed for user:', user.username);
-      return bad(c, 'Invalid credentials');
-    }
+    if (!user || !user.id) return bad(c, 'Invalid credentials');
+    if (!await verifyPassword(password, user.passwordHash)) return bad(c, 'Invalid credentials');
     const token = crypto.randomUUID();
     const sessionData = { id: token, userId: user.id, expires: Date.now() + SESSION_DURATION };
     await SessionEntity.create(c.env, sessionData);
@@ -108,6 +98,10 @@ export function userRoutes(app: AppHono) {
   finance.post('/users', adminGuard, async (c) => {
     const { username, password, role, email } = await c.req.json<Partial<User> & { password?: string }>();
     if (!isStr(username) || !isStr(password) || !role) return bad(c, 'Username, password, and role are required');
+    const { items: existingUsers } = await UserEntity.list(c.env);
+    if (existingUsers.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+      return bad(c, 'El nombre de usuario ya existe');
+    }
     const passwordHash = await hashPassword(password);
     const newUser: User = { id: crypto.randomUUID(), username, passwordHash, role, email };
     await UserEntity.create(c.env, newUser);
@@ -116,18 +110,23 @@ export function userRoutes(app: AppHono) {
   });
   finance.put('/users/:id', adminGuard, async (c) => {
     const id = c.req.param('id');
-    const { password, role, email } = await c.req.json<Partial<User> & { password?: string }>();
-    const user = new UserEntity(c.env, id);
-    if (!await user.exists()) return notFound(c, 'User not found');
-    let passwordHash: string | undefined;
-    if (password) {
-      passwordHash = await hashPassword(password);
-    }
+    const { username, password, role, email } = await c.req.json<Partial<User> & { password?: string }>();
+    const userEntity = new UserEntity(c.env, id);
+    if (!await userEntity.exists()) return notFound(c, 'User not found');
     const updates: Partial<User> = {};
+    if (isStr(username)) {
+      const { items: existingUsers } = await UserEntity.list(c.env);
+      if (existingUsers.some(u => u.id !== id && u.username.toLowerCase() === username.toLowerCase())) {
+        return bad(c, 'El nombre de usuario ya existe');
+      }
+      updates.username = username;
+    }
+    if (password && isStr(password)) {
+      updates.passwordHash = await hashPassword(password);
+    }
     if (role) updates.role = role;
-    if (email) updates.email = email;
-    if (passwordHash) updates.passwordHash = passwordHash;
-    const updatedUser = await user.mutate(u => ({ ...u, ...updates }));
+    if (email !== undefined) updates.email = email;
+    const updatedUser = await userEntity.mutate(u => ({ ...u, ...updates }));
     const { passwordHash: _, ...userWithoutPassword } = updatedUser;
     return ok(c, userWithoutPassword);
   });
@@ -160,11 +159,11 @@ export function userRoutes(app: AppHono) {
     const { name, type, currency } = await c.req.json<Partial<Account>>();
     const account = new AccountEntity(c.env, id);
     if (!await account.exists()) return notFound(c, 'Account not found');
-    const updatedAccount = await account.mutate(acc => ({ 
-      ...acc, 
-      name: name || acc.name, 
-      type: type || acc.type, 
-      currency: currency || acc.currency 
+    const updatedAccount = await account.mutate(acc => ({
+      ...acc,
+      name: name || acc.name,
+      type: type || acc.type,
+      currency: currency || acc.currency
     }));
     return ok(c, updatedAccount);
   });
@@ -257,7 +256,6 @@ export function userRoutes(app: AppHono) {
       const generated = await ledger.generateRecurrents();
       return ok(c, { generated: generated.length });
     } catch (e: any) {
-      console.error("Recurrent generation failed:", e);
       return bad(c, e.message || "Failed to generate recurrent transactions");
     }
   });
@@ -318,7 +316,7 @@ export function userRoutes(app: AppHono) {
   });
   finance.post('/categories', adminGuard, async (c) => {
     const { name } = await c.req.json<{name: string}>();
-    if (!isStr(name) || name.length < 2) return bad(c, 'Nombre requerido (mín. 2 chars)');
+    if (!isStr(name) || name.length < 2) return bad(c, 'Nombre requerido (m��n. 2 chars)');
     const { items } = await CategoryEntity.list(c.env);
     if (items.find(cat => cat.name.toLowerCase() === name.toLowerCase())) return bad(c, 'Categoría ya existe');
     const newCat = { id: crypto.randomUUID(), name: name.trim() };
@@ -335,7 +333,6 @@ export function userRoutes(app: AppHono) {
     const { items } = await CurrencyEntity.list(c.env);
     return ok(c, items.sort((a, b) => a.code.localeCompare(b.code)));
   });
-
   // FREQUENCIES API
   finance.get('/frequencies', async (c) => {
     const { items } = await FrequencyEntity.list(c.env);

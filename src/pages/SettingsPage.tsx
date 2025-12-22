@@ -52,7 +52,9 @@ const containerVariants: Variants = {
 };
 export function SettingsPage() {
   const { isDark } = useTheme();
-  const { setSettings, triggerRefetch, setCurrencies: setStoreCurrencies } = useAppStore.getState();
+  const setSettings = useAppStore(s => s.setSettings);
+  const triggerRefetch = useAppStore(s => s.triggerRefetch);
+  const setStoreCurrencies = useAppStore(s => s.setCurrencies);
   const currentUser = useAppStore(s => s.settings.user);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -80,11 +82,12 @@ export function SettingsPage() {
       geminiPrompt: localStorage.getItem('gemini_prompt') || '',
     }
   });
-  const { isSubmitting, isDirty } = form.formState;
+  const isSubmitting = form.formState.isSubmitting;
+  const isDirty = form.formState.isDirty;
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      const [settings, cats, currs, freqs] = await Promise.all([
+      const [settingsData, cats, currs, freqs] = await Promise.all([
         api<Settings>('/api/finance/settings'),
         api<Category[]>('/api/finance/categories'),
         api<Currency[]>('/api/finance/currencies'),
@@ -95,20 +98,19 @@ export function SettingsPage() {
         setUsers(fetchedUsers);
       }
       form.reset({
-        ...settings,
-        fiscalMonthStart: settings.fiscalMonthStart ?? 1,
+        ...settingsData,
+        fiscalMonthStart: settingsData.fiscalMonthStart ?? 1,
         geminiApiKey: localStorage.getItem('gemini_api_key') || '',
         geminiModel: localStorage.getItem('gemini_model') || 'gemini-1.5-flash-latest',
         geminiPrompt: localStorage.getItem('gemini_prompt') || '',
       });
-      setSettings(settings);
+      setSettings(settingsData);
       setCategories(cats);
       setCurrencies(currs);
       setFrequencies(freqs);
       setStoreCurrencies(currs);
     } catch (error) {
       toast.error('No se pudieron cargar los datos de configuración.');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -148,24 +150,14 @@ export function SettingsPage() {
         method: 'POST',
         body: JSON.stringify(settingsData),
       });
-      if (geminiApiKey) {
-        localStorage.setItem('gemini_api_key', geminiApiKey);
-      } else {
-        localStorage.removeItem('gemini_api_key');
-      }
-      if (geminiModel) {
-        localStorage.setItem('gemini_model', geminiModel);
-      } else {
-        localStorage.removeItem('gemini_model');
-      }
-      if (geminiPrompt) {
-        localStorage.setItem('gemini_prompt', geminiPrompt);
-      } else {
-        localStorage.removeItem('gemini_prompt');
-      }
+      if (geminiApiKey) localStorage.setItem('gemini_api_key', geminiApiKey);
+      else localStorage.removeItem('gemini_api_key');
+      if (geminiModel) localStorage.setItem('gemini_model', geminiModel);
+      else localStorage.removeItem('gemini_model');
+      if (geminiPrompt) localStorage.setItem('gemini_prompt', geminiPrompt);
+      else localStorage.removeItem('gemini_prompt');
       toast.success('Ajustes guardados correctamente.');
       form.reset({ ...updatedSettings, geminiApiKey, geminiModel, geminiPrompt });
-      useAppStore.getState().setCurrency(updatedSettings.currency);
       setSettings(updatedSettings);
       triggerRefetch();
     } catch (error) {
@@ -183,7 +175,7 @@ export function SettingsPage() {
       }
       setCategorySheetOpen(false);
       setEditingCategory(null);
-      fetchAllData();
+      await fetchAllData();
       triggerRefetch();
     } catch (e: any) {
       toast.error(e.message || 'Error al guardar la categoría.');
@@ -195,7 +187,7 @@ export function SettingsPage() {
       await api(`/api/finance/categories/${deletingCategory.id}`, { method: 'DELETE' });
       toast.success('Categoría eliminada.');
       setDeletingCategory(null);
-      fetchAllData();
+      await fetchAllData();
       triggerRefetch();
     } catch (e: any) {
       toast.error(e.message || 'Error al eliminar la categoría.');
@@ -212,7 +204,7 @@ export function SettingsPage() {
       }
       setCurrencySheetOpen(false);
       setEditingCurrency(null);
-      fetchAllData();
+      await fetchAllData();
       triggerRefetch();
     } catch (e: any) {
       toast.error(e.message || 'Error al guardar la moneda.');
@@ -224,7 +216,7 @@ export function SettingsPage() {
       await api(`/api/finance/currencies/${deletingCurrency.id}`, { method: 'DELETE' });
       toast.success('Moneda eliminada.');
       setDeletingCurrency(null);
-      fetchAllData();
+      await fetchAllData();
       triggerRefetch();
     } catch (e: any) {
       toast.error(e.message || 'Error al eliminar la moneda.');
@@ -241,7 +233,7 @@ export function SettingsPage() {
       }
       setFrequencySheetOpen(false);
       setEditingFrequency(null);
-      fetchAllData();
+      await fetchAllData();
       triggerRefetch();
     } catch (e: any) {
       toast.error(e.message || 'Error al guardar la frecuencia.');
@@ -253,7 +245,7 @@ export function SettingsPage() {
       await api(`/api/finance/frequencies/${deletingFrequency.id}`, { method: 'DELETE' });
       toast.success('Frecuencia eliminada.');
       setDeletingFrequency(null);
-      fetchAllData();
+      await fetchAllData();
       triggerRefetch();
     } catch (e: any) {
       toast.error(e.message || 'Error al eliminar la frecuencia.');
@@ -270,7 +262,7 @@ export function SettingsPage() {
       }
       setUserSheetOpen(false);
       setEditingUser(null);
-      fetchAllData();
+      await fetchAllData();
     } catch (e: any) {
       toast.error(e.message || 'Error al guardar el usuario.');
     }
@@ -281,7 +273,7 @@ export function SettingsPage() {
       await api(`/api/finance/users/${deletingUser.id}`, { method: 'DELETE' });
       toast.success('Usuario eliminado.');
       setDeletingUser(null);
-      fetchAllData();
+      await fetchAllData();
     } catch (e: any) {
       toast.error(e.message || 'Error al eliminar el usuario.');
     }
@@ -308,9 +300,7 @@ export function SettingsPage() {
                     <Label>{t('settings.theme')}</Label>
                     <div className="flex items-center gap-2">
                       <span>{isDark ? t('settings.themeDark') : t('settings.themeLight')}</span>
-                      <motion.div key={isDark ? 'dark' : 'light'} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
-                        <ThemeToggle className="relative top-0 right-0" />
-                      </motion.div>
+                      <ThemeToggle className="relative top-0 right-0" />
                     </div>
                   </div>
                 </CardContent>
@@ -318,69 +308,26 @@ export function SettingsPage() {
             </motion.div>
             <motion.div variants={cardVariants}>
               {loading ? (
-                <Card>
-                  <CardHeader><CardTitle>{t('settings.finances')}</CardTitle><CardDescription>{t('settings.financesDesc')}</CardDescription></CardHeader>
-                  <CardContent className="space-y-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent>
-                  <div className="flex justify-end p-6 border-t"><Button disabled>{t('common.save')}</Button></div>
-                </Card>
+                <Card><CardHeader><CardTitle>{t('settings.finances')}</CardTitle></CardHeader><CardContent className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
               ) : (
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)}>
                     <Card>
                       <CardHeader><CardTitle>{t('settings.finances')}</CardTitle><CardDescription>{t('settings.financesDesc')}</CardDescription></CardHeader>
                       <CardContent className="space-y-6">
-                        <FormField control={form.control} name="currency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('finance.mainCurrency')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar moneda" /></SelectTrigger></FormControl><SelectContent>{currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.fiscalMonthStart')}</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value) || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.recurrentDefaultFreq')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="geminiApiKey" render={({ field }) => (<FormItem><FormLabel>{t('settings.gemini.key')}</FormLabel><FormControl><Input type="password" placeholder="AIza..." {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="geminiModel" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t('settings.gemini.model')}</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="gemini-1.5-flash-latest"
-                                onChange={(e) => {
-                                  field.onChange(e);
-                                  localStorage.setItem('gemini_model', e.target.value);
-                                }}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={form.control} name="geminiPrompt" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t('settings.gemini.prompt')}</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                rows={6}
-                                placeholder="Analiza el recibo y extrae la información..."
-                                {...field}
-                                onChange={(e) => {
-                                  field.onChange(e);
-                                  localStorage.setItem('gemini_prompt', e.target.value);
-                                }}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
+                        <FormField control={form.control} name="currency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('finance.mainCurrency')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar moneda" /></SelectTrigger></FormControl><SelectContent>{currencies.map(c => <SelectItem key={c.id} value={c.code}>{c.code} ({c.symbol})</SelectItem>)}</SelectContent></Select></div></FormItem>)} />
+                        <FormField control={form.control} name="fiscalMonthStart" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.fiscalMonthStart')}</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value)}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Día del mes" /></SelectTrigger></FormControl><SelectContent>{Array.from({ length: 28 }, (_, i) => i + 1).map(day => (<SelectItem key={day} value={String(day)}>Día {day}</SelectItem>))}</SelectContent></Select></div></FormItem>)} />
+                        <FormField control={form.control} name="recurrentDefaultFrequency" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>{t('settings.recurrentDefaultFreq')}</FormLabel><Select onValueChange={field.onChange} value={field.value || ''}><FormControl><SelectTrigger className="w-[180px]"><SelectValue placeholder="Seleccionar frecuencia" /></SelectTrigger></FormControl><SelectContent>{frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}</SelectContent></Select></div></FormItem>)} />
+                        <FormField control={form.control} name="geminiApiKey" render={({ field }) => (<FormItem><FormLabel>{t('settings.gemini.key')}</FormLabel><FormControl><Input type="password" placeholder="AIza..." {...field} /></FormControl></FormItem>)} />
+                        <FormField control={form.control} name="geminiModel" render={({ field }) => (<FormItem><FormLabel>{t('settings.gemini.model')}</FormLabel><FormControl><Input placeholder="gemini-1.5-flash-latest" {...field} /></FormControl></FormItem>)} />
+                        <FormField control={form.control} name="geminiPrompt" render={({ field }) => (<FormItem><FormLabel>{t('settings.gemini.prompt')}</FormLabel><FormControl><Textarea rows={6} placeholder="Analiza el recibo..." {...field} /></FormControl></FormItem>)} />
                       </CardContent>
                       <div className="flex flex-wrap justify-between items-center p-6 border-t gap-2">
                         <div className="flex gap-2">
-                          <Button type="button" variant="outline" onClick={handleValidateApiKey} disabled={isVerifyingKey || isSubmitting}>
-                            {isVerifyingKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                            Probar Clave
-                          </Button>
-                          <Button type="button" variant="outline" onClick={handleTestPrompt} disabled={isVerifyingKey || isSubmitting}>
-                            Probar Prompt
-                          </Button>
+                          <Button type="button" variant="outline" onClick={handleValidateApiKey} disabled={isVerifyingKey || isSubmitting}>{isVerifyingKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />} Probar Clave</Button>
+                          <Button type="button" variant="outline" onClick={handleTestPrompt} disabled={isVerifyingKey || isSubmitting}>Probar Prompt</Button>
                         </div>
-                        <Button type="submit" disabled={isSubmitting || !isDirty}>
-                          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                          {t('common.save')}
-                        </Button>
+                        <Button type="submit" disabled={isSubmitting || !isDirty}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t('common.save')}</Button>
                       </div>
                     </Card>
                   </form>
@@ -391,7 +338,7 @@ export function SettingsPage() {
               <Card>
                 <CardHeader><CardTitle>{t('settings.frequencies.title')}</CardTitle><CardDescription>{t('settings.frequencies.description')}</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
-                  {loading ? <Skeleton className="h-20 w-full" /> : frequencies.length > 0 ? (
+                  {loading ? <Skeleton className="h-20 w-full" /> : (
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                       {frequencies.map(freq => (
                         <div key={freq.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-md">
@@ -403,10 +350,8 @@ export function SettingsPage() {
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-muted-foreground text-sm text-center py-4">No hay frecuencias personalizadas.</p>}
-                  <Button variant="outline" onClick={() => { setEditingFrequency(null); setFrequencySheetOpen(true); }} className="w-full">
-                    <Plus className="mr-2 h-4 w-4" /> {t('settings.frequencies.add')}
-                  </Button>
+                  )}
+                  <Button variant="outline" onClick={() => { setEditingFrequency(null); setFrequencySheetOpen(true); }} className="w-full"><Plus className="mr-2 h-4 w-4" /> {t('settings.frequencies.add')}</Button>
                 </CardContent>
               </Card>
             </motion.div>
@@ -416,7 +361,7 @@ export function SettingsPage() {
               <Card>
                 <CardHeader><CardTitle>{t('settings.categories.title')}</CardTitle><CardDescription>{t('settings.categories.description')}</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
-                  {loading ? <Skeleton className="h-20 w-full" /> : categories.length > 0 ? (
+                  {loading ? <Skeleton className="h-20 w-full" /> : (
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                       {categories.map(cat => (
                         <div key={cat.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-md">
@@ -428,10 +373,8 @@ export function SettingsPage() {
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-muted-foreground text-sm text-center py-4">No hay categorías personalizadas.</p>}
-                  <Button variant="outline" onClick={() => { setEditingCategory(null); setCategorySheetOpen(true); }} className="w-full">
-                    <Plus className="mr-2 h-4 w-4" /> {t('settings.categories.add')}
-                  </Button>
+                  )}
+                  <Button variant="outline" onClick={() => { setEditingCategory(null); setCategorySheetOpen(true); }} className="w-full"><Plus className="mr-2 h-4 w-4" /> {t('settings.categories.add')}</Button>
                 </CardContent>
               </Card>
             </motion.div>
@@ -439,7 +382,7 @@ export function SettingsPage() {
               <Card>
                 <CardHeader><CardTitle>{t('settings.currencies.title')}</CardTitle><CardDescription>{t('settings.currencies.description')}</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
-                  {loading ? <Skeleton className="h-20 w-full" /> : currencies.length > 0 ? (
+                  {loading ? <Skeleton className="h-20 w-full" /> : (
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                       {currencies.map(cur => (
                         <div key={cur.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-md">
@@ -451,19 +394,17 @@ export function SettingsPage() {
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-muted-foreground text-sm text-center py-4">No hay monedas personalizadas.</p>}
-                  <Button variant="outline" onClick={() => { setEditingCurrency(null); setCurrencySheetOpen(true); }} className="w-full">
-                    <Plus className="mr-2 h-4 w-4" /> {t('settings.currencies.add')}
-                  </Button>
+                  )}
+                  <Button variant="outline" onClick={() => { setEditingCurrency(null); setCurrencySheetOpen(true); }} className="w-full"><Plus className="mr-2 h-4 w-4" /> {t('settings.currencies.add')}</Button>
                 </CardContent>
               </Card>
             </motion.div>
-             {currentUser?.role === 'admin' && (
+            {currentUser?.role === 'admin' && (
               <motion.div variants={cardVariants}>
                 <Card>
                   <CardHeader><CardTitle>{t('settings.users.title')}</CardTitle><CardDescription>{t('settings.users.description')}</CardDescription></CardHeader>
                   <CardContent className="space-y-4">
-                    {loading ? <Skeleton className="h-20 w-full" /> : users.length > 0 ? (
+                    {loading ? <Skeleton className="h-20 w-full" /> : (
                       <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                         {users.map(user => (
                           <div key={user.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-md">
@@ -475,10 +416,8 @@ export function SettingsPage() {
                           </div>
                         ))}
                       </div>
-                    ) : <p className="text-muted-foreground text-sm text-center py-4">No hay otros usuarios.</p>}
-                    <Button variant="outline" onClick={() => { setEditingUser(null); setUserSheetOpen(true); }} className="w-full">
-                      <Plus className="mr-2 h-4 w-4" /> {t('settings.users.add')}
-                    </Button>
+                    )}
+                    <Button variant="outline" onClick={() => { setEditingUser(null); setUserSheetOpen(true); }} className="w-full"><Plus className="mr-2 h-4 w-4" /> {t('settings.users.add')}</Button>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -487,52 +426,28 @@ export function SettingsPage() {
         </motion.div>
       </div>
       <Sheet open={isCategorySheetOpen} onOpenChange={setCategorySheetOpen}>
-        <SheetContent aria-describedby="category-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingCategory ? t('settings.categories.edit') : t('settings.categories.add')}</SheetTitle><SheetDescription id="category-sheet-desc">{t('settings.categories.sheet.description')}</SheetDescription></SheetHeader>
-          <CategoryForm onSubmit={handleCategorySubmit} defaultValues={editingCategory ? { name: editingCategory.name } : {}} />
-        </SheetContent>
+        <SheetContent><SheetHeader className="p-6 border-b"><SheetTitle>{editingCategory ? t('settings.categories.edit') : t('settings.categories.add')}</SheetTitle></SheetHeader><CategoryForm onSubmit={handleCategorySubmit} defaultValues={editingCategory ? { name: editingCategory.name } : {}} /></SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingCategory} onOpenChange={() => setDeletingCategory(null)}>
-        <AlertDialogContent aria-describedby="delete-category-desc">
-          <AlertDialogHeader><AlertDialogTitle>{t('settings.categories.delete')}</AlertDialogTitle><AlertDialogDescription id="delete-category-desc">{t('settings.categories.confirmDelete', deletingCategory?.name || '')}</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleCategoryDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('settings.categories.delete')}</AlertDialogTitle><AlertDialogDescription>{t('settings.categories.confirmDelete', deletingCategory?.name || '')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleCategoryDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
       <Sheet open={isCurrencySheetOpen} onOpenChange={setCurrencySheetOpen}>
-        <SheetContent aria-describedby="currency-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingCurrency ? t('settings.currencies.edit') : t('settings.currencies.add')}</SheetTitle><SheetDescription id="currency-sheet-desc">{t('settings.currencies.sheet.description')}</SheetDescription></SheetHeader>
-          <CurrencyForm onSubmit={handleCurrencySubmit} defaultValues={editingCurrency || {}} />
-        </SheetContent>
+        <SheetContent><SheetHeader className="p-6 border-b"><SheetTitle>{editingCurrency ? t('settings.currencies.edit') : t('settings.currencies.add')}</SheetTitle></SheetHeader><CurrencyForm onSubmit={handleCurrencySubmit} defaultValues={editingCurrency || {}} /></SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingCurrency} onOpenChange={() => setDeletingCurrency(null)}>
-        <AlertDialogContent aria-describedby="delete-currency-desc">
-          <AlertDialogHeader><AlertDialogTitle>{t('settings.currencies.delete')}</AlertDialogTitle><AlertDialogDescription id="delete-currency-desc">{t('settings.currencies.confirmDelete', deletingCurrency?.code || '')}</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleCurrencyDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('settings.currencies.delete')}</AlertDialogTitle><AlertDialogDescription>{t('settings.currencies.confirmDelete', deletingCurrency?.code || '')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleCurrencyDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
       <Sheet open={isFrequencySheetOpen} onOpenChange={setFrequencySheetOpen}>
-        <SheetContent aria-describedby="frequency-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingFrequency ? t('settings.frequencies.edit') : t('settings.frequencies.add')}</SheetTitle><SheetDescription id="frequency-sheet-desc">{t('settings.frequencies.sheet.description')}</SheetDescription></SheetHeader>
-          <FrequencyForm onSubmit={handleFrequencySubmit} defaultValues={editingFrequency || {}} />
-        </SheetContent>
+        <SheetContent><SheetHeader className="p-6 border-b"><SheetTitle>{editingFrequency ? t('settings.frequencies.edit') : t('settings.frequencies.add')}</SheetTitle></SheetHeader><FrequencyForm onSubmit={handleFrequencySubmit} defaultValues={editingFrequency || {}} /></SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingFrequency} onOpenChange={() => setDeletingFrequency(null)}>
-        <AlertDialogContent aria-describedby="delete-frequency-desc">
-          <AlertDialogHeader><AlertDialogTitle>{t('settings.frequencies.delete')}</AlertDialogTitle><AlertDialogDescription id="delete-frequency-desc">{t('settings.frequencies.confirmDelete', deletingFrequency?.name || '')}</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleFrequencyDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('settings.frequencies.delete')}</AlertDialogTitle><AlertDialogDescription>{t('settings.frequencies.confirmDelete', deletingFrequency?.name || '')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleFrequencyDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
       <Sheet open={isUserSheetOpen} onOpenChange={setUserSheetOpen}>
-        <SheetContent aria-describedby="user-sheet-desc">
-          <SheetHeader className="p-6 border-b"><SheetTitle>{editingUser ? t('settings.users.sheet.titleEdit') : t('settings.users.sheet.titleNew')}</SheetTitle><SheetDescription id="user-sheet-desc">{t('settings.users.sheet.description')}</SheetDescription></SheetHeader>
-          <UserForm onSubmit={handleUserSubmit} defaultValues={editingUser || {}} isEditing={!!editingUser} />
-        </SheetContent>
+        <SheetContent><SheetHeader className="p-6 border-b"><SheetTitle>{editingUser ? t('settings.users.sheet.titleEdit') : t('settings.users.sheet.titleNew')}</SheetTitle></SheetHeader><UserForm onSubmit={handleUserSubmit} defaultValues={editingUser || {}} isEditing={!!editingUser} /></SheetContent>
       </Sheet>
       <AlertDialog open={!!deletingUser} onOpenChange={() => setDeletingUser(null)}>
-        <AlertDialogContent aria-describedby="delete-user-desc">
-          <AlertDialogHeader><AlertDialogTitle>{t('settings.users.delete')}</AlertDialogTitle><AlertDialogDescription id="delete-user-desc">{t('settings.users.confirmDelete', deletingUser?.username || '')}</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleUserDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('settings.users.delete')}</AlertDialogTitle><AlertDialogDescription>{t('settings.users.confirmDelete', deletingUser?.username || '')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleUserDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </div>
   );

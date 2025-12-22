@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
@@ -10,9 +10,15 @@ import t from '@/lib/i18n';
 import type { User } from '@shared/types';
 const userSchema = z.object({
   username: z.string().min(3, t('form.minChars', 3)).max(20, t('form.maxChars', 20)),
-  password: z.string().min(5, t('form.minChars', 5)).optional().or(z.literal('')),
+  password: z.string().optional(),
   role: z.enum(['user', 'admin']),
   email: z.string().email(t('form.email')).optional().or(z.literal('')),
+}).superRefine((data, ctx) => {
+  // If not editing, password is required
+  if (!ctx.path.includes('isEditingFlag') && !data.password) {
+    // Note: superRefine doesn't have easy access to external props like 'isEditing'
+    // but we can handle this logic in the schema or during submission.
+  }
 });
 type UserFormValues = z.infer<typeof userSchema>;
 interface UserFormProps {
@@ -32,12 +38,20 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
   });
   const { isSubmitting } = form.formState;
   const handleSubmit: SubmitHandler<UserFormValues> = async (values) => {
+    if (!isEditing && (!values.password || values.password.length < 5)) {
+      form.setError('password', { message: t('form.minChars', 5) });
+      return;
+    }
+    if (isEditing && values.password && values.password.length > 0 && values.password.length < 5) {
+      form.setError('password', { message: t('form.minChars', 5) });
+      return;
+    }
     const payload: Partial<User> & { password?: string } = {
-      username: values.username,
+      username: values.username.trim(),
       role: values.role,
-      email: values.email || undefined,
+      email: values.email ? values.email.trim() : undefined,
     };
-    if (values.password) {
+    if (values.password && values.password.length >= 5) {
       payload.password = values.password;
     }
     await onSubmit(payload);
@@ -52,7 +66,7 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
             <FormItem>
               <FormLabel>{t('settings.users.username')}</FormLabel>
               <FormControl>
-                <Input placeholder="juanperez" {...field} disabled={isEditing} />
+                <Input placeholder="usuario123" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -67,6 +81,11 @@ export function UserForm({ onSubmit, defaultValues, isEditing = false }: UserFor
               <FormControl>
                 <Input type="password" placeholder="••••••••" {...field} />
               </FormControl>
+              <FormDescription>
+                {isEditing 
+                  ? "Deja en blanco para mantener la contraseña actual (mín. 5 caracteres)." 
+                  : "Mínimo 5 caracteres."}
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
