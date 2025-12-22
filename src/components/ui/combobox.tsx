@@ -1,4 +1,3 @@
-"use client"
 import * as React from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -24,11 +23,11 @@ interface ComboboxProps {
   placeholder?: string;
   disabled?: boolean;
 }
+
 const ComboboxItem = ({ option, value, onSelect }: { option: { value: string; label: string }, value: string, onSelect: (currentValue: string) => void }) => {
   const colorClass = useCategoryColor(option.value);
   return (
     <CommandItem
-      key={option.value}
       value={option.value}
       onSelect={onSelect}
     >
@@ -43,6 +42,7 @@ const ComboboxItem = ({ option, value, onSelect }: { option: { value: string; la
     </CommandItem>
   );
 };
+
 export function Combobox({ options, value, onChange, placeholder = "Select an option...", disabled = false }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
   return (
@@ -73,8 +73,8 @@ export function Combobox({ options, value, onChange, placeholder = "Select an op
                   option={option}
                   value={value}
                   onSelect={(currentValue) => {
-                    onChange(currentValue === value ? "" : currentValue)
-                    setOpen(false)
+                    onChange(currentValue === value ? "" : currentValue);
+                    setOpen(false);
                   }}
                 />
               ))}
