@@ -11,17 +11,20 @@ interface ExternalGeminiConfig {
   modeloIa?: string;
   instruccionesIa?: string;
 }
+export interface ResolvedConfig {
+  apiKey: string;
+  model: string;
+  prompt: string;
+  source: 'External' | 'LocalStorage' | 'Default';
+}
 const DEFAULT_MODEL = "gemini-2.5-flash-image";
 const CONFIG_URL = "/config/gemini.json";
 /**
- * Resolves the configuration hierarchy for the Gemini AI.
- * Hierarchy priority (Highest to Lowest):
- * 1. External configuration file (public/config/gemini.json) - Managed by Server/Admin.
- * 2. Local browser settings (localStorage) - Configured in SettingsPage.
- * 3. Application hardcoded defaults.
+ * Resolves the configuration hierarchy for the Gemini AI and tracks the source.
  */
-async function resolveConfig(): Promise<{ apiKey: string; model: string; prompt: string }> {
+async function resolveConfig(): Promise<ResolvedConfig> {
   let externalConfig: ExternalGeminiConfig = {};
+  let source: ResolvedConfig['source'] = 'Default';
   try {
     const response = await fetch(CONFIG_URL);
     if (response.ok) {
@@ -30,11 +33,16 @@ async function resolveConfig(): Promise<{ apiKey: string; model: string; prompt:
   } catch (error) {
     console.warn("Could not fetch external Gemini config, falling back to local settings.");
   }
-  // Final resolution following the defined priority
+  // Determine Source Priority
+  if (externalConfig.claveApi) {
+    source = 'External';
+  } else if (localStorage.getItem('gemini_api_key')) {
+    source = 'LocalStorage';
+  }
   const apiKey = externalConfig.claveApi || localStorage.getItem('gemini_api_key') || '';
   const model = externalConfig.modeloIa || localStorage.getItem('gemini_model') || DEFAULT_MODEL;
   const prompt = externalConfig.instruccionesIa || localStorage.getItem('gemini_prompt') || '';
-  return { apiKey, model, prompt };
+  return { apiKey, model, prompt, source };
 }
 export const structuredPrompt = `
 Eres un experto en contabilidad. Analiza la imagen del recibo y extrae:
@@ -53,7 +61,7 @@ export async function analyzeReceipt(imageBase64: string, apiKeyOverride?: strin
   if (!effectiveApiKey) {
     throw new Error("No se encontró una Clave API configurada para Gemini AI.");
   }
-  // Dynamic category context retrieval for the prompt
+  // Dynamic category context retrieval
   let categoriesStr = "Comida, Transporte, Alquiler, Salario, Otro";
   try {
     const cats = await api<{ id: string; name: string }[]>('/api/finance/categories');
@@ -64,15 +72,15 @@ export async function analyzeReceipt(imageBase64: string, apiKeyOverride?: strin
     console.warn("Using fallback categories for AI context.");
   }
   // LOGGING FOR MAINTENANCE
+  console.log(`[AI SERVICE] Config Source: ${config.source}`);
   console.log(`[AI SERVICE] Resolved Model: ${config.model}`);
+  console.log(`[AI SERVICE] Using API Key (start): ${effectiveApiKey.substring(0, 5)}...`);
   console.log(`[AI SERVICE] Base Prompt: ${structuredPrompt}`);
   console.log(`[AI SERVICE] User Context: ${config.prompt}`);
   console.log(`[AI SERVICE] Valid Categories: ${categoriesStr}`);
   /**
-   * MOCK IMPLEMENTATION NOTE: 
-   * In a live production environment with full Gemini API access, 
-   * this block would utilize the @google/generative-ai library or a direct HTTPS fetch 
-   * to the Google AI Gateway. For stability in the current phase, we return a structured mock.
+   * MOCK IMPLEMENTATION NOTE:
+   * In production, this would call the actual Gemini API.
    */
   await new Promise(resolve => setTimeout(resolve, 2000));
   return {
@@ -86,7 +94,7 @@ export async function analyzeReceipt(imageBase64: string, apiKeyOverride?: strin
  * Basic structural validation for a Gemini API Key.
  */
 export async function validateApiKey(key: string): Promise<boolean> {
-  if (!key || key.length < 15) {
+  if (!key || key.length < 10) {
     toast.error('La clave API no tiene un formato válido.');
     return false;
   }
@@ -101,17 +109,20 @@ export async function testPrompt(key: string, model: string, prompt: string): Pr
   return {
     merchant: 'Prueba Exitosa de IA',
     amount: 99.99,
-    date: format(new Date(), 'yyyy-MM-dd'),
+    date: new Date().toISOString().split('T')[0],
     category: 'Otro'
   };
 }
 /**
- * Determines if AI features should be visible based on availability of an API key.
+ * Determines if AI features should be enabled based on configuration presence.
  */
 export async function isAiEnabled(): Promise<boolean> {
   const config = await resolveConfig();
-  return !!config.apiKey;
+  return !!config.apiKey && config.apiKey.length > 5;
 }
-function format(date: Date, pattern: string): string {
-  return date.toISOString().split('T')[0];
+/**
+ * Retrieves the currently resolved configuration (for UI visibility).
+ */
+export async function getActiveConfig(): Promise<ResolvedConfig> {
+  return await resolveConfig();
 }

@@ -1,13 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, easeOut } from 'framer-motion';
-import { BrainCircuit, Upload, Camera, Layers, Loader2, X } from 'lucide-react';
+import { BrainCircuit, Upload, Camera, Layers, Loader2, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/useAppStore';
-import { analyzeReceipt, isAiEnabled } from '@/lib/gemini-client';
+import { analyzeReceipt, getActiveConfig, type ResolvedConfig } from '@/lib/gemini-client';
 import { cn } from '@/lib/utils';
 import t from '@/lib/i18n';
 const containerVariants = {
@@ -29,7 +29,8 @@ export function IAPage() {
   const [firstShot, setFirstShot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showPlayOverlay, setShowPlayOverlay] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
+  const [aiConfig, setAiConfig] = useState<ResolvedConfig | null>(null);
+  const [configChecked, setConfigChecked] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -51,15 +52,13 @@ export function IAPage() {
     }
     setShowPlayOverlay(false);
   }, []);
-  // Ensure camera is stopped when component unmounts
   useEffect(() => {
-    return () => {
-      stopCamera();
-    };
+    getActiveConfig().then((config) => {
+      setAiConfig(config);
+      setConfigChecked(true);
+    });
+    return () => stopCamera();
   }, [stopCamera]);
-  useEffect(() => {
-    isAiEnabled().then(setHasApiKey);
-  }, []);
   const startStream = useCallback(async () => {
     try {
       const constraints = {
@@ -91,7 +90,7 @@ export function IAPage() {
         ts: result.date ? new Date(result.date).getTime() : Date.now(),
         attachmentDataUrl: base64Image,
       });
-      toast.success('Recibo analizado con ��xito.');
+      toast.success('Recibo analizado con éxito.');
     } catch (error: any) {
       console.error('AI Analysis error:', error);
       toast.error('Error al analizar la imagen.');
@@ -154,6 +153,7 @@ export function IAPage() {
       };
     };
   };
+  const isConfigValid = aiConfig && aiConfig.apiKey && aiConfig.apiKey.length > 5;
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -162,21 +162,42 @@ export function IAPage() {
           <h1 className="mt-4 text-4xl font-display font-bold tracking-tight">IA Moneyo</h1>
           <p className="mt-4 text-lg text-muted-foreground">Digitaliza tus recibos al instante.</p>
         </header>
-        {hasApiKey === false && (
+        {configChecked && !isConfigValid && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-12">
-            <Card className="border-destructive/30 bg-destructive/5">
-              <CardContent className="pt-6 text-center">
-                <p className="text-destructive font-medium">No se ha detectado una Clave API de Gemini válida.</p>
-                <p className="text-sm text-muted-foreground mt-1">Configure una clave en los ajustes de la aplicación o consulte con su administrador.</p>
+            <Card className="border-destructive/30 bg-destructive/5 shadow-sm">
+              <CardContent className="pt-6 flex flex-col items-center gap-2">
+                <AlertCircle className="size-6 text-destructive" />
+                <p className="text-destructive font-semibold text-center">Configuración de IA Incompleta</p>
+                <p className="text-sm text-muted-foreground text-center max-w-md">
+                  No se ha detectado una Clave API válida en {aiConfig?.source === 'External' ? 'el servidor' : 'los ajustes locales'}. 
+                  Asegúrate de configurar tu Clave API de Gemini para habilitar el escaneo.
+                </p>
               </CardContent>
             </Card>
           </motion.div>
         )}
+        {configChecked && isConfigValid && aiConfig?.source === 'External' && (
+          <div className="mb-8 flex justify-center">
+            <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+              <span className="mr-1.5 flex h-2 w-2 items-center justify-center">
+                <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+              </span>
+              IA Configurada Globalmente ({aiConfig.model})
+            </span>
+          </div>
+        )}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-orange-500" />
-            <p className="text-muted-foreground">Analizando con Gemini...</p>
-            <Skeleton className="h-64 w-full max-w-md" />
+          <div className="flex flex-col items-center justify-center space-y-6">
+            <div className="relative">
+              <Loader2 className="h-16 w-16 animate-spin text-orange-500" />
+              <BrainCircuit className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-6 text-orange-500" />
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-medium">Analizando recibo...</p>
+              <p className="text-sm text-muted-foreground">Esto puede tardar unos segundos con Gemini AI.</p>
+            </div>
+            <Skeleton className="h-64 w-full max-w-md rounded-xl" />
           </div>
         ) : (
           <motion.div
@@ -187,41 +208,45 @@ export function IAPage() {
           >
             <motion.div variants={itemVariants}>
               <Card
-                className={cn("h-full cursor-pointer transition-all", isDragging && "border-orange-500 ring-2 ring-orange-500")}
+                className={cn(
+                  "h-full cursor-pointer transition-all hover:shadow-lg hover:border-orange-200 dark:hover:border-orange-900/50", 
+                  isDragging && "border-orange-500 ring-2 ring-orange-500",
+                  !isConfigValid && "opacity-60 cursor-not-allowed"
+                )}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileSelect(e.dataTransfer.files[0]); }}
-                onClick={() => hasApiKey !== false && fileInputRef.current?.click()}
+                onClick={() => isConfigValid && fileInputRef.current?.click()}
               >
                 <CardHeader>
                   <Upload className="h-8 w-8 text-orange-500" />
-                  <CardTitle className={cn(hasApiKey === false && "opacity-50")}>Subir Foto</CardTitle>
+                  <CardTitle>Subir Foto</CardTitle>
                   <CardDescription>Sube o arrastra el archivo aquí.</CardDescription>
                 </CardHeader>
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e.target.files?.[0] || null)} />
               </Card>
             </motion.div>
             <motion.div variants={itemVariants}>
-              <Card className="h-full">
+              <Card className={cn("h-full transition-all hover:shadow-lg", !isConfigValid && "opacity-60")}>
                 <CardHeader>
                   <Camera className="h-8 w-8 text-orange-500" />
                   <CardTitle>Cámara</CardTitle>
                   <CardDescription>Captura el recibo ahora mismo.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" onClick={() => openCamera(false)} disabled={cameraLoading || hasApiKey === false}>Abrir Cámara</Button>
+                  <Button className="w-full h-11" onClick={() => openCamera(false)} disabled={cameraLoading || !isConfigValid}>Abrir Cámara</Button>
                 </CardContent>
               </Card>
             </motion.div>
             <motion.div variants={itemVariants}>
-              <Card className="h-full">
+              <Card className={cn("h-full transition-all hover:shadow-lg", !isConfigValid && "opacity-60")}>
                 <CardHeader>
                   <Layers className="h-8 w-8 text-orange-500" />
                   <CardTitle>Multicaptura</CardTitle>
                   <CardDescription>Para recibos largos o complejos.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" onClick={() => openCamera(true)} disabled={cameraLoading || hasApiKey === false}>Iniciar Doble Captura</Button>
+                  <Button className="w-full h-11" onClick={() => openCamera(true)} disabled={cameraLoading || !isConfigValid}>Doble Captura</Button>
                 </CardContent>
               </Card>
             </motion.div>
@@ -229,9 +254,10 @@ export function IAPage() {
         )}
       </div>
       <Sheet open={isCameraOpen} onOpenChange={(open) => { if (!open) { stopCamera(); setCameraOpen(false); } }}>
-        <SheetContent side="bottom" className="h-[90vh] p-0 overflow-hidden flex flex-col">
+        <SheetContent side="bottom" className="h-[90vh] p-0 overflow-hidden flex flex-col sm:max-w-full" aria-describedby="camera-sheet-desc">
           <SheetHeader className="p-4 border-b">
             <SheetTitle>{isMultiShot ? 'Captura por partes' : 'Capturar Recibo'}</SheetTitle>
+            <SheetDescription id="camera-sheet-desc">Alinea el recibo dentro del visor.</SheetDescription>
           </SheetHeader>
           <div className="flex-1 relative bg-black flex items-center justify-center">
             <video
@@ -247,7 +273,8 @@ export function IAPage() {
             {showPlayOverlay && (
               <Button variant="secondary" onClick={() => videoRef.current?.play()}>Play Vista Previa</Button>
             )}
-            {firstShot && <img src={firstShot} className="absolute top-4 left-4 w-20 border-2 border-white rounded shadow-lg opacity-80" />}
+            {firstShot && <img src={firstShot} className="absolute top-4 left-4 w-20 border-2 border-white rounded shadow-lg opacity-80" alt="Vista previa primer tiro" />}
+            {cameraLoading && <Loader2 className="absolute size-10 animate-spin text-white" />}
           </div>
           <div className="p-8 flex justify-center border-t bg-background">
             <Button size="lg" className="rounded-full w-20 h-20 shadow-xl" onClick={takePicture}>
