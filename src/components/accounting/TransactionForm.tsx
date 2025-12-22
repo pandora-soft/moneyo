@@ -9,12 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
-import { CalendarIcon, Loader2, UploadCloud, X, FileText } from 'lucide-react';
+import { CalendarIcon, Loader2, UploadCloud, X, FileText, Repeat } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Account, Transaction } from '@shared/types';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { api } from '@/lib/api-client';
 import { Combobox } from '@/components/ui/combobox';
@@ -45,7 +45,6 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   onFinished: () => void;
   defaultValues?: Partial<TransactionFormValues>;
 }) {
-  const refetchData = useAppStore(s => s.refetchData);
   const [categories, setCategories] = useState<{ value: string; label: string }[]>([]);
   const [frequencies, setFrequencies] = useState<Frequency[]>([]);
   useEffect(() => {
@@ -59,14 +58,15 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      amount: 0 as number,
+      amount: 0,
       type: 'expense',
       ts: new Date(),
+      recurrent: false,
       ...defaultValues,
     }
   });
-
   const type = form.watch('type');
+  const isRecurrent = form.watch('recurrent');
   const handleSubmit: SubmitHandler<TransactionFormValues> = async (values) => {
     const acc = accounts.find(a => a.id === values.accountId);
     const finalValues: Partial<Transaction> & { id?: string } = {
@@ -110,6 +110,34 @@ export function TransactionForm({ accounts, onSubmit, onFinished, defaultValues 
         <FormField control={form.control} name="ts" render={({ field }) => (
           <FormItem className="flex flex-col"><FormLabel>Fecha</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full text-left font-normal">{field.value ? format(field.value, "PPP", { locale: es }) : <span>Elegir fecha</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={d => d > new Date()} locale={es} initialFocus /></PopoverContent></Popover></FormItem>
         )} />
+        <FormField control={form.control} name="note" render={({ field }) => (
+          <FormItem><FormLabel>Nota</FormLabel><FormControl><Textarea placeholder="Ej: Cena con amigos..." {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+          <FormField control={form.control} name="recurrent" render={({ field }) => (
+            <FormItem className="flex items-center justify-between space-y-0">
+              <div className="flex items-center gap-2">
+                <Repeat className="size-4 text-orange-500" />
+                <FormLabel className="cursor-pointer">Transacción Recurrente</FormLabel>
+              </div>
+              <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+            </FormItem>
+          )} />
+          {isRecurrent && (
+            <FormField control={form.control} name="frequency" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Frecuencia</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Seleccione frecuencia" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {frequencies.map(f => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+          )}
+        </div>
         <FormField control={form.control} name="attachmentDataUrl" render={({ field }) => (
           <FormItem>
             <FormLabel>Adjunto</FormLabel>

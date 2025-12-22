@@ -76,6 +76,10 @@ const GlobalTransactionSheet = () => {
               ...modalInitialValues,
               ts: new Date(modalInitialValues.ts || Date.now()),
               accountToId: modalInitialValues.accountTo,
+              recurrent: !!modalInitialValues.recurrent,
+              frequency: modalInitialValues.frequency,
+              note: modalInitialValues.note,
+              attachmentDataUrl: modalInitialValues.attachmentDataUrl,
             } : {}}
           />
         )}

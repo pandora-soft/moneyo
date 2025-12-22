@@ -32,8 +32,6 @@ export class UserEntity extends IndexedEntity<User> {
       };
       await UserEntity.create(env, adminUser);
     }
-
-    // Refresh users list after potential admin creation
     const refreshedIdx = new Index<string>(env, this.indexName);
     const refreshedIds = await refreshedIdx.list();
     const refreshedUsers = await Promise.all(refreshedIds.map(id => new UserEntity(env, id).getState()));
@@ -188,17 +186,14 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const oldTx = transactions.find(t => t.id === id);
     if (!oldTx) throw new Error("Transaction not found");
     const newTx: Transaction = { ...oldTx, ...updates };
-    // Skip balance updates for templates
     if (!oldTx.recurrent && !newTx.recurrent) {
       const oldAmount = oldTx.type === 'income' ? Math.abs(oldTx.amount) : -Math.abs(oldTx.amount);
       const newAmount = newTx.type === 'income' ? Math.abs(newTx.amount) : -Math.abs(newTx.amount);
       const mutations: Promise<any>[] = [];
       if (oldTx.accountId !== newTx.accountId) {
-        // Account switched: Reverse old amount from old account, Apply new amount to new account
         mutations.push(new AccountEntity(this.env, oldTx.accountId).mutate(acc => ({ ...acc, balance: acc.balance - oldAmount })));
         mutations.push(new AccountEntity(this.env, newTx.accountId).mutate(acc => ({ ...acc, balance: acc.balance + newAmount })));
       } else if (oldAmount !== newAmount) {
-        // Same account, different amount
         const balanceChange = newAmount - oldAmount;
         mutations.push(new AccountEntity(this.env, oldTx.accountId).mutate(acc => ({ ...acc, balance: acc.balance + balanceChange })));
       }
@@ -217,7 +212,6 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
     const mutations: Promise<any>[] = [];
     const idsToRemove = [id];
     const processTxDelete = (tx: Transaction) => {
-      // Skip balance updates for templates (recurrent=true)
       if (!tx.recurrent) {
         const amountToReverse = tx.type === 'income' ? -Math.abs(tx.amount) : Math.abs(tx.amount);
         mutations.push(new AccountEntity(this.env, tx.accountId).mutate(acc => ({ ...acc, balance: acc.balance + amountToReverse })));
@@ -264,10 +258,11 @@ export class CurrencyEntity extends IndexedEntity<Currency> {
     static seedData = [
         { id: 'usd', code: 'USD', symbol: '$', suffix: false },
         { id: 'eur', code: 'EUR', symbol: '€', suffix: true },
+        { id: 'ars', code: 'ARS', symbol: '$', suffix: false },
     ];
 }
 export interface Session {
-  id: string; 
+  id: string;
   userId: string;
   expires: number;
 }

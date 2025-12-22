@@ -163,7 +163,8 @@ export function userRoutes(app: AppHono) {
   finance.put('/accounts/:id', async (c) => {
     const acc = new AccountEntity(c.env, c.req.param('id'));
     if (!await acc.exists()) return notFound(c);
-    return ok(c, await acc.mutate(s => ({ ...s, ...c.req.json() })));
+    const body = await c.req.json();
+    return ok(c, await acc.mutate(s => ({ ...s, ...body })));
   });
   finance.delete('/accounts/:id', async (c) => ok(c, { deleted: await AccountEntity.delete(c.env, c.req.param('id')) }));
   // Transactions
@@ -171,6 +172,11 @@ export function userRoutes(app: AppHono) {
     const q = c.req.query();
     const ledger = new LedgerEntity(c.env, 'main');
     return ok(c, await ledger.listTransactions(Number(q.limit) || 25, Number(q.cursor) || 0, { accountId: q.accountId, type: q.type, query: q.query, dateFrom: Number(q.dateFrom), dateTo: Number(q.dateTo) }));
+  });
+  finance.post('/transactions/generate', async (c) => {
+    const ledger = new LedgerEntity(c.env, 'main');
+    const generated = await ledger.generateRecurrents();
+    return ok(c, generated);
   });
   finance.post('/transactions', async (c) => {
     const body = await c.req.json<Transaction>();
@@ -203,7 +209,8 @@ export function userRoutes(app: AppHono) {
   finance.put('/budgets/:id', async (c) => {
     const b = new BudgetEntity(c.env, c.req.param('id'));
     if (!await b.exists()) return notFound(c);
-    return ok(c, await b.mutate(s => ({ ...s, ...c.req.json() })));
+    const body = await c.req.json();
+    return ok(c, await b.mutate(s => ({ ...s, ...body })));
   });
   finance.delete('/budgets/:id', async (c) => ok(c, { deleted: await BudgetEntity.delete(c.env, c.req.param('id')) }));
   // Settings
