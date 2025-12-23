@@ -8,7 +8,6 @@ export function formatCurrency(value: number, currencyCode?: string): string {
   const effectiveCurrencyCode = currencyCode || state.currency || 'EUR';
   const currencyInfo = state.currencies[effectiveCurrencyCode] || { symbol: '€', suffix: true };
   const { symbol, suffix } = currencyInfo;
-  // Use es-ES style for EUR as a convention if requested or if it's the default
   const locale = effectiveCurrencyCode === 'EUR' ? 'es-ES' : 'en-US';
   const formatter = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
@@ -17,10 +16,8 @@ export function formatCurrency(value: number, currencyCode?: string): string {
   const formattedValue = formatter.format(Math.abs(value));
   const sign = value < 0 ? '-' : '';
   if (suffix) {
-    // Standard European style: 1.000,00 €
     return `${sign}${formattedValue} ${symbol}`;
   }
-  // Standard Anglo style: $1,000.00
   return `${sign}${symbol}${formattedValue}`;
 }
 /**
@@ -31,8 +28,6 @@ export function useFormatCurrency() {
   const currencies = useAppStore(s => s.currencies);
   const format = useCallback(
     (value: number, overrideCurrencyCode?: string) => {
-      // By using values from the store, this callback is refreshed whenever 
-      // the currency configuration changes globally.
       const effectiveCode = overrideCurrencyCode || currencyCode || 'EUR';
       const info = currencies[effectiveCode] || { symbol: '€', suffix: true };
       const { symbol, suffix } = info;

@@ -48,7 +48,7 @@ export const useAppStore = create<AppState>()(
         }, {} as CurrencyMap);
         set({ currencies: currencyMap });
       },
-      // Refetch trigger
+      // Refetch trigger for synchronization
       refetchData: 0,
       triggerRefetch: () => set(state => ({ refetchData: state.refetchData + 1 })),
     }),

@@ -1,7 +1,7 @@
 import { IndexedEntity, Entity, Env, Index } from "./core-utils";
-import { Account, Transaction, Budget, Settings, Currency, User, TransactionType } from "@shared/types";
+import { Account, Transaction, Budget, Settings, Currency, User } from "@shared/types";
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@shared/mock-data";
-import { addDays, addMonths, addWeeks, isBefore, startOfToday, isWithinInterval } from 'date-fns';
+import { addMonths, addWeeks, isBefore, startOfToday } from 'date-fns';
 export async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -19,16 +19,14 @@ export class UserEntity extends IndexedEntity<User> {
   static async ensureSeed(env: Env): Promise<void> {
     const idx = new Index<string>(env, this.indexName);
     const ids = await idx.list();
-    const users = await Promise.all(ids.map(id => new UserEntity(env, id).getState()));
-    const hasAdmin = users.some(u => u.username.toLowerCase() === 'admin');
-    if (!hasAdmin) {
+    if (ids.length === 0) {
       const adminPasswordHash = await hashPassword('admin');
       const adminUser: User = {
         id: crypto.randomUUID(),
         username: 'admin',
         passwordHash: adminPasswordHash,
         role: 'admin',
-        email: 'admin@example.com'
+        email: 'admin@moneyo.com'
       };
       await UserEntity.create(env, adminUser);
     }
@@ -100,6 +98,7 @@ export class LedgerEntity extends IndexedEntity<LedgerState> {
       if (filters.type && filters.type !== 'all' && tx.type !== filters.type) return false;
       if (filters.dateFrom && tx.ts < filters.dateFrom) return false;
       if (filters.dateTo && tx.ts > filters.dateTo) return false;
+      if (filters.query && !tx.category?.toLowerCase().includes(filters.query.toLowerCase()) && !tx.note?.toLowerCase().includes(filters.query.toLowerCase())) return false;
       return true;
     });
     const totalCount = filtered.length;
