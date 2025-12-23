@@ -17,19 +17,19 @@ export class UserEntity extends IndexedEntity<User> {
   static readonly initialState: User = { id: "", username: "", passwordHash: "", role: 'user' };
   static seedData = [];
   static async ensureSeed(env: Env): Promise<void> {
-    const idx = new Index<string>(env, this.indexName);
-    const ids = await idx.list();
-    if (ids.length === 0) {
-      const adminPasswordHash = await hashPassword('admin');
-      const adminUser: User = {
-        id: crypto.randomUUID(),
-        username: 'admin',
-        passwordHash: adminPasswordHash,
-        role: 'admin',
-        email: 'admin@moneyo.com'
-      };
-      await UserEntity.create(env, adminUser);
+    const adminId = 'admin-user';
+    if (await new UserEntity(env, adminId).exists()) {
+      return;
     }
+    const adminPasswordHash = await hashPassword('admin');
+    const adminUser: User = {
+      id: adminId,
+      username: 'admin',
+      passwordHash: adminPasswordHash,
+      role: 'admin',
+      email: 'admin@moneyo.com'
+    };
+    await UserEntity.create(env, adminUser);
   }
 }
 export class AccountEntity extends IndexedEntity<Account> {

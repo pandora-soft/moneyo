@@ -53,7 +53,7 @@ export function userRoutes(app: AppHono) {
     await next();
   };
   const adminGuard = async (c: Context<{ Bindings: Env, Variables: { user?: User } }>, next: () => Promise<void>) => {
-    const user = c.get('user');
+    const user: User | undefined = c.get('user');
     if (!user || user.role !== 'admin') return bad(c, 'Forbidden: Admin access required');
     await next();
   };
@@ -72,7 +72,7 @@ export function userRoutes(app: AppHono) {
     return ok(c, { token, user: safeUser });
   });
   auth.get('/verify', authGuard, (c) => {
-    const user = c.get('user') as User;
+    const user = c.get('user')! as User;
     const { passwordHash, ...safeUser } = user;
     return ok(c, { user: safeUser });
   });
