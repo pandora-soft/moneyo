@@ -81,7 +81,12 @@ function runSetupCommands() {
     "bun add jspdf@2.5.1 --save",
     "bun add jspdf-autotable --save",
     "bun install @google/generative-ai",
-    "bun add @google/generative-ai"
+    "bun add @google/generative-ai",
+    "bun install date-fns@4.1.0",
+    "bun install framer-motion@12.23.0",
+    "bun install recharts@2.15.4",
+    "bun install sonner@2.0.6",
+    "bun install zustand@5.0.6"
 ];
     
     if (commands.length === 0) {
