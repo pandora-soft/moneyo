@@ -1,40 +1,88 @@
-# Moneyo — Contabilidad doméstica bonita y segura 💰
-**Moneyo** es una aplicación de finanzas personales minimalista, rápida y segura, diseñada para funcionar en el ecosistema de **Cloudflare Workers** con persistencia en **Durable Objects**. Permite gestionar cuentas, transacciones, presupuestos e incluso digitalizar recibos mediante Inteligencia Artificial (Gemini).
-## 🚀 Guía: Actualizar desde GitHub
-Si has desplegado Moneyo y quieres mantener tu instancia actualizada con las últimas mejoras del repositorio original, sigue estos pasos:
-### 1. Exportar a GitHub
-Desde el entorno de previsualización o desarrollo donde estés visualizando este proyecto, utiliza el botón de **Export to GitHub** (ubicado habitualmente en la esquina superior derecha). Esto creará un repositorio en tu cuenta con todo el código fuente.
-### 2. Crear un Fork
-Si ya tienes el repositorio en tu cuenta de GitHub pero quieres trabajar de forma organizada, asegúrate de tener un **Fork** personal. Esto te permitirá recibir actualizaciones del "upstream" (el repositorio original) sin perder tus cambios locales.
-### 3. Sincronizar Cambios (Upstream Sync)
-Para traer las nuevas funcionalidades o correcciones del autor original a tu copia:
-1. Configura el repositorio original como remoto: `git remote add upstream [URL_DEL_REPO_ORIGINAL]`
-2. Trae los cambios: `git fetch upstream`
-3. Fusiona los cambios en tu rama principal: `git merge upstream/main`
-### 4. Editar Archivos
-Puedes realizar cambios rápidos directamente en la interfaz de GitHub (botón `.` o editar archivo) o clonar el repo en tu máquina local. Los archivos más importantes para configurar son:
-- `wrangler.jsonc`: Configuración de despliegue en Cloudflare.
-- `package.json`: Versiones de dependencias y scripts de construcción.
-- `public/config/gemini.json`: Configuración global de la IA.
-### 5. Desplegar en Cloudflare Workers
-Moneyo está optimizado para Cloudflare. Una vez que tengas tu código listo en tu fork o local:
-1. Instala las dependencias: `bun install`
-2. Construye la aplicación: `bun run build` (ejecuta `vite build`)
-3. Despliega en tu cuenta de Cloudflare: `bun run deploy` (ejecuta `wrangler deploy`)
+# 💰 Moneyo — Finanzas Personales con IA
+Moneyo es una aplicación de contabilidad doméstica moderna, minimalista y segura. Diseñada para ofrecer una experiencia visual excepcional mientras mantiene un control riguroso de tus cuentas, transacciones y presupuestos, todo potenciado por inteligencia artificial para la digitalización de recibos.
+## ✨ Características Principales
+-   **Dashboard Visual**: Resumen detallado de balance total, ingresos y gastos con gráficos interactivos.
+-   **Gestión de Cuentas**: Control de efectivo, cuentas bancarias y tarjetas de crédito.
+-   **IA Moneyo**: Digitalización de tickets y facturas mediante Gemini AI (Google).
+-   **Presupuestos Inteligentes**: Control de límites de gasto mensual por categorías.
+-   **Transacciones Recurrentes**: Automatización de movimientos fijos (alquiler, suscripciones, etc.).
+-   **Reportes Avanzados**: Exportación de datos a CSV y generación de informes financieros en PDF.
+-   **Multi-idioma y Multi-moneda**: Soporte completo para diferentes divisas y localización.
+-   **Seguridad y Privacidad**: Ejecución sobre Cloudflare Workers con persistencia en Durable Objects.
 ---
-## 🛠️ Tecnologías Principales
-- **Frontend**: React 18, TypeScript, Tailwind CSS, Shadcn UI, Framer Motion.
-- **Backend**: Hono (ejecutándose en Cloudflare Workers).
-- **Almacenamiento**: Cloudflare Durable Objects (vía `core-utils.ts`).
-- **IA**: Google Gemini AI para análisis de recibos.
-- **Gráficos**: Recharts.
-## 📦 Scripts Disponibles
-- `bun run dev`: Inicia el servidor de desarrollo local (Vite).
-- `bun run build`: Compila el frontend para producción.
-- `bun run deploy`: Construye el proyecto y lo publica en Cloudflare Workers.
-- `bun run lint`: Ejecuta el análisis estático de código.
+## 📱 Instalación Local
+Sigue estos pasos para ejecutar tu propia instancia de Moneyo en tu ordenador para desarrollo o uso personal.
+### 1. Prerrequisitos
+Asegúrate de tener instalado lo siguiente:
+-   **Node.js** (v18 o superior).
+-   **Bun** (Recomendado): Instalador rápido de paquetes. `powershell -c "irm bun.sh/install.ps1 | iex"` (Windows) o `curl -fsSL https://bun.sh/install | bash` (macOS/Linux).
+-   **Wrangler CLI**: La herramienta de Cloudflare para ejecutar Workers.
+    ```bash
+    npm install -g wrangler
+    ```
+### 2. Clonar el Proyecto
+Clona tu fork o el repositorio original:
+```bash
+git clone https://github.com/TU_USUARIO/moneyo.git
+cd moneyo
+```
+### 3. Instalación de Dependencias
+Usa Bun para instalar todos los paquetes necesarios de forma rápida:
+```bash
+bun install
+```
+### 4. Configuración de IA (Opcional)
+Si deseas usar la función de escaneo de recibos, edita el archivo `public/config/gemini.json` con tu propia API Key de Google Gemini:
+```json
+{
+  "claveApi": "TU_API_KEY_AQUÍ",
+  "modeloIa": "gemini-1.5-flash",
+  "instruccionesIa": "extrae los datos del ticket"
+}
+```
+### 5. Ejecución en Desarrollo
+Inicia el servidor local simulando el entorno de Cloudflare:
+```bash
+wrangler dev
+```
+### 6. Acceso
+Una vez iniciado, abre tu navegador en:
+**[http://localhost:3000](http://localhost:3000)**
 ---
-## 🔒 Seguridad y Privacidad
-Moneyo no almacena tus datos en servidores de terceros. Todo reside en **tu propia infraestructura de Cloudflare**, dándote control total sobre tu información financiera.
+## 🔄 Actualización y Mantenimiento
+Para mantener tu instancia de Moneyo al día con las últimas mejoras del repositorio original, sigue este flujo:
+1.  **Vincular el repositorio original** (solo la primera vez):
+    ```bash
+    git remote add upstream https://github.com/chdeimos/moneyo.git
+    ```
+2.  **Sincronizar cambios**:
+    ```bash
+    git pull upstream main
+    bun install
+    wrangler dev
+    ```
 ---
-*Desarrollado con ❤️ para una gestión financiera más inteligente.*
+## 💾 Base de Datos Local (Durable Objects)
+Moneyo utiliza **Cloudflare Durable Objects** para el almacenamiento. En el entorno local, los datos se guardan en una carpeta oculta:
+-   **Ubicación**: `.wrangler/state/v3/durable_objects`
+-   **Resetear Datos**: Si deseas borrar toda la información local y empezar de cero (limpiar la base de datos), simplemente cierra el proceso de `wrangler dev` y elimina la carpeta `.wrangler`:
+    ```bash
+    rm -rf .wrangler
+    ```
+---
+## 🚀 Despliegue en Producción
+Para publicar tu aplicación en tu propia cuenta de Cloudflare de forma gratuita:
+1.  Inicia sesión en Cloudflare: `wrangler login`.
+2.  Despliega la aplicación:
+    ```bash
+    bun run deploy
+    ```
+---
+## 🛠️ Tecnologías Utilizadas
+-   **Frontend**: React 18, TypeScript, Tailwind CSS, Shadcn UI, Framer Motion.
+-   **Backend**: Hono (Worker), Cloudflare Durable Objects.
+-   **IA**: Google Gemini API.
+-   **Gráficos**: Recharts.
+-   **PDF**: jsPDF.
+---
+Desarrollado con ❤️ por **chdeimos** (2025).
