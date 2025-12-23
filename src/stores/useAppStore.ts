@@ -55,10 +55,10 @@ export const useAppStore = create<AppState>()(
     {
       name: 'moneyo-app-storage',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ 
-        currency: state.currency, 
-        settings: state.settings, 
-        currencies: state.currencies 
+      partialize: (state) => ({
+        currency: state.currency,
+        settings: state.settings,
+        currencies: state.currencies
       }),
     }
   )

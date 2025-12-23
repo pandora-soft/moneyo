@@ -6,7 +6,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import type { Account, AccountType, Currency } from '@shared/types';
+import type { Account, Currency } from '@shared/types';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api-client';
 import t from '@/lib/i18n';
