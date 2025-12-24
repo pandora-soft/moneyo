@@ -86,7 +86,8 @@ function runSetupCommands() {
     "bun install framer-motion@12.23.0",
     "bun install recharts@2.15.4",
     "bun install sonner@2.0.6",
-    "bun install zustand@5.0.6"
+    "bun install zustand@5.0.6",
+    "bun add -d @vitejs/plugin-react@latest"
 ];
     
     if (commands.length === 0) {
