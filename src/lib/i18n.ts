@@ -118,7 +118,7 @@ const translations = {
     month: 'Mes',
     progress: 'Progreso',
     save: 'Guardar Presupuesto',
-    spendingLimit: 'L��mite de Gasto',
+    spendingLimit: 'Límite de Gasto',
     overview: 'Resumen de Presupuestos',
     overviewDesc: 'Límites activos este mes.',
     viewAll: 'Ver todos',
@@ -195,7 +195,7 @@ const translations = {
   form: {
     required: 'Campo obligatorio.',
     minChars: (n: number) => `Mín. ${n} caracteres.`,
-    maxChars: (n: number) => `M��x. ${n} caracteres.`,
+    maxChars: (n: number) => `Máx. ${n} caracteres.`,
     positive: 'Debe ser mayor a 0.',
     email: 'Email no válido.',
     requiredAccount: 'Cuenta requerida.',
